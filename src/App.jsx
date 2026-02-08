@@ -478,7 +478,7 @@ function AttendanceView({ members, reports, onEdit }) {
             </div>
             {selectedMemberId && (
               <div className="flex items-center justify-between bg-gradient-to-r from-emerald-600 to-emerald-500 p-5 rounded-2xl text-white shadow-lg shadow-emerald-200">
-                <span className="text-sm font-bold opacity-80">想定給与</span>
+                <span className="text-sm font-bold opacity-80">給与</span>
                 <span className="text-3xl font-black">¥{totalSalary.toLocaleString()}</span>
               </div>
             )}
