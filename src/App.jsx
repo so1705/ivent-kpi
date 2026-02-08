@@ -749,38 +749,38 @@ function Settings({ events, currentEventId, onAddEvent, onUpdateGoals, members, 
     <div className="space-y-8 md:grid md:grid-cols-2 md:gap-8 md:space-y-0 pb-20 no-print">
       <div className="md:col-span-2 flex items-center gap-2">
         <button onClick={onClose} className="p-3 bg-white rounded-full shadow-sm hover:bg-gray-50 transition-colors"><Icon p={I.X}/></button>
-        <h2 className="font-bold text-2xl text-gray-900">Settings</h2>
+        <h2 className="font-bold text-2xl text-gray-900">設定</h2>
       </div>
 
       <div className="space-y-6">
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-6">
-          <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2"><Icon p={I.Calendar} size={20}/> New Event</h3>
+          <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2"><Icon p={I.Calendar} size={20}/> 新しいイベントを作成</h3>
           <div className="space-y-3">
-            <input className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100" placeholder="Event Name" value={newEventName} onChange={e=>setNewEventName(e.target.value)} />
-            <input className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100" placeholder="Date (e.g. 2026-06-30)" value={newEventDate} onChange={e=>setNewEventDate(e.target.value)} />
+            <input className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100" placeholder="イベント名" value={newEventName} onChange={e=>setNewEventName(e.target.value)} />
+            <input className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100" placeholder="日付 (例: 2026-06-30)" value={newEventDate} onChange={e=>setNewEventDate(e.target.value)} />
           </div>
           <button 
             onClick={() => { if(newEventName){ onAddEvent(newEventName, newEventDate); setNewEventName(""); setNewEventDate(""); }}} 
             className="w-full bg-gray-900 text-white py-4 rounded-2xl font-bold text-sm shadow-lg shadow-gray-200 hover:bg-black transition-all"
           >
-            Create Event
+            イベントを追加
           </button>
         </div>
 
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-6">
-          <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2"><Icon p={I.Users} size={20}/> Team Members</h3>
+          <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2"><Icon p={I.Users} size={20}/> メンバー設定</h3>
           <div className="flex gap-2">
-            <input className="flex-1 p-4 bg-gray-50 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100" placeholder="Name" value={newMem} onChange={e=>setNewMem(e.target.value)} />
+            <input className="flex-1 p-4 bg-gray-50 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100" placeholder="名前" value={newMem} onChange={e=>setNewMem(e.target.value)} />
             <select 
               className="p-4 bg-gray-50 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-100 cursor-pointer"
               value={newRole}
               onChange={e => setNewRole(e.target.value)}
             >
-              <option value="apo">Apo</option>
-              <option value="closer">Closer</option>
+              <option value="apo">アポインター</option>
+              <option value="closer">クローザー</option>
             </select>
           </div>
-          <button onClick={()=>{if(newMem){onAddMember(newMem, newRole);setNewMem("")}}} className="w-full bg-indigo-50 text-indigo-600 py-3 rounded-2xl font-bold hover:bg-indigo-100 transition-colors">Add Member</button>
+          <button onClick={()=>{if(newMem){onAddMember(newMem, newRole);setNewMem("")}}} className="w-full bg-indigo-50 text-indigo-600 py-3 rounded-2xl font-bold hover:bg-indigo-100 transition-colors">メンバーを追加</button>
           
           <div className="space-y-2 mt-4 max-h-60 overflow-y-auto pr-2">
             {members.map(m => (
@@ -801,15 +801,15 @@ function Settings({ events, currentEventId, onAddEvent, onUpdateGoals, members, 
       <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-6 h-fit">
         <div className="flex justify-between items-center">
           <div>
-            <h3 className="font-bold text-lg text-gray-900">Target Goals</h3>
+            <h3 className="font-bold text-lg text-gray-900">目標設定</h3>
             <p className="text-xs text-gray-400 font-bold">{cur.name}</p>
           </div>
-          <button onClick={saveGoals} className="bg-emerald-500 text-white px-6 py-2 rounded-xl text-xs font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-600 transition-all">Save Changes</button>
+          <button onClick={saveGoals} className="bg-emerald-500 text-white px-6 py-2 rounded-xl text-xs font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-600 transition-all">保存</button>
         </div>
         
         <div className="space-y-6">
           <div className="p-5 bg-amber-50 rounded-[2rem] border border-amber-100 space-y-3">
-            <div className="text-xs font-extrabold text-amber-800 uppercase tracking-widest mb-2 flex items-center gap-2"><Icon p={I.Trophy} size={14}/> Total Goals</div>
+            <div className="text-xs font-extrabold text-amber-800 uppercase tracking-widest mb-2 flex items-center gap-2"><Icon p={I.Trophy} size={14}/> 最終目標</div>
             <GoalRow label="商談成約" val={goals.total?.deals} set={v=>updateGoalVal('total','deals',v)} />
             <GoalRow label="商談数(実施)" val={goals.total?.meetings} set={v=>updateGoalVal('total','meetings',v)} />
             <GoalRow label="見込(CL)" val={goals.total?.prospects} set={v=>updateGoalVal('total','prospects',v)} />
@@ -821,7 +821,7 @@ function Settings({ events, currentEventId, onAddEvent, onUpdateGoals, members, 
           </div>
 
           <div className="p-5 bg-indigo-50 rounded-[2rem] border border-indigo-100 space-y-3">
-            <div className="text-xs font-extrabold text-indigo-800 uppercase tracking-widest mb-2 flex items-center gap-2"><Icon p={I.Calendar} size={14}/> Weekly Goals</div>
+            <div className="text-xs font-extrabold text-indigo-800 uppercase tracking-widest mb-2 flex items-center gap-2"><Icon p={I.Calendar} size={14}/> 週間目標</div>
             <GoalRow label="商談成約" val={goals.weekly?.deals} set={v=>updateGoalVal('weekly','deals',v)} />
             <GoalRow label="商談数(実施)" val={goals.weekly?.meetings} set={v=>updateGoalVal('weekly','meetings',v)} />
             <GoalRow label="見込(CL)" val={goals.weekly?.prospects} set={v=>updateGoalVal('weekly','prospects',v)} />
