@@ -535,7 +535,7 @@ const ShiftView = ({ members, shifts, onDeleteShift, onAddShift }) => {
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-3">
               <div className="p-2 bg-pink-50 text-pink-500 rounded-xl"><Icon p={I.Calendar} size={20}/></div>
-              Shift
+              シフト
             </h2>
             <div className="flex bg-gray-100 p-1 rounded-xl">
               <button onClick={()=>setViewMode('month')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='month' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-400'}`}>月</button>
