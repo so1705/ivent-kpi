@@ -436,35 +436,35 @@ function AttendanceView({ members, reports, onEdit }) {
             稼働管理
           </h2>
           <button onClick={handlePrint} className="flex items-center gap-2 text-sm font-bold text-white bg-gray-900 px-5 py-2.5 rounded-xl hover:bg-gray-800 shadow-lg shadow-gray-200 transition-all active:scale-95">
-            <Icon p={I.Download} size={16}/> PDF Export
+            <Icon p={I.Download} size={16}/> PDFを作成
           </button>
         </div>
 
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Month</label>
-              <input type="month" className="w-full bg-gray-50 p-3 rounded-xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} />
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">日付</label>
+              <input type="" className="w-full bg-gray-50 p-3 rounded-xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Member</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">メンバー</label>
               <select className="w-full bg-gray-50 p-3 rounded-xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all" value={selectedMemberId} onChange={e => setSelectedMemberId(e.target.value)}>
-                <option value="">All Members</option>
+                <option value="">メンバー全員</option>
                 {apoMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
             </div>
           </div>
           <div className="flex items-center justify-between bg-gradient-to-r from-gray-900 to-gray-800 p-5 rounded-2xl text-white shadow-lg shadow-gray-200">
-            <span className="text-sm font-bold opacity-80">Total Hours</span>
+            <span className="text-sm font-bold opacity-80">合計時間</span>
             <span className="text-3xl font-black">{totalHours}<span className="text-sm font-medium ml-1 opacity-60">h</span></span>
           </div>
         </div>
 
         <div className="space-y-3 pb-20">
           <div className="text-[10px] font-bold text-gray-400 px-4 flex justify-between uppercase tracking-wider">
-            <span>Date</span>
-            <span className="flex-1 text-center pl-8">Time Range</span>
-            <span>Total</span>
+            <span>日付</span>
+            <span className="flex-1 text-center pl-8">時間帯</span>
+            <span>合計時間</span>
           </div>
           {filteredReports.map(r => (
             <div 
@@ -1082,7 +1082,7 @@ function App() {
         {/* Header */}
         <header className="bg-white/90 backdrop-blur sticky top-0 z-20 px-4 py-3 border-b border-slate-100 flex justify-between items-center md:rounded-b-2xl md:mx-4 md:mt-2 md:shadow-sm no-print">
           <div className="flex flex-col">
-            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Current Event</div>
+            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">現在のイベント</div>
             <div className="relative group">
               <select 
                 className="appearance-none bg-transparent font-black text-lg text-indigo-900 pr-6 outline-none cursor-pointer"
