@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { 
@@ -9,7 +9,7 @@ import {
 // ==========================================
 // 1. System Initialization
 // ==========================================
-const appId = 'tele-apo-manager-v21-final-fixed';
+const appId = 'tele-apo-manager-v26-stable-fixed';
 
 // ★あなたのFirebase設定値
 const firebaseConfig = {
@@ -67,7 +67,7 @@ const isSameWeek = (dateObj) => {
 };
 
 // ==========================================
-// 2. Icon Definitions
+// 2. Icon Component
 // ==========================================
 function Icon({ p, size=24, color="currentColor", className="" }) {
   return (
@@ -250,7 +250,6 @@ function GoalSection({ title, subTitle, data, goals, variant }) {
             <div className="w-1.5 h-1.5 rounded-full bg-purple-400"></div>
             <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Closer</span>
           </div>
-          <MetricBar label="商談成約" val={data.deals} tgt={goals.deals} color="bg-amber-600" />
           <MetricBar label="商談数 (実施)" val={data.meetings} tgt={goals.meetings} color="bg-purple-600" />
           <MetricBar label="商談見込み" val={data.dealProspects} tgt={goals.prospects} color="bg-amber-500" />
           <MetricBar label="失注数" val={data.lost} tgt={goals.lost} color="bg-rose-400" />
@@ -261,7 +260,7 @@ function GoalSection({ title, subTitle, data, goals, variant }) {
 }
 
 // ==========================================
-// 5. Views
+// 5. Views Components
 // ==========================================
 
 function Dashboard({ event, totals, memberStats }) {
@@ -372,10 +371,10 @@ function AttendanceView({ members, reports }) {
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-3">
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Icon p={I.Clock} size={20}/></div>
-            稼働管理
+            Attendance
           </h2>
           <button onClick={handlePrint} className="flex items-center gap-2 text-sm font-bold text-white bg-gray-900 px-5 py-2.5 rounded-xl hover:bg-gray-800 shadow-lg shadow-gray-200 transition-all active:scale-95">
-            <Icon p={I.Download} size={16}/> 月報PDF出力
+            <Icon p={I.Download} size={16}/> PDF Export
           </button>
         </div>
 
@@ -427,8 +426,8 @@ function AttendanceView({ members, reports }) {
         </div>
       </div>
 
-      {/* Print Template - Premium Layout */}
-      <div className="print-wrapper" style={{ display: 'none' }}>
+      {/* Print Template (Hidden on screen, Visible on print) */}
+      <div className="print-only" style={{ display: 'none' }}>
         <div className="max-w-4xl mx-auto font-sans text-gray-900">
           <div className="flex justify-between items-end border-b-2 border-gray-900 pb-6 mb-10">
             <div>
@@ -443,7 +442,7 @@ function AttendanceView({ members, reports }) {
 
           <div className="space-y-12">
             {printData.map((pd, i) => (
-              <div key={i} style={{ pageBreakInside: 'avoid' }}>
+              <div key={i} style={{ pageBreakInside: 'avoid', marginBottom: '40px' }}>
                 <div className="flex justify-between items-center mb-4 bg-gray-100 p-4 rounded-lg">
                   <h3 className="text-2xl font-bold">{pd.name} <span className="text-sm font-normal text-gray-500 ml-2">様</span></h3>
                   <div className="text-right">
@@ -523,7 +522,7 @@ function InputModal({ members, onAdd, onClose }) {
       <div className="w-full h-full md:max-w-md md:h-auto md:max-h-[90vh] md:bg-white md:rounded-[2rem] md:shadow-2xl md:border md:border-gray-100 flex flex-col overflow-hidden">
         <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-white/50 backdrop-blur-md sticky top-0 z-10">
           <button onClick={onClose} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500 transition-colors"><Icon p={I.X}/></button>
-          <h2 className="font-bold text-lg text-gray-800">New Report</h2>
+          <h2 className="font-bold text-lg text-gray-800">稼働報告</h2>
           <div className="w-10"/>
         </div>
         
@@ -575,9 +574,9 @@ function InputModal({ members, onAdd, onClose }) {
 
                   <div className="grid grid-cols-2 gap-4">
                     <InputItem label="架電数" icon={I.Phone} val={val.calls} set={v=>setVal({...val, calls:v})} />
-                    <InputItem label="アポ数" icon={I.Check} val={val.appts} set={v=>setVal({...val, appts:v})} />
+                    <InputItem label="アポ数" icon={I.Check} val={val.appts} set={v=>setVal({...val, appts:v})} color="text-emerald-600" />
                     <InputItem label="資料請求" icon={I.FileText} val={val.requests} set={v=>setVal({...val, requests:v})} />
-                    <InputItem label="見込み" icon={I.Help} val={val.prospects} set={v=>setVal({...val, prospects:v})} />
+                    <InputItem label="見込み" icon={I.Help} val={val.prospects} set={v=>setVal({...val, prospects:v})} color="text-blue-500" />
                   </div>
                 </>
               ) : (
@@ -587,11 +586,11 @@ function InputModal({ members, onAdd, onClose }) {
                   </div>
                   <div className="bg-amber-50 p-6 rounded-3xl border border-amber-100 shadow-sm">
                     <div className="flex items-center justify-center gap-2 mb-2 text-amber-800 font-bold text-xs uppercase tracking-widest"><Icon p={I.Briefcase} size={16}/> Deals Won</div>
-                    <input type="number" className="w-full bg-white p-4 rounded-2xl text-4xl font-black text-center text-gray-800 outline-none shadow-sm focus:ring-4 focus:ring-amber-200 transition-all" placeholder="0" value={val.deals} onChange={e=>setVal({...val, deals: e.target.value})} />
+                    <input type="number" className="w-full bg-white p-4 rounded-2xl text-4xl font-black text-center text-gray-900 outline-none shadow-sm focus:ring-4 focus:ring-amber-200 transition-all" placeholder="0" value={val.deals} onChange={e=>setVal({...val, deals: e.target.value})} />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <InputItem label="見込み" icon={I.Help} val={val.prospects} set={v=>setVal({...val, prospects:v})} />
-                    <InputItem label="失注" icon={I.Ban} val={val.lost} set={v=>setVal({...val, lost:v})} />
+                    <InputItem label="見込み" icon={I.Help} val={val.prospects} set={v=>setVal({...val, prospects:v})} color="text-blue-500" />
+                    <InputItem label="失注" icon={I.Ban} val={val.lost} set={v=>setVal({...val, lost:v})} color="text-rose-500" />
                   </div>
                 </>
               )}
@@ -633,12 +632,12 @@ function Settings({ events, currentEventId, onAddEvent, onUpdateGoals, members, 
     <div className="space-y-8 md:grid md:grid-cols-2 md:gap-8 md:space-y-0 pb-20 no-print">
       <div className="md:col-span-2 flex items-center gap-2">
         <button onClick={onClose} className="p-3 bg-white rounded-full shadow-sm hover:bg-gray-50 transition-colors"><Icon p={I.X}/></button>
-        <h2 className="font-bold text-2xl text-gray-800">Settings</h2>
+        <h2 className="font-bold text-2xl text-gray-900">Settings</h2>
       </div>
 
       <div className="space-y-6">
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-6">
-          <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2"><Icon p={I.Calendar} size={20}/> New Event</h3>
+          <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2"><Icon p={I.Calendar} size={20}/> New Event</h3>
           <div className="space-y-3">
             <input className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100" placeholder="Event Name" value={newEventName} onChange={e=>setNewEventName(e.target.value)} />
             <input className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100" placeholder="Date (e.g. 2026-06-30)" value={newEventDate} onChange={e=>setNewEventDate(e.target.value)} />
@@ -652,7 +651,7 @@ function Settings({ events, currentEventId, onAddEvent, onUpdateGoals, members, 
         </div>
 
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-6">
-          <h3 className="font-bold text-lg text-gray-800 flex items-center gap-2"><Icon p={I.Users} size={20}/> Team Members</h3>
+          <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2"><Icon p={I.Users} size={20}/> Team Members</h3>
           <div className="flex gap-2">
             <input className="flex-1 p-4 bg-gray-50 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100" placeholder="Name" value={newMem} onChange={e=>setNewMem(e.target.value)} />
             <select 
