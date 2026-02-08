@@ -599,7 +599,7 @@ const ShiftView = ({ members, shifts, onDeleteShift, onAddShift }) => {
                         <span className={`text-xl font-black ${isToday?'text-pink-500':'text-gray-800'}`}>{d.getDate()}</span>
                       </div>
                       <div className="flex-1 space-y-2">
-                        {dayShifts.length === 0 ? <div className="text-xs font-bold text-gray-200 py-1">シフト無し</div> : 
+                        {dayShifts.length === 0 ? <div className="text-xs font-bold text-gray-200 py-1">No Shifts</div> : 
                           <div className="grid grid-cols-1 gap-2">
                             {dayShifts.map(s => {
                               const mem = members.find(m => m.id === s.memberId);
@@ -815,7 +815,7 @@ function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData =
   );
 };
 
-function Settings({ events, currentEventId, onAddEvent, onUpdateGoals, onUpdateWeeklyGoals, members, onAddMember, onDelMember, onClose }) {
+function Settings({ events, currentEventId, onAddEvent, onDeleteEvent, onUpdateGoals, onUpdateWeeklyGoals, members, onAddMember, onDelMember, onClose }) {
   const cur = events.find(e => e.id === currentEventId) || {};
   const [targetDate, setTargetDate] = useState(new Date()); 
   const [goals, setGoals] = useState({ total: {}, weekly: {} });
@@ -862,14 +862,35 @@ function Settings({ events, currentEventId, onAddEvent, onUpdateGoals, onUpdateW
       <div className="md:col-span-2 flex items-center gap-2"><button onClick={onClose} className="p-3 bg-white rounded-full shadow-sm hover:bg-gray-50 transition-colors"><Icon p={I.X}/></button><h2 className="font-bold text-2xl text-gray-900">設定</h2></div>
       <div className="space-y-6">
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-6">
-          <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2"><Icon p={I.Calendar} size={20}/> 新しいイベントを作成</h3>
-          <div className="space-y-3"><input className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100" placeholder="イベント名" value={newEventName} onChange={e=>setNewEventName(e.target.value)} /><input className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100" placeholder="日付 (例: 2026-06-30)" value={newEventDate} onChange={e=>setNewEventDate(e.target.value)} /></div>
+          <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2"><Icon p={I.Calendar} size={20}/> イベント設定</h3>
+          
+          {/* イベント追加 */}
+          <div className="space-y-3">
+            <input className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100" placeholder="イベント名" value={newEventName} onChange={e=>setNewEventName(e.target.value)} />
+            <input className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100" placeholder="日付 (例: 2026-06-30)" value={newEventDate} onChange={e=>setNewEventDate(e.target.value)} />
+          </div>
           <button onClick={() => { if(newEventName){ onAddEvent(newEventName, newEventDate); setNewEventName(""); setNewEventDate(""); }}} className="w-full bg-gray-900 text-white py-4 rounded-2xl font-bold text-sm shadow-lg shadow-gray-200 hover:bg-black transition-all">イベントを追加</button>
+
+          {/* イベント削除リスト */}
+          <div className="pt-4 border-t border-gray-100">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 block">既存のイベント一覧</label>
+            <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+              {events.map(e => (
+                <div key={e.id} className="flex justify-between items-center p-2 hover:bg-gray-50 rounded-lg group transition-colors">
+                  <span className={`text-sm font-bold ${e.id === currentEventId ? 'text-indigo-600' : 'text-gray-600'}`}>{e.name}</span>
+                  <button onClick={() => { if(window.confirm(`${e.name} を本当に削除しますか？`)) onDeleteEvent(e.id); }} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
+                    <Icon p={I.Trash} size={16}/>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
+
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-6">
           <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2"><Icon p={I.Users} size={20}/> メンバー管理</h3>
           <div className="flex flex-col gap-2"><div className="flex gap-2"><input className="flex-1 p-4 bg-gray-50 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100" placeholder="名前" value={newMem} onChange={e=>setNewMem(e.target.value)} /><select className="p-4 bg-gray-50 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-100 cursor-pointer" value={newRole} onChange={e => setNewRole(e.target.value)}><option value="apo">アポインター</option><option value="closer">クローザー</option></select></div><div className="relative"><input type="number" className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 pl-12" placeholder="時給 (円)" value={newHourlyWage} onChange={e=>setNewHourlyWage(e.target.value)} /><div className="absolute left-4 top-4 text-gray-400"><Icon p={I.Yen} size={20}/></div></div><button onClick={()=>{if(newMem){onAddMember(newMem, newRole, newHourlyWage);setNewMem("");setNewHourlyWage("");}}} className="w-full bg-indigo-50 text-indigo-600 py-3 rounded-2xl font-bold hover:bg-indigo-100 transition-colors mt-2">メンバーを追加</button></div>
-          <div className="space-y-2 mt-4 max-h-60 overflow-y-auto pr-2">{members.map(m => (<div key={m.id} className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-xl transition-colors group"><div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black uppercase ${m.role === 'closer' ? 'bg-amber-100 text-amber-700' : 'bg-sky-100 text-sky-700'}`}>{m.role === 'closer' ? 'CL' : 'AP'}</div><div><span className="font-bold text-sm text-gray-700 block">{m.name}</span>{m.hourlyWage > 0 && <span className="text-[10px] text-gray-400 font-medium">¥{Number(m.hourlyWage).toLocaleString()}/h</span>}</div></div><button onClick={()=>onDelMember(m.id)} className="text-gray-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"><Icon p={I.Trash} size={18}/></button></div>))}</div>
+          <div className="space-y-2 mt-4 max-h-60 overflow-y-auto pr-2">{members.map(m => (<div key={m.id} className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-xl transition-colors"><div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black uppercase ${m.role === 'closer' ? 'bg-amber-100 text-amber-700' : 'bg-sky-100 text-sky-700'}`}>{m.role === 'closer' ? 'CL' : 'AP'}</div><div><span className="font-bold text-sm text-gray-700 block">{m.name}</span>{m.hourlyWage > 0 && <span className="text-[10px] text-gray-400 font-medium">¥{Number(m.hourlyWage).toLocaleString()}/h</span>}</div></div><button onClick={() => { if(window.confirm(`${m.name} を削除しますか？この操作は取り消せません。`)) onDelMember(m.id); }} className="text-gray-300 hover:text-rose-500 transition-colors p-2"><Icon p={I.Trash} size={18}/></button></div>))}</div>
         </div>
       </div>
       <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-6 h-fit">
@@ -985,6 +1006,15 @@ function App() {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', eventId), {
         [fieldPath]: weeklyGoal
       });
+    }
+  };
+
+  const deleteEvent = async (id) => {
+    if (db && user) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', id));
+    // If the deleted event was selected, switch to another one
+    if (currentEventId === id) {
+      const remaining = events.filter(e => e.id !== id);
+      setCurrentEventId(remaining.length > 0 ? remaining[0].id : null);
     }
   };
 
@@ -1106,7 +1136,7 @@ function App() {
           {activeTab === 'dashboard' && (<div className="no-print"><Dashboard event={currentEvent} totals={totals} memberStats={memberStats} currentBaseDate={currentBaseDate} setCurrentBaseDate={setCurrentBaseDate} activeWeeklyGoals={activeWeeklyGoals} /></div>)}
           {activeTab === 'attendance' && (<AttendanceView members={members} reports={eventReports} onEdit={(report) => setEditingReport(report)} />)}
           {activeTab === 'shift' && (<div className="no-print"><ShiftView members={members} shifts={shifts} onDeleteShift={deleteShift} onAddShift={addShift} /></div>)}
-          {activeTab === 'settings' && (<div className="no-print"><Settings events={events} currentEventId={currentEventId} onAddEvent={addEvent} onUpdateGoals={updateEventGoals} onUpdateWeeklyGoals={updateEventWeeklyGoals} members={members} onAddMember={addMember} onDelMember={deleteMember} onClose={() => setActiveTab('dashboard')} /></div>)}
+          {activeTab === 'settings' && (<div className="no-print"><Settings events={events} currentEventId={currentEventId} onAddEvent={addEvent} onDeleteEvent={deleteEvent} onUpdateGoals={updateEventGoals} onUpdateWeeklyGoals={updateEventWeeklyGoals} members={members} onAddMember={addMember} onDelMember={deleteMember} onClose={() => setActiveTab('dashboard')} /></div>)}
         </div>
         {activeTab !== 'settings' && (<div className="fixed bottom-24 right-6 z-30 md:bottom-10 md:right-10 no-print"><button onClick={() => setShowInput(true)} className="bg-indigo-600 text-white p-4 rounded-full shadow-xl shadow-indigo-500/40 hover:scale-110 active:scale-95 transition-all border-4 border-white"><Icon p={I.Plus} size={28} /></button></div>)}
         {(showInput || editingReport) && (<div className="no-print"><InputModal members={members} initialData={editingReport} onAdd={addReport} onUpdate={updateReport} onDelete={deleteReport} onClose={() => { setShowInput(false); setEditingReport(null); }} /></div>)}
