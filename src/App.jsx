@@ -1,15 +1,15 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { 
   getFirestore, collection, doc, onSnapshot, addDoc, setDoc, 
   deleteDoc, Timestamp, updateDoc 
 } from 'firebase/firestore';
 
 // ==========================================
-// 1. System Initialization & Helpers
+// 1. System Initialization
 // ==========================================
-const appId = 'tele-apo-manager-v17-final';
+const appId = 'tele-apo-manager-v21-final-fixed';
 
 // ★あなたのFirebase設定値
 const firebaseConfig = {
@@ -27,7 +27,7 @@ let auth = null;
 let isOffline = false;
 
 try {
-  // 設定値のチェック（空文字や初期値でないか）
+  // 設定値チェック
   if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY") {
     const app = initializeApp(firebaseConfig);
     auth = getAuth(app);
@@ -219,7 +219,7 @@ function GoalSection({ title, subTitle, data, goals, variant }) {
         </div>
         <div>
           <h3 className="text-lg font-bold text-gray-800 leading-tight">{title} Goal</h3>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Progress Tracker</p>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{subTitle}</p>
         </div>
       </div>
 
@@ -250,6 +250,7 @@ function GoalSection({ title, subTitle, data, goals, variant }) {
             <div className="w-1.5 h-1.5 rounded-full bg-purple-400"></div>
             <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Closer</span>
           </div>
+          <MetricBar label="商談成約" val={data.deals} tgt={goals.deals} color="bg-amber-600" />
           <MetricBar label="商談数 (実施)" val={data.meetings} tgt={goals.meetings} color="bg-purple-600" />
           <MetricBar label="商談見込み" val={data.dealProspects} tgt={goals.prospects} color="bg-amber-500" />
           <MetricBar label="失注数" val={data.lost} tgt={goals.lost} color="bg-rose-400" />
@@ -371,10 +372,10 @@ function AttendanceView({ members, reports }) {
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-3">
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Icon p={I.Clock} size={20}/></div>
-            Attendance
+            稼働管理
           </h2>
           <button onClick={handlePrint} className="flex items-center gap-2 text-sm font-bold text-white bg-gray-900 px-5 py-2.5 rounded-xl hover:bg-gray-800 shadow-lg shadow-gray-200 transition-all active:scale-95">
-            <Icon p={I.Download} size={16}/> PDF Export
+            <Icon p={I.Download} size={16}/> 月報PDF出力
           </button>
         </div>
 
@@ -431,12 +432,12 @@ function AttendanceView({ members, reports }) {
         <div className="max-w-4xl mx-auto font-sans text-gray-900">
           <div className="flex justify-between items-end border-b-2 border-gray-900 pb-6 mb-10">
             <div>
-              <h1 className="text-4xl font-extrabold tracking-tight mb-2">稼働報告書</h1>
-              <p className="text-lg font-medium text-gray-600">{selectedMonth.replace("-", "年")}月度</p>
+              <h1 className="text-4xl font-extrabold tracking-tight mb-2">給与明細 (稼働詳細)</h1>
+              <p className="text-lg font-medium text-gray-600">{selectedMonth.replace("-", "年")}月分</p>
             </div>
             <div className="text-right">
-              <p className="text-sm font-bold text-gray-500">発行日</p>
-              <p className="text-lg font-bold">{new Date().toLocaleDateString('ja-JP')}</p>
+              <p className="text-sm font-bold text-gray-500">発行日: {new Date().toLocaleDateString('ja-JP')}</p>
+              <p className="text-xl font-bold mt-2">振込元: 森平心</p>
             </div>
           </div>
 
@@ -518,7 +519,7 @@ function InputModal({ members, onAdd, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col animate-in fade-in duration-300 md:items-center md:justify-center no-print">
+    <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col animate-in fade-in duration-300 md:items-center md:justify-center no-print text-gray-900">
       <div className="w-full h-full md:max-w-md md:h-auto md:max-h-[90vh] md:bg-white md:rounded-[2rem] md:shadow-2xl md:border md:border-gray-100 flex flex-col overflow-hidden">
         <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-white/50 backdrop-blur-md sticky top-0 z-10">
           <button onClick={onClose} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500 transition-colors"><Icon p={I.X}/></button>
@@ -537,9 +538,9 @@ function InputModal({ members, onAdd, onClose }) {
             />
             <div className="flex flex-wrap gap-2">
               {members.map(m => (
-                <label key={m.id} className={`px-4 py-3 rounded-2xl border cursor-pointer font-bold transition-all text-xs flex items-center gap-2 shadow-sm ${val.memberId===m.id ? 'border-gray-900 bg-gray-900 text-white transform scale-105' : 'border-gray-100 bg-white text-gray-600 hover:border-gray-300'}`}>
+                <label key={m.id} className={`px-4 py-3 rounded-2xl border cursor-pointer font-bold transition-all text-xs flex items-center gap-2 shadow-sm ${val.memberId===m.id ? 'border-black bg-black text-white transform scale-105' : 'border-gray-100 bg-white text-gray-500 hover:border-gray-300'}`}>
                   <input type="radio" name="mem" value={m.id} className="hidden" onChange={e=>setVal({...val, memberId: e.target.value})} />
-                  <span className={`w-2 h-2 rounded-full ${m.role === 'closer' ? 'bg-amber-400' : 'bg-sky-400'}`}></span>
+                  <span className={`w-2 h-2 rounded-full ${m.role === 'closer' ? 'bg-black border border-white' : 'bg-gray-300'}`}></span>
                   {m.name}
                 </label>
               ))}
@@ -574,9 +575,9 @@ function InputModal({ members, onAdd, onClose }) {
 
                   <div className="grid grid-cols-2 gap-4">
                     <InputItem label="架電数" icon={I.Phone} val={val.calls} set={v=>setVal({...val, calls:v})} />
-                    <InputItem label="アポ数" icon={I.Check} val={val.appts} set={v=>setVal({...val, appts:v})} color="text-emerald-600" />
+                    <InputItem label="アポ数" icon={I.Check} val={val.appts} set={v=>setVal({...val, appts:v})} />
                     <InputItem label="資料請求" icon={I.FileText} val={val.requests} set={v=>setVal({...val, requests:v})} />
-                    <InputItem label="見込み" icon={I.Help} val={val.prospects} set={v=>setVal({...val, prospects:v})} color="text-blue-500" />
+                    <InputItem label="見込み" icon={I.Help} val={val.prospects} set={v=>setVal({...val, prospects:v})} />
                   </div>
                 </>
               ) : (
@@ -589,16 +590,16 @@ function InputModal({ members, onAdd, onClose }) {
                     <input type="number" className="w-full bg-white p-4 rounded-2xl text-4xl font-black text-center text-gray-800 outline-none shadow-sm focus:ring-4 focus:ring-amber-200 transition-all" placeholder="0" value={val.deals} onChange={e=>setVal({...val, deals: e.target.value})} />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <InputItem label="見込み" icon={I.Help} val={val.prospects} set={v=>setVal({...val, prospects:v})} color="text-blue-500" />
-                    <InputItem label="失注" icon={I.Ban} val={val.lost} set={v=>setVal({...val, lost:v})} color="text-rose-500" />
+                    <InputItem label="見込み" icon={I.Help} val={val.prospects} set={v=>setVal({...val, prospects:v})} />
+                    <InputItem label="失注" icon={I.Ban} val={val.lost} set={v=>setVal({...val, lost:v})} />
                   </div>
                 </>
               )}
             </div>
           )}
 
-          <button className="w-full bg-gray-900 text-white py-4 rounded-2xl font-bold text-lg shadow-xl shadow-gray-200 active:scale-95 transition-transform hover:bg-black">
-            Submit Report
+          <button className="w-full bg-black text-white py-4 rounded-2xl font-bold text-lg shadow-xl shadow-gray-200 active:scale-95 transition-transform hover:bg-gray-800">
+            報告を送信
           </button>
         </form>
       </div>
@@ -759,18 +760,7 @@ function App() {
 
     const init = async () => {
       try {
-        // 修正: トークン不一致エラーに対処するためのフォールバックロジック
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          try {
-            await signInWithCustomToken(auth, __initial_auth_token);
-          } catch (tokenError) {
-            // トークンがマッチしない場合（自分のFirebase Configを使っている場合など）は匿名ログイン
-            console.warn("Custom token failed, using anonymous auth", tokenError);
-            await signInAnonymously(auth);
-          }
-        } else {
-          await signInAnonymously(auth);
-        }
+        await signInAnonymously(auth);
       } catch (e) { 
         console.error("Auth init failed", e); 
         setConnectionStatus("offline"); 
