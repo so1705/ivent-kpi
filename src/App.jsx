@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
 import { 
@@ -7,7 +7,7 @@ import {
 } from 'firebase/firestore';
 
 // ==========================================
-// 1. System Initialization & Helpers
+// 1. System Initialization
 // ==========================================
 const appId = 'tele-apo-manager-v27-editable';
 
@@ -46,23 +46,25 @@ const loadLocal = (key) => {
   try { return JSON.parse(localStorage.getItem(key)) || []; } catch (e) { return []; }
 };
 
-const getWeekRange = () => {
+// 週の範囲を計算する関数（offset: 0=今週, -1=先週, 1=来週...）
+const getWeekRange = (offset = 0) => {
   const now = new Date();
+  // オフセット分ずらす
+  now.setDate(now.getDate() + (offset * 7));
+  
   const day = now.getDay();
+  // 月曜始まりの計算 (日曜0の場合は-6して月曜に戻す)
   const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-  const start = new Date(now.setDate(diff));
+  
+  const start = new Date(now);
+  start.setDate(diff);
   start.setHours(0,0,0,0);
+  
   const end = new Date(start);
   end.setDate(start.getDate() + 6);
   end.setHours(23,59,59,999);
+  
   return { start, end };
-};
-
-const isSameWeek = (dateObj) => {
-  if (!dateObj) return false;
-  const d = dateObj.toDate ? dateObj.toDate() : new Date(dateObj.seconds * 1000);
-  const { start, end } = getWeekRange();
-  return d >= start && d <= end;
 };
 
 // ==========================================
@@ -92,6 +94,8 @@ const I = {
   WifiOff: <><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/><path d="M10.71 5.05A16 16 0 0 1 22.58 9"/><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></>,
   Calendar: <><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></>,
   ChevronDown: <><polyline points="6 9 12 15 18 9"/></>,
+  ChevronLeft: <><polyline points="15 18 9 12 15 6"/></>,
+  ChevronRight: <><polyline points="9 18 15 12 9 6"/></>,
   Help: <><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></>,
   Ban: <><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></>,
   FileText: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></>,
@@ -202,7 +206,7 @@ function MainMetric({ label, icon, current, target, color, bg }) {
 // 4. Complex UI Components
 // ==========================================
 
-function GoalSection({ title, subTitle, data, goals, variant }) {
+function GoalSection({ title, subTitle, data, goals, variant, headerAction }) {
   const isGold = variant === "gold";
   const accentColor = isGold ? "text-amber-600" : "text-indigo-600";
   const barColor = isGold ? "bg-amber-500" : "bg-indigo-500";
@@ -212,14 +216,17 @@ function GoalSection({ title, subTitle, data, goals, variant }) {
     <div className="bg-white p-6 rounded-[2rem] shadow-xl shadow-gray-100/50 border border-gray-100 relative overflow-hidden group hover:shadow-2xl transition-all duration-500">
       <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${isGold ? 'from-amber-100/40' : 'from-indigo-100/40'} to-transparent rounded-bl-[4rem] -mr-8 -mt-8 transition-transform group-hover:scale-110 duration-700 pointer-events-none`}></div>
 
-      <div className="flex items-center gap-3 mb-6 relative z-10">
-        <div className={`p-3 rounded-2xl ${headerBg} ${accentColor} shadow-sm`}>
-          <Icon p={isGold ? I.Trophy : I.Calendar} size={24}/>
+      <div className="flex items-center justify-between mb-6 relative z-10">
+        <div className="flex items-center gap-3">
+          <div className={`p-3 rounded-2xl ${headerBg} ${accentColor} shadow-sm`}>
+            <Icon p={isGold ? I.Trophy : I.Calendar} size={24}/>
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-gray-800 leading-tight">{title}</h3>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{subTitle}</p>
+          </div>
         </div>
-        <div>
-          <h3 className="text-lg font-bold text-gray-800 leading-tight">{title} Goal</h3>
-          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{subTitle}</p>
-        </div>
+        {headerAction}
       </div>
 
       <div className="mb-8 relative z-10">
@@ -262,13 +269,30 @@ function GoalSection({ title, subTitle, data, goals, variant }) {
 // 5. Views Components
 // ==========================================
 
-function Dashboard({ event, totals, memberStats }) {
+function Dashboard({ event, totals, memberStats, weekOffset, setWeekOffset }) {
   const g = event.goals || { total: {}, weekly: {} };
   
+  // 週の表示用
+  const wr = getWeekRange(weekOffset);
+  const weekRangeString = `${wr.start.getMonth()+1}/${wr.start.getDate()} - ${wr.end.getMonth()+1}/${wr.end.getDate()}`;
+
   return (
     <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-700 md:grid md:grid-cols-2 md:gap-8 md:space-y-0">
       <div className="space-y-8">
-        <GoalSection title="週間目標" subTitle="Weekly Target" data={totals.weekly} goals={g.weekly} variant="indigo" />
+        <GoalSection 
+          title="週間目標" 
+          subTitle={weekRangeString} 
+          data={totals.weekly} 
+          goals={g.weekly} 
+          variant="indigo" 
+          headerAction={
+            <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-1 border border-gray-200">
+              <button onClick={() => setWeekOffset(prev => prev - 1)} className="p-1 hover:bg-white rounded-md text-gray-500 transition-all"><Icon p={I.ChevronLeft} size={16}/></button>
+              <button onClick={() => setWeekOffset(0)} className="px-2 text-[10px] font-bold text-gray-600 hover:text-black">今週</button>
+              <button onClick={() => setWeekOffset(prev => prev + 1)} className="p-1 hover:bg-white rounded-md text-gray-500 transition-all"><Icon p={I.ChevronRight} size={16}/></button>
+            </div>
+          }
+        />
         <GoalSection title="全体目標" subTitle={`${event.date} まで`} data={totals.total} goals={g.total} variant="gold" />
       </div>
 
@@ -373,35 +397,35 @@ function AttendanceView({ members, reports, onEdit }) {
             稼働管理
           </h2>
           <button onClick={handlePrint} className="flex items-center gap-2 text-sm font-bold text-white bg-gray-900 px-5 py-2.5 rounded-xl hover:bg-gray-800 shadow-lg shadow-gray-200 transition-all active:scale-95">
-            <Icon p={I.Download} size={16}/> PDFを出力
+            <Icon p={I.Download} size={16}/> PDF Export
           </button>
         </div>
 
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">日付</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Month</label>
               <input type="month" className="w-full bg-gray-50 p-3 rounded-xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">メンバー</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Member</label>
               <select className="w-full bg-gray-50 p-3 rounded-xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all" value={selectedMemberId} onChange={e => setSelectedMemberId(e.target.value)}>
-                <option value="">メンバー全員</option>
+                <option value="">All Members</option>
                 {apoMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
             </div>
           </div>
           <div className="flex items-center justify-between bg-gradient-to-r from-gray-900 to-gray-800 p-5 rounded-2xl text-white shadow-lg shadow-gray-200">
-            <span className="text-sm font-bold opacity-80">合計時間</span>
+            <span className="text-sm font-bold opacity-80">Total Hours</span>
             <span className="text-3xl font-black">{totalHours}<span className="text-sm font-medium ml-1 opacity-60">h</span></span>
           </div>
         </div>
 
         <div className="space-y-3 pb-20">
           <div className="text-[10px] font-bold text-gray-400 px-4 flex justify-between uppercase tracking-wider">
-            <span>日付</span>
-            <span className="flex-1 text-center pl-8">稼働時間</span>
-            <span>合計</span>
+            <span>Date</span>
+            <span className="flex-1 text-center pl-8">Time Range</span>
+            <span>Total</span>
           </div>
           {filteredReports.map(r => (
             <div 
@@ -429,7 +453,7 @@ function AttendanceView({ members, reports, onEdit }) {
         </div>
       </div>
 
-      {/* Print Template (Hidden on screen, Visible on print) */}
+      {/* Print Template - Premium Layout */}
       <div className="print-wrapper" style={{ display: 'none' }}>
         <div className="max-w-4xl mx-auto font-sans text-gray-900">
           <div className="flex justify-between items-end border-b-2 border-gray-900 pb-6 mb-10">
@@ -758,7 +782,7 @@ function Settings({ events, currentEventId, onAddEvent, onUpdateGoals, members, 
           </div>
 
           <div className="p-5 bg-indigo-50 rounded-[2rem] border border-indigo-100 space-y-3">
-            <div className="text-xs font-extrabold text-indigo-800 uppercase tracking-widest mb-2 flex items-center gap-2"><Icon p={I.Calendar} size={14}/> Weekly Goals</div>
+            <div className="text-xs font-extrabold text-indigo-800 uppercase tracking-widest mb-2 flex items-center gap-2"><Icon p={I.Calendar} size={14}/> </div>
             <GoalRow label="商談成約" val={goals.weekly?.deals} set={v=>updateGoalVal('weekly','deals',v)} />
             <GoalRow label="商談数(実施)" val={goals.weekly?.meetings} set={v=>updateGoalVal('weekly','meetings',v)} />
             <GoalRow label="見込(CL)" val={goals.weekly?.prospects} set={v=>updateGoalVal('weekly','prospects',v)} />
@@ -780,14 +804,17 @@ function Settings({ events, currentEventId, onAddEvent, onUpdateGoals, members, 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showInput, setShowInput] = useState(false);
-  const [editingReport, setEditingReport] = useState(null); // 編集対象のレポート
   const [user, setUser] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState("connecting");
+  const [weekOffset, setWeekOffset] = useState(0); // 週切り替え用のステート
 
   const [events, setEvents] = useState([]);
   const [currentEventId, setCurrentEventId] = useState(null);
   const [members, setMembers] = useState([]);
   const [reports, setReports] = useState([]);
+  
+  // 編集用のステート
+  const [editingReport, setEditingReport] = useState(null);
 
   // Default goals including meetings
   const defaultGoals = {
@@ -880,7 +907,7 @@ function App() {
       date: reportDate,
       createdAt: Timestamp.now()
     };
-    // ローカル即時反映 (Optimistic UI)
+    // ローカル即時反映
     setReports(prev => [ { id: "temp_" + Date.now(), ...reportData }, ...prev ]);
     
     if (db && user) {
@@ -951,10 +978,19 @@ function App() {
     }, { deals: 0, meetings: 0, apoProspects: 0, dealProspects: 0, lost: 0, appts: 0, calls: 0, requests: 0 });
 
     const total = calc(eventReports);
-    const weekly = calc(eventReports.filter(r => isSameWeek(r.date)));
+    
+    // 週次集計（weekOffset考慮）
+    const wr = getWeekRange(weekOffset);
+    const weeklyReports = eventReports.filter(r => {
+      if (!r.date) return false;
+      const d = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
+      return d >= wr.start && d <= wr.end;
+    });
+    
+    const weekly = calc(weeklyReports);
 
     return { total, weekly };
-  }, [eventReports, memberRoleMap]);
+  }, [eventReports, memberRoleMap, weekOffset]);
 
   const memberStats = useMemo(() => {
     return members.map(m => {
@@ -1031,6 +1067,8 @@ function App() {
                 event={currentEvent} 
                 totals={totals} 
                 memberStats={memberStats} 
+                weekOffset={weekOffset}
+                setWeekOffset={setWeekOffset}
               />
             </div>
           )}
@@ -1066,7 +1104,7 @@ function App() {
           </div>
         )}
 
-        {/* Input Modal (新規作成 or 編集) */}
+        {/* Input Modal */}
         {(showInput || editingReport) && (
           <div className="no-print">
             <InputModal 
