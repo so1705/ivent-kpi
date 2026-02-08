@@ -538,9 +538,9 @@ const ShiftView = ({ members, shifts, onDeleteShift, onAddShift }) => {
               Shift
             </h2>
             <div className="flex bg-gray-100 p-1 rounded-xl">
-              <button onClick={()=>setViewMode('month')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='month' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-400'}`}>Month</button>
-              <button onClick={()=>setViewMode('week')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='week' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-400'}`}>Week</button>
-              <button onClick={()=>setViewMode('day')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='day' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-400'}`}>Day</button>
+              <button onClick={()=>setViewMode('month')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='month' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-400'}`}>月</button>
+              <button onClick={()=>setViewMode('week')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='week' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-400'}`}>週</button>
+              <button onClick={()=>setViewMode('day')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='day' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-400'}`}>日</button>
             </div>
           </div>
           
@@ -599,7 +599,7 @@ const ShiftView = ({ members, shifts, onDeleteShift, onAddShift }) => {
                         <span className={`text-xl font-black ${isToday?'text-pink-500':'text-gray-800'}`}>{d.getDate()}</span>
                       </div>
                       <div className="flex-1 space-y-2">
-                        {dayShifts.length === 0 ? <div className="text-xs font-bold text-gray-200 py-1">No Shifts</div> : 
+                        {dayShifts.length === 0 ? <div className="text-xs font-bold text-gray-200 py-1">シフト無し</div> : 
                           <div className="grid grid-cols-1 gap-2">
                             {dayShifts.map(s => {
                               const mem = members.find(m => m.id === s.memberId);
