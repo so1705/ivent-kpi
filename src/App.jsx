@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { 
   getFirestore, collection, doc, onSnapshot, addDoc, setDoc, 
   deleteDoc, Timestamp, updateDoc 
@@ -9,7 +9,7 @@ import {
 // ==========================================
 // 1. System Initialization
 // ==========================================
-const appId = 'tele-apo-manager-v27-editable';
+const appId = 'tele-apo-manager-v28-calendar';
 
 // ★あなたのFirebase設定値
 const firebaseConfig = {
@@ -46,17 +46,14 @@ const loadLocal = (key) => {
   try { return JSON.parse(localStorage.getItem(key)) || []; } catch (e) { return []; }
 };
 
-// 週の範囲を計算する関数（offset: 0=今週, -1=先週, 1=来週...）
-const getWeekRange = (offset = 0) => {
-  const now = new Date();
-  // オフセット分ずらす
-  now.setDate(now.getDate() + (offset * 7));
-  
-  const day = now.getDay();
+// 指定された日付が含まれる週の開始日・終了日を計算
+const getWeekRange = (baseDate) => {
+  const d = new Date(baseDate);
+  const day = d.getDay();
   // 月曜始まりの計算 (日曜0の場合は-6して月曜に戻す)
-  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
   
-  const start = new Date(now);
+  const start = new Date(d);
   start.setDate(diff);
   start.setHours(0,0,0,0);
   
@@ -65,6 +62,20 @@ const getWeekRange = (offset = 0) => {
   end.setHours(23,59,59,999);
   
   return { start, end };
+};
+
+// 日付判定用
+const isDateInWeek = (targetDate, start, end) => {
+  if (!targetDate) return false;
+  const d = targetDate.toDate ? targetDate.toDate() : new Date(targetDate.seconds * 1000);
+  return d >= start && d <= end;
+};
+
+// 日付操作用
+const shiftDate = (date, days) => {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
 };
 
 // ==========================================
@@ -222,7 +233,7 @@ function GoalSection({ title, subTitle, data, goals, variant, headerAction }) {
             <Icon p={isGold ? I.Trophy : I.Calendar} size={24}/>
           </div>
           <div>
-            <h3 className="text-lg font-bold text-gray-800 leading-tight">{title}</h3>
+            <h3 className="text-lg font-bold text-gray-800 leading-tight">{title} Goal</h3>
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{subTitle}</p>
           </div>
         </div>
@@ -269,12 +280,29 @@ function GoalSection({ title, subTitle, data, goals, variant, headerAction }) {
 // 5. Views Components
 // ==========================================
 
-function Dashboard({ event, totals, memberStats, weekOffset, setWeekOffset }) {
+function Dashboard({ event, totals, memberStats, currentBaseDate, setCurrentBaseDate }) {
   const g = event.goals || { total: {}, weekly: {} };
   
   // 週の表示用
-  const wr = getWeekRange(weekOffset);
+  const wr = getWeekRange(currentBaseDate);
   const weekRangeString = `${wr.start.getMonth()+1}/${wr.start.getDate()} - ${wr.end.getMonth()+1}/${wr.end.getDate()}`;
+  
+  // 日付操作用
+  const shiftWeek = (days) => {
+    const newDate = new Date(currentBaseDate);
+    newDate.setDate(newDate.getDate() + days);
+    setCurrentBaseDate(newDate);
+  };
+  
+  // カレンダー変更用
+  const handleDateChange = (e) => {
+    if(e.target.value) {
+      setCurrentBaseDate(new Date(e.target.value));
+    }
+  };
+  
+  // input date用の文字列生成 (YYYY-MM-DD)
+  const dateString = currentBaseDate.toISOString().slice(0, 10);
 
   return (
     <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-700 md:grid md:grid-cols-2 md:gap-8 md:space-y-0">
@@ -286,10 +314,21 @@ function Dashboard({ event, totals, memberStats, weekOffset, setWeekOffset }) {
           goals={g.weekly} 
           variant="indigo" 
           headerAction={
-            <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-1 border border-gray-200">
-              <button onClick={() => setWeekOffset(prev => prev - 1)} className="p-1 hover:bg-white rounded-md text-gray-500 transition-all"><Icon p={I.ChevronLeft} size={16}/></button>
-              <button onClick={() => setWeekOffset(0)} className="px-2 text-[10px] font-bold text-gray-600 hover:text-black">今週</button>
-              <button onClick={() => setWeekOffset(prev => prev + 1)} className="p-1 hover:bg-white rounded-md text-gray-500 transition-all"><Icon p={I.ChevronRight} size={16}/></button>
+            <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-1 border border-gray-200 shadow-sm">
+              <button onClick={() => shiftWeek(-7)} className="p-1.5 hover:bg-white rounded-md text-gray-500 transition-all hover:shadow-sm active:scale-95"><Icon p={I.ChevronLeft} size={16}/></button>
+              <button onClick={() => setCurrentBaseDate(new Date())} className="px-3 text-[10px] font-bold text-gray-600 hover:text-black transition-colors">今週</button>
+              <button onClick={() => shiftWeek(7)} className="p-1.5 hover:bg-white rounded-md text-gray-500 transition-all hover:shadow-sm active:scale-95"><Icon p={I.ChevronRight} size={16}/></button>
+              <div className="relative ml-1 border-l border-gray-200 pl-1">
+                <input 
+                  type="date" 
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" 
+                  onChange={handleDateChange}
+                  value={dateString}
+                />
+                <button className="p-1.5 hover:bg-white rounded-md text-indigo-500 transition-all hover:shadow-sm">
+                  <Icon p={I.Calendar} size={16}/>
+                </button>
+              </div>
             </div>
           }
         />
@@ -782,7 +821,7 @@ function Settings({ events, currentEventId, onAddEvent, onUpdateGoals, members, 
           </div>
 
           <div className="p-5 bg-indigo-50 rounded-[2rem] border border-indigo-100 space-y-3">
-            <div className="text-xs font-extrabold text-indigo-800 uppercase tracking-widest mb-2 flex items-center gap-2"><Icon p={I.Calendar} size={14}/> </div>
+            <div className="text-xs font-extrabold text-indigo-800 uppercase tracking-widest mb-2 flex items-center gap-2"><Icon p={I.Calendar} size={14}/> Weekly Goals</div>
             <GoalRow label="商談成約" val={goals.weekly?.deals} set={v=>updateGoalVal('weekly','deals',v)} />
             <GoalRow label="商談数(実施)" val={goals.weekly?.meetings} set={v=>updateGoalVal('weekly','meetings',v)} />
             <GoalRow label="見込(CL)" val={goals.weekly?.prospects} set={v=>updateGoalVal('weekly','prospects',v)} />
@@ -807,6 +846,10 @@ function App() {
   const [user, setUser] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState("connecting");
   const [weekOffset, setWeekOffset] = useState(0); // 週切り替え用のステート
+  // ここでcurrentBaseDateという名前のステートを定義する方が、より直感的かもしれないが、
+  // getWeekRangeがoffsetベースではなくdateベースに変更されたため、
+  // ここでは currentBaseDate を管理する。
+  const [currentBaseDate, setCurrentBaseDate] = useState(new Date());
 
   const [events, setEvents] = useState([]);
   const [currentEventId, setCurrentEventId] = useState(null);
@@ -979,8 +1022,8 @@ function App() {
 
     const total = calc(eventReports);
     
-    // 週次集計（weekOffset考慮）
-    const wr = getWeekRange(weekOffset);
+    // 週次集計（currentBaseDate考慮）
+    const wr = getWeekRange(currentBaseDate);
     const weeklyReports = eventReports.filter(r => {
       if (!r.date) return false;
       const d = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
@@ -990,7 +1033,7 @@ function App() {
     const weekly = calc(weeklyReports);
 
     return { total, weekly };
-  }, [eventReports, memberRoleMap, weekOffset]);
+  }, [eventReports, memberRoleMap, currentBaseDate]);
 
   const memberStats = useMemo(() => {
     return members.map(m => {
@@ -1067,8 +1110,8 @@ function App() {
                 event={currentEvent} 
                 totals={totals} 
                 memberStats={memberStats} 
-                weekOffset={weekOffset}
-                setWeekOffset={setWeekOffset}
+                currentBaseDate={currentBaseDate}
+                setCurrentBaseDate={setCurrentBaseDate}
               />
             </div>
           )}
