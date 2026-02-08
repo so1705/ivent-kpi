@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
 import { 
   getFirestore, collection, doc, onSnapshot, addDoc, setDoc, 
   deleteDoc, Timestamp, updateDoc 
 } from 'firebase/firestore';
 
 // ==========================================
-// 1. System Initialization
+// 1. System Initialization & Helpers
 // ==========================================
-const appId = 'tele-apo-manager-v26-stable-fixed';
+const appId = 'tele-apo-manager-v27-editable';
 
 // ★あなたのFirebase設定値
 const firebaseConfig = {
@@ -27,7 +27,6 @@ let auth = null;
 let isOffline = false;
 
 try {
-  // 設定値チェック
   if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY") {
     const app = initializeApp(firebaseConfig);
     auth = getAuth(app);
@@ -67,7 +66,7 @@ const isSameWeek = (dateObj) => {
 };
 
 // ==========================================
-// 2. Icon Component
+// 2. Icon Definitions
 // ==========================================
 function Icon({ p, size=24, color="currentColor", className="" }) {
   return (
@@ -300,7 +299,7 @@ function Dashboard({ event, totals, memberStats }) {
                 </div>
                 <div className="text-right">
                   <span className="text-2xl font-black text-gray-800">{m.cph}</span>
-                  <div className="text-[9px] font-bold text-gray-400 uppercase">Calls / Hour</div>
+                  <div className="text-[9px] font-bold text-gray-400 uppercase">Call / H</div>
                 </div>
               </div>
               
@@ -325,7 +324,7 @@ function Dashboard({ event, totals, memberStats }) {
   );
 }
 
-function AttendanceView({ members, reports }) {
+function AttendanceView({ members, reports, onEdit }) {
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); 
   const [selectedMemberId, setSelectedMemberId] = useState("");
   const apoMembers = members.filter(m => m.role !== 'closer');
@@ -371,41 +370,45 @@ function AttendanceView({ members, reports }) {
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold text-gray-800 flex items-center gap-3">
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Icon p={I.Clock} size={20}/></div>
-            Attendance
+            稼働管理
           </h2>
           <button onClick={handlePrint} className="flex items-center gap-2 text-sm font-bold text-white bg-gray-900 px-5 py-2.5 rounded-xl hover:bg-gray-800 shadow-lg shadow-gray-200 transition-all active:scale-95">
-            <Icon p={I.Download} size={16}/> PDF Export
+            <Icon p={I.Download} size={16}/> PDFを出力
           </button>
         </div>
 
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Month</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">日付</label>
               <input type="month" className="w-full bg-gray-50 p-3 rounded-xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Member</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">メンバー</label>
               <select className="w-full bg-gray-50 p-3 rounded-xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all" value={selectedMemberId} onChange={e => setSelectedMemberId(e.target.value)}>
-                <option value="">All Members</option>
+                <option value="">メンバー全員</option>
                 {apoMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
             </div>
           </div>
           <div className="flex items-center justify-between bg-gradient-to-r from-gray-900 to-gray-800 p-5 rounded-2xl text-white shadow-lg shadow-gray-200">
-            <span className="text-sm font-bold opacity-80">Total Hours</span>
+            <span className="text-sm font-bold opacity-80">合計時間</span>
             <span className="text-3xl font-black">{totalHours}<span className="text-sm font-medium ml-1 opacity-60">h</span></span>
           </div>
         </div>
 
         <div className="space-y-3 pb-20">
           <div className="text-[10px] font-bold text-gray-400 px-4 flex justify-between uppercase tracking-wider">
-            <span>Date</span>
-            <span className="flex-1 text-center pl-8">Time Range</span>
-            <span>Total</span>
+            <span>日付</span>
+            <span className="flex-1 text-center pl-8">稼働時間</span>
+            <span>合計</span>
           </div>
           {filteredReports.map(r => (
-            <div key={r.id} className="bg-white p-4 rounded-2xl border border-gray-50 shadow-sm flex items-center justify-between hover:border-gray-200 transition-colors">
+            <div 
+              key={r.id} 
+              onClick={() => onEdit(r)}
+              className="bg-white p-4 rounded-2xl border border-gray-50 shadow-sm flex items-center justify-between hover:border-gray-300 transition-all cursor-pointer active:scale-95"
+            >
               <div className="w-20">
                 <div className="font-bold text-gray-800 text-lg">{formatDate(r.date)}</div>
                 <div className="text-[10px] font-bold text-gray-400 uppercase">{formatDay(r.date)}</div>
@@ -427,7 +430,7 @@ function AttendanceView({ members, reports }) {
       </div>
 
       {/* Print Template (Hidden on screen, Visible on print) */}
-      <div className="print-only" style={{ display: 'none' }}>
+      <div className="print-wrapper" style={{ display: 'none' }}>
         <div className="max-w-4xl mx-auto font-sans text-gray-900">
           <div className="flex justify-between items-end border-b-2 border-gray-900 pb-6 mb-10">
             <div>
@@ -484,18 +487,48 @@ function AttendanceView({ members, reports }) {
   );
 }
 
-function InputModal({ members, onAdd, onClose }) {
+function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData = null }) {
   const today = new Date().toISOString().slice(0, 10);
   const [val, setVal] = useState({ 
     memberId: '', date: today,
     calls: '', appts: '', requests: '', prospects: '', lost: '', deals: '', hours: '',
     startTime: '', endTime: ''
   });
+  
+  // Initialize with data if editing
+  useEffect(() => {
+    if (initialData) {
+      let dateStr = today;
+      if (initialData.date) {
+        // Handle Timestamp or Date string
+        const d = initialData.date.toDate ? initialData.date.toDate() : new Date(initialData.date);
+        dateStr = d.toISOString().slice(0, 10);
+      }
+      
+      setVal({
+        ...initialData,
+        date: dateStr,
+        // Ensure numbers are strings for input
+        calls: initialData.calls || '',
+        appts: initialData.appts || '',
+        requests: initialData.requests || '',
+        prospects: initialData.prospects || '',
+        lost: initialData.lost || '',
+        deals: initialData.deals || '',
+        hours: initialData.hours || '',
+        startTime: initialData.startTime || '',
+        endTime: initialData.endTime || ''
+      });
+    }
+  }, [initialData]);
+
   const selectedMember = members.find(m => m.id === val.memberId);
   const isCloser = selectedMember?.role === 'closer';
+  const isEditMode = !!initialData;
 
   useEffect(() => {
-    if (val.startTime && val.endTime) {
+    // Only auto-calc if user changed times (simple check)
+    if (val.startTime && val.endTime && (!initialData || val.startTime !== initialData.startTime || val.endTime !== initialData.endTime)) {
       const start = new Date(`2000-01-01T${val.startTime}`);
       const end = new Date(`2000-01-01T${val.endTime}`);
       if (end > start) {
@@ -508,30 +541,51 @@ function InputModal({ members, onAdd, onClose }) {
   const submit = (e) => {
     e.preventDefault();
     if (!val.memberId) return alert("Please select a member");
-    onAdd({
+    
+    const data = {
       ...val,
       calls: Number(val.calls), appts: Number(val.appts), requests: Number(val.requests),
       prospects: Number(val.prospects), lost: Number(val.lost),
       deals: Number(val.deals), hours: Number(val.hours)
-    });
+    };
+
+    if (isEditMode) {
+      onUpdate(data);
+    } else {
+      onAdd(data);
+    }
     onClose();
+  };
+  
+  const handleDelete = () => {
+    if (window.confirm("この記録を削除しますか？")) {
+      onDelete(initialData.id);
+      onClose();
+    }
   };
 
   return (
     <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col animate-in fade-in duration-300 md:items-center md:justify-center no-print text-gray-900">
       <div className="w-full h-full md:max-w-md md:h-auto md:max-h-[90vh] md:bg-white md:rounded-[2rem] md:shadow-2xl md:border md:border-gray-100 flex flex-col overflow-hidden">
         <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-white/50 backdrop-blur-md sticky top-0 z-10">
-          <button onClick={onClose} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500 transition-colors"><Icon p={I.X}/></button>
-          <h2 className="font-bold text-lg text-gray-800">稼働報告</h2>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500 transition-colors"><Icon p={I.X}/></button>
+            {isEditMode && (
+              <button onClick={handleDelete} className="p-2 bg-red-50 hover:bg-red-100 rounded-full text-red-500 transition-colors">
+                <Icon p={I.Trash} size={20}/>
+              </button>
+            )}
+          </div>
+          <h2 className="font-bold text-lg text-gray-800">{isEditMode ? '記録の修正' : '稼働報告'}</h2>
           <div className="w-10"/>
         </div>
         
         <form onSubmit={submit} className="flex-1 overflow-y-auto p-6 space-y-8 bg-white">
           <div className="space-y-3">
-            <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest pl-1">Basic Info</label>
+            <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest pl-1">基本情報</label>
             <input 
               type="date" 
-              className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-gray-200 transition-all"
+              className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-gray-900 outline-none focus:ring-2 focus:ring-gray-200 transition-all"
               value={val.date}
               onChange={e => setVal({...val, date: e.target.value})}
             />
@@ -598,7 +652,7 @@ function InputModal({ members, onAdd, onClose }) {
           )}
 
           <button className="w-full bg-black text-white py-4 rounded-2xl font-bold text-lg shadow-xl shadow-gray-200 active:scale-95 transition-transform hover:bg-gray-800">
-            報告を送信
+            {isEditMode ? '修正内容を保存' : '報告を送信'}
           </button>
         </form>
       </div>
@@ -726,6 +780,7 @@ function Settings({ events, currentEventId, onAddEvent, onUpdateGoals, members, 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showInput, setShowInput] = useState(false);
+  const [editingReport, setEditingReport] = useState(null); // 編集対象のレポート
   const [user, setUser] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState("connecting");
 
@@ -825,8 +880,38 @@ function App() {
       date: reportDate,
       createdAt: Timestamp.now()
     };
-    setReports([ { id: "temp_" + Date.now(), ...reportData }, ...reports ]);
-    if (db && user) await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reports'), reportData);
+    // ローカル即時反映 (Optimistic UI)
+    setReports(prev => [ { id: "temp_" + Date.now(), ...reportData }, ...prev ]);
+    
+    if (db && user) {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reports'), reportData);
+    }
+  };
+
+  const updateReport = async (data) => {
+    const reportDate = data.date ? Timestamp.fromDate(new Date(data.date)) : Timestamp.now();
+    const reportId = data.id;
+    // Remove ID from data object for update
+    const { id, ...updateData } = data;
+    updateData.date = reportDate;
+    
+    // ローカル即時反映
+    setReports(prev => prev.map(r => r.id === reportId ? { ...r, ...updateData } : r));
+
+    if (db && user && !reportId.startsWith("temp_")) {
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reports', reportId), updateData);
+    }
+    setEditingReport(null); // モーダルを閉じる
+  };
+
+  const deleteReport = async (id) => {
+    // ローカル即時反映
+    setReports(prev => prev.filter(r => r.id !== id));
+
+    if (db && user && !id.startsWith("temp_")) {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reports', id));
+    }
+    setEditingReport(null); // モーダルを閉じる
   };
 
   const addMember = async (name, role) => {
@@ -953,6 +1038,7 @@ function App() {
             <AttendanceView 
               members={members}
               reports={eventReports}
+              onEdit={(report) => setEditingReport(report)}
             />
           )}
           {activeTab === 'settings' && (
@@ -980,13 +1066,19 @@ function App() {
           </div>
         )}
 
-        {/* Input Modal */}
-        {showInput && (
+        {/* Input Modal (新規作成 or 編集) */}
+        {(showInput || editingReport) && (
           <div className="no-print">
             <InputModal 
               members={members} 
+              initialData={editingReport}
               onAdd={addReport} 
-              onClose={() => setShowInput(false)} 
+              onUpdate={updateReport}
+              onDelete={deleteReport}
+              onClose={() => {
+                setShowInput(false);
+                setEditingReport(null);
+              }} 
             />
           </div>
         )}
