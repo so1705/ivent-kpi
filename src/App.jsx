@@ -7,9 +7,9 @@ import {
 } from 'firebase/firestore';
 
 // ==========================================
-// 1. System Initialization
+// 1. システム初期化
 // ==========================================
-const appId = 'tele-apo-manager-v28-calendar';
+const appId = 'tele-apo-manager-v30-salary-fixed';
 
 // ★あなたのFirebase設定値
 const firebaseConfig = {
@@ -46,40 +46,35 @@ const loadLocal = (key) => {
   try { return JSON.parse(localStorage.getItem(key)) || []; } catch (e) { return []; }
 };
 
-// 指定された日付が含まれる週の開始日・終了日を計算
 const getWeekRange = (baseDate) => {
   const d = new Date(baseDate);
   const day = d.getDay();
-  // 月曜始まりの計算 (日曜0の場合は-6して月曜に戻す)
   const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  
   const start = new Date(d);
   start.setDate(diff);
   start.setHours(0,0,0,0);
-  
   const end = new Date(start);
   end.setDate(start.getDate() + 6);
   end.setHours(23,59,59,999);
-  
   return { start, end };
 };
 
-// 日付判定用
-const isDateInWeek = (targetDate, start, end) => {
-  if (!targetDate) return false;
-  const d = targetDate.toDate ? targetDate.toDate() : new Date(targetDate.seconds * 1000);
+const isSameWeek = (dateObj) => {
+  if (!dateObj) return false;
+  const d = dateObj.toDate ? dateObj.toDate() : new Date(dateObj.seconds * 1000);
+  const now = new Date();
+  const day = now.getDay();
+  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+  const start = new Date(now.setDate(diff));
+  start.setHours(0,0,0,0);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  end.setHours(23,59,59,999);
   return d >= start && d <= end;
 };
 
-// 日付操作用
-const shiftDate = (date, days) => {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
-};
-
 // ==========================================
-// 2. Icon Definitions
+// 2. アイコン定義
 // ==========================================
 function Icon({ p, size=24, color="currentColor", className="" }) {
   return (
@@ -110,7 +105,8 @@ const I = {
   Help: <><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></>,
   Ban: <><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></>,
   FileText: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></>,
-  Download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>
+  Download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>,
+  Yen: <><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>
 };
 
 // ==========================================
@@ -283,25 +279,21 @@ function GoalSection({ title, subTitle, data, goals, variant, headerAction }) {
 function Dashboard({ event, totals, memberStats, currentBaseDate, setCurrentBaseDate }) {
   const g = event.goals || { total: {}, weekly: {} };
   
-  // 週の表示用
   const wr = getWeekRange(currentBaseDate);
   const weekRangeString = `${wr.start.getMonth()+1}/${wr.start.getDate()} - ${wr.end.getMonth()+1}/${wr.end.getDate()}`;
   
-  // 日付操作用
   const shiftWeek = (days) => {
     const newDate = new Date(currentBaseDate);
     newDate.setDate(newDate.getDate() + days);
     setCurrentBaseDate(newDate);
   };
   
-  // カレンダー変更用
   const handleDateChange = (e) => {
     if(e.target.value) {
       setCurrentBaseDate(new Date(e.target.value));
     }
   };
   
-  // input date用の文字列生成 (YYYY-MM-DD)
   const dateString = currentBaseDate.toISOString().slice(0, 10);
 
   return (
@@ -402,7 +394,18 @@ function AttendanceView({ members, reports, onEdit }) {
     }).sort((a,b) => (a.date?.seconds || 0) - (b.date?.seconds || 0));
   }, [reports, selectedMonth, selectedMemberId]);
 
+  // 時給計算
+  const calculateSalary = (hours, hourlyWage) => {
+    if (!hourlyWage) return 0;
+    return Math.floor(hours * hourlyWage);
+  };
+
   const totalHours = filteredReports.reduce((s, r) => s + (Number(r.hours) || 0), 0);
+  
+  const totalSalary = selectedMemberId ? filteredReports.reduce((s, r) => {
+    const member = members.find(m => m.id === r.memberId);
+    return s + calculateSalary(Number(r.hours) || 0, member?.hourlyWage || 0);
+  }, 0) : 0;
 
   const formatDate = (ts) => {
     if (!ts) return "";
@@ -417,12 +420,26 @@ function AttendanceView({ members, reports, onEdit }) {
 
   const handlePrint = () => window.print();
 
+  // Print Data Generation
   const printData = useMemo(() => {
     const data = {};
     filteredReports.forEach(r => {
-      if (!data[r.memberId]) data[r.memberId] = { name: members.find(m=>m.id===r.memberId)?.name || 'Unknown', logs: [], total: 0 };
-      data[r.memberId].logs.push(r);
-      data[r.memberId].total += Number(r.hours) || 0;
+      const member = members.find(m => m.id === r.memberId);
+      if (!data[r.memberId]) {
+        data[r.memberId] = { 
+          name: member?.name || 'Unknown', 
+          hourlyWage: member?.hourlyWage || 0,
+          logs: [], 
+          totalHours: 0, 
+          totalSalary: 0 
+        };
+      }
+      const hours = Number(r.hours) || 0;
+      const dailySalary = calculateSalary(hours, member?.hourlyWage || 0);
+
+      data[r.memberId].logs.push({ ...r, dailySalary });
+      data[r.memberId].totalHours += hours;
+      data[r.memberId].totalSalary += dailySalary;
     });
     return Object.values(data);
   }, [filteredReports, members]);
@@ -436,35 +453,43 @@ function AttendanceView({ members, reports, onEdit }) {
             稼働管理
           </h2>
           <button onClick={handlePrint} className="flex items-center gap-2 text-sm font-bold text-white bg-gray-900 px-5 py-2.5 rounded-xl hover:bg-gray-800 shadow-lg shadow-gray-200 transition-all active:scale-95">
-            <Icon p={I.Download} size={16}/> PDFを作成
+            <Icon p={I.Download} size={16}/> PDF出力
           </button>
         </div>
 
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">日付</label>
-              <input type="" className="w-full bg-gray-50 p-3 rounded-xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} />
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Month</label>
+              <input type="month" className="w-full bg-gray-50 p-3 rounded-xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">メンバー</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Member</label>
               <select className="w-full bg-gray-50 p-3 rounded-xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all" value={selectedMemberId} onChange={e => setSelectedMemberId(e.target.value)}>
-                <option value="">メンバー全員</option>
+                <option value="">全員</option>
                 {apoMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
             </div>
           </div>
-          <div className="flex items-center justify-between bg-gradient-to-r from-gray-900 to-gray-800 p-5 rounded-2xl text-white shadow-lg shadow-gray-200">
-            <span className="text-sm font-bold opacity-80">合計時間</span>
-            <span className="text-3xl font-black">{totalHours}<span className="text-sm font-medium ml-1 opacity-60">h</span></span>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center justify-between bg-gradient-to-r from-gray-900 to-gray-800 p-5 rounded-2xl text-white shadow-lg shadow-gray-200">
+              <span className="text-sm font-bold opacity-80">合計時間</span>
+              <span className="text-3xl font-black">{totalHours}<span className="text-sm font-medium ml-1 opacity-60">h</span></span>
+            </div>
+            {selectedMemberId && (
+              <div className="flex items-center justify-between bg-gradient-to-r from-emerald-600 to-emerald-500 p-5 rounded-2xl text-white shadow-lg shadow-emerald-200">
+                <span className="text-sm font-bold opacity-80">想定給与</span>
+                <span className="text-3xl font-black">¥{totalSalary.toLocaleString()}</span>
+              </div>
+            )}
           </div>
         </div>
 
         <div className="space-y-3 pb-20">
           <div className="text-[10px] font-bold text-gray-400 px-4 flex justify-between uppercase tracking-wider">
             <span>日付</span>
-            <span className="flex-1 text-center pl-8">時間帯</span>
-            <span>合計時間</span>
+            <span className="flex-1 text-center pl-8">稼働時間</span>
+            <span>合計</span>
           </div>
           {filteredReports.map(r => (
             <div 
@@ -486,13 +511,20 @@ function AttendanceView({ members, reports, onEdit }) {
                   <div className="text-[10px] font-bold text-indigo-500 mt-1">{members.find(m => m.id === r.memberId)?.name}</div>
                 )}
               </div>
-              <div className="w-16 text-right font-black text-xl text-gray-800">{r.hours}<span className="text-xs text-gray-400 font-medium ml-0.5">h</span></div>
+              <div className="w-24 text-right">
+                <div className="font-black text-xl text-gray-800">{r.hours}<span className="text-xs text-gray-400 font-medium ml-0.5">h</span></div>
+                {selectedMemberId && members.find(m => m.id === r.memberId)?.hourlyWage > 0 && (
+                  <div className="text-[10px] font-bold text-emerald-600">
+                    ¥{Math.floor(r.hours * members.find(m => m.id === r.memberId).hourlyWage).toLocaleString()}
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Print Template - Premium Layout */}
+      {/* Print Template - Fixed Style */}
       <div className="print-wrapper" style={{ display: 'none' }}>
         <div className="max-w-4xl mx-auto font-sans text-gray-900">
           <div className="flex justify-between items-end border-b-2 border-gray-900 pb-6 mb-10">
@@ -510,19 +542,23 @@ function AttendanceView({ members, reports, onEdit }) {
             {printData.map((pd, i) => (
               <div key={i} style={{ pageBreakInside: 'avoid', marginBottom: '40px' }}>
                 <div className="flex justify-between items-center mb-4 bg-gray-100 p-4 rounded-lg">
-                  <h3 className="text-2xl font-bold">{pd.name} <span className="text-sm font-normal text-gray-500 ml-2">様</span></h3>
+                  <div>
+                    <h3 className="text-2xl font-bold">{pd.name} <span className="text-sm font-normal text-gray-500 ml-2">様</span></h3>
+                    {pd.hourlyWage > 0 && <p className="text-sm text-gray-500 mt-1">時給: ¥{Number(pd.hourlyWage).toLocaleString()}</p>}
+                  </div>
                   <div className="text-right">
-                    <span className="text-sm font-bold text-gray-500 mr-2">合計稼働</span>
-                    <span className="text-2xl font-black">{pd.total} h</span>
+                    <span className="text-sm font-bold text-gray-500 mr-2 block">合計支給額</span>
+                    <span className="text-3xl font-black">¥{pd.totalSalary.toLocaleString()}</span>
                   </div>
                 </div>
                 <table className="w-full text-sm border-collapse">
                   <thead>
                     <tr className="border-b-2 border-gray-300">
-                      <th className="p-3 text-left w-32 font-bold text-gray-500">日付</th>
+                      <th className="p-3 text-left w-24 font-bold text-gray-500">日付</th>
                       <th className="p-3 text-center font-bold text-gray-500">開始時間</th>
                       <th className="p-3 text-center font-bold text-gray-500">終了時間</th>
-                      <th className="p-3 text-right w-24 font-bold text-gray-500">稼働時間</th>
+                      <th className="p-3 text-right w-20 font-bold text-gray-500">稼働時間</th>
+                      <th className="p-3 text-right w-24 font-bold text-gray-500">日給</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -532,17 +568,16 @@ function AttendanceView({ members, reports, onEdit }) {
                         <td className="p-3 text-center font-mono">{log.startTime || '-'}</td>
                         <td className="p-3 text-center font-mono">{log.endTime || '-'}</td>
                         <td className="p-3 text-right font-bold">{log.hours}h</td>
+                        <td className="p-3 text-right font-bold text-gray-800">¥{log.dailySalary.toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+                <div className="mt-4 text-right pr-4">
+                  <span className="text-sm font-bold text-gray-500 mr-4">合計稼働時間: {pd.totalHours}h</span>
+                </div>
               </div>
             ))}
-          </div>
-
-          <div className="mt-16 pt-8 border-t-2 border-gray-900 flex justify-end items-end gap-6">
-            <span className="text-sm font-bold text-gray-500 mb-1">月間総稼働時間</span>
-            <span className="text-5xl font-black">{totalHours}<span className="text-xl font-bold ml-2 text-gray-400">Hours</span></span>
           </div>
         </div>
       </div>
@@ -563,7 +598,6 @@ function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData =
     if (initialData) {
       let dateStr = today;
       if (initialData.date) {
-        // Handle Timestamp or Date string
         const d = initialData.date.toDate ? initialData.date.toDate() : new Date(initialData.date);
         dateStr = d.toISOString().slice(0, 10);
       }
@@ -571,7 +605,6 @@ function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData =
       setVal({
         ...initialData,
         date: dateStr,
-        // Ensure numbers are strings for input
         calls: initialData.calls || '',
         appts: initialData.appts || '',
         requests: initialData.requests || '',
@@ -590,7 +623,6 @@ function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData =
   const isEditMode = !!initialData;
 
   useEffect(() => {
-    // Only auto-calc if user changed times (simple check)
     if (val.startTime && val.endTime && (!initialData || val.startTime !== initialData.startTime || val.endTime !== initialData.endTime)) {
       const start = new Date(`2000-01-01T${val.startTime}`);
       const end = new Date(`2000-01-01T${val.endTime}`);
@@ -603,7 +635,7 @@ function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData =
 
   const submit = (e) => {
     e.preventDefault();
-    if (!val.memberId) return alert("Please select a member");
+    if (!val.memberId) return alert("メンバーを選択してください");
     
     const data = {
       ...val,
@@ -730,11 +762,12 @@ function Settings({ events, currentEventId, onAddEvent, onUpdateGoals, members, 
   const [newEventDate, setNewEventDate] = useState("");
   const [newMem, setNewMem] = useState("");
   const [newRole, setNewRole] = useState("apo");
+  const [newHourlyWage, setNewHourlyWage] = useState("");
 
   const saveGoals = () => {
     if (currentEventId) {
       onUpdateGoals(currentEventId, goals);
-      alert("Settings Saved");
+      alert("設定を保存しました");
     }
   };
 
@@ -768,19 +801,36 @@ function Settings({ events, currentEventId, onAddEvent, onUpdateGoals, members, 
         </div>
 
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-6">
-          <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2"><Icon p={I.Users} size={20}/> メンバー設定</h3>
-          <div className="flex gap-2">
-            <input className="flex-1 p-4 bg-gray-50 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100" placeholder="名前" value={newMem} onChange={e=>setNewMem(e.target.value)} />
-            <select 
-              className="p-4 bg-gray-50 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-100 cursor-pointer"
-              value={newRole}
-              onChange={e => setNewRole(e.target.value)}
+          <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2"><Icon p={I.Users} size={20}/> メンバー管理</h3>
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
+              <input className="flex-1 p-4 bg-gray-50 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100" placeholder="名前" value={newMem} onChange={e=>setNewMem(e.target.value)} />
+              <select 
+                className="p-4 bg-gray-50 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-100 cursor-pointer"
+                value={newRole}
+                onChange={e => setNewRole(e.target.value)}
+              >
+                <option value="apo">アポインター</option>
+                <option value="closer">クローザー</option>
+              </select>
+            </div>
+            <div className="relative">
+              <input 
+                type="number" 
+                className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 pl-12" 
+                placeholder="時給 (円)" 
+                value={newHourlyWage} 
+                onChange={e=>setNewHourlyWage(e.target.value)} 
+              />
+              <div className="absolute left-4 top-4 text-gray-400"><Icon p={I.Yen} size={20}/></div>
+            </div>
+            <button 
+              onClick={()=>{if(newMem){onAddMember(newMem, newRole, newHourlyWage);setNewMem("");setNewHourlyWage("");}}} 
+              className="w-full bg-indigo-50 text-indigo-600 py-3 rounded-2xl font-bold hover:bg-indigo-100 transition-colors mt-2"
             >
-              <option value="apo">アポインター</option>
-              <option value="closer">クローザー</option>
-            </select>
+              メンバーを追加
+            </button>
           </div>
-          <button onClick={()=>{if(newMem){onAddMember(newMem, newRole);setNewMem("")}}} className="w-full bg-indigo-50 text-indigo-600 py-3 rounded-2xl font-bold hover:bg-indigo-100 transition-colors">メンバーを追加</button>
           
           <div className="space-y-2 mt-4 max-h-60 overflow-y-auto pr-2">
             {members.map(m => (
@@ -789,7 +839,10 @@ function Settings({ events, currentEventId, onAddEvent, onUpdateGoals, members, 
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black uppercase ${m.role === 'closer' ? 'bg-amber-100 text-amber-700' : 'bg-sky-100 text-sky-700'}`}>
                     {m.role === 'closer' ? 'CL' : 'AP'}
                   </div>
-                  <span className="font-bold text-sm text-gray-700">{m.name}</span>
+                  <div>
+                    <span className="font-bold text-sm text-gray-700 block">{m.name}</span>
+                    {m.hourlyWage > 0 && <span className="text-[10px] text-gray-400 font-medium">¥{Number(m.hourlyWage).toLocaleString()}/h</span>}
+                  </div>
                 </div>
                 <button onClick={()=>onDelMember(m.id)} className="text-gray-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"><Icon p={I.Trash} size={18}/></button>
               </div>
@@ -801,7 +854,7 @@ function Settings({ events, currentEventId, onAddEvent, onUpdateGoals, members, 
       <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-6 h-fit">
         <div className="flex justify-between items-center">
           <div>
-            <h3 className="font-bold text-lg text-gray-900">目標設定</h3>
+            <h3 className="font-bold text-lg text-gray-900">目標値設定</h3>
             <p className="text-xs text-gray-400 font-bold">{cur.name}</p>
           </div>
           <button onClick={saveGoals} className="bg-emerald-500 text-white px-6 py-2 rounded-xl text-xs font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-600 transition-all">保存</button>
@@ -809,7 +862,7 @@ function Settings({ events, currentEventId, onAddEvent, onUpdateGoals, members, 
         
         <div className="space-y-6">
           <div className="p-5 bg-amber-50 rounded-[2rem] border border-amber-100 space-y-3">
-            <div className="text-xs font-extrabold text-amber-800 uppercase tracking-widest mb-2 flex items-center gap-2"><Icon p={I.Trophy} size={14}/> 最終目標</div>
+            <div className="text-xs font-extrabold text-amber-800 uppercase tracking-widest mb-2 flex items-center gap-2"><Icon p={I.Trophy} size={14}/> 全体目標</div>
             <GoalRow label="商談成約" val={goals.total?.deals} set={v=>updateGoalVal('total','deals',v)} />
             <GoalRow label="商談数(実施)" val={goals.total?.meetings} set={v=>updateGoalVal('total','meetings',v)} />
             <GoalRow label="見込(CL)" val={goals.total?.prospects} set={v=>updateGoalVal('total','prospects',v)} />
@@ -845,10 +898,7 @@ function App() {
   const [showInput, setShowInput] = useState(false);
   const [user, setUser] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState("connecting");
-  const [weekOffset, setWeekOffset] = useState(0); // 週切り替え用のステート
-  // ここでcurrentBaseDateという名前のステートを定義する方が、より直感的かもしれないが、
-  // getWeekRangeがoffsetベースではなくdateベースに変更されたため、
-  // ここでは currentBaseDate を管理する。
+  const [weekOffset, setWeekOffset] = useState(0); 
   const [currentBaseDate, setCurrentBaseDate] = useState(new Date());
 
   const [events, setEvents] = useState([]);
@@ -856,17 +906,14 @@ function App() {
   const [members, setMembers] = useState([]);
   const [reports, setReports] = useState([]);
   
-  // 編集用のステート
   const [editingReport, setEditingReport] = useState(null);
 
-  // Default goals including meetings
   const defaultGoals = {
     total: { deals: 15, meetings: 40, prospects: 30, lost: 10, appts: 100, calls: 1000, apoProspects: 50 },
     weekly: { deals: 2, meetings: 8, prospects: 5, lost: 2, appts: 20, calls: 200, apoProspects: 10 }
   };
 
   useEffect(() => {
-    // Load local data first
     const lEvents = loadLocal('events');
     const lMems = loadLocal('members');
     const lReps = loadLocal('reports');
@@ -897,7 +944,6 @@ function App() {
       if (u) {
         setConnectionStatus("connected");
 
-        // Events Listener
         onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'events'), (s) => {
           const list = s.docs.map(d => ({ id: d.id, ...d.data() }));
           if (list.length === 0) {
@@ -913,14 +959,12 @@ function App() {
           }
         });
 
-        // Members Listener
         onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'members'), (s) => {
           const list = s.docs.map(d => ({ id: d.id, ...d.data() }));
           setMembers(list);
           saveLocal('members', list);
         });
 
-        // Reports Listener
         onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'reports'), (s) => {
           const list = s.docs.map(d => ({ id: d.id, ...d.data() }));
           setReports(list);
@@ -931,7 +975,6 @@ function App() {
     return () => unsubAuth();
   }, []);
 
-  // --- Actions ---
   const addEvent = async (name, date) => {
     const newEvent = { name, date, goals: defaultGoals, createdAt: Timestamp.now() };
     if (db && user) await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'events'), newEvent);
@@ -950,7 +993,6 @@ function App() {
       date: reportDate,
       createdAt: Timestamp.now()
     };
-    // ローカル即時反映
     setReports(prev => [ { id: "temp_" + Date.now(), ...reportData }, ...prev ]);
     
     if (db && user) {
@@ -961,37 +1003,41 @@ function App() {
   const updateReport = async (data) => {
     const reportDate = data.date ? Timestamp.fromDate(new Date(data.date)) : Timestamp.now();
     const reportId = data.id;
-    // Remove ID from data object for update
     const { id, ...updateData } = data;
     updateData.date = reportDate;
     
-    // ローカル即時反映
     setReports(prev => prev.map(r => r.id === reportId ? { ...r, ...updateData } : r));
 
     if (db && user && !reportId.startsWith("temp_")) {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reports', reportId), updateData);
     }
-    setEditingReport(null); // モーダルを閉じる
+    setEditingReport(null);
   };
 
   const deleteReport = async (id) => {
-    // ローカル即時反映
     setReports(prev => prev.filter(r => r.id !== id));
 
     if (db && user && !id.startsWith("temp_")) {
       await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reports', id));
     }
-    setEditingReport(null); // モーダルを閉じる
+    setEditingReport(null);
   };
 
-  const addMember = async (name, role) => {
-    if (db && user) await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'members'), { name, role, createdAt: Timestamp.now() });
+  const addMember = async (name, role, hourlyWage) => {
+    if (db && user) {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'members'), { 
+        name, 
+        role, 
+        hourlyWage: Number(hourlyWage),
+        createdAt: Timestamp.now() 
+      });
+    }
   };
+  
   const deleteMember = async (id) => {
     if (db && user) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', id));
   };
 
-  // --- Aggregation ---
   const currentEvent = events.find(e => e.id === currentEventId) || { goals: defaultGoals, name: "Loading..." };
   const eventReports = reports.filter(r => r.eventId === currentEventId || (!r.eventId && events.length > 0 && events[0].id === currentEventId)); 
 
@@ -1022,7 +1068,6 @@ function App() {
 
     const total = calc(eventReports);
     
-    // 週次集計（currentBaseDate考慮）
     const wr = getWeekRange(currentBaseDate);
     const weeklyReports = eventReports.filter(r => {
       if (!r.date) return false;
@@ -1082,7 +1127,7 @@ function App() {
         {/* Header */}
         <header className="bg-white/90 backdrop-blur sticky top-0 z-20 px-4 py-3 border-b border-slate-100 flex justify-between items-center md:rounded-b-2xl md:mx-4 md:mt-2 md:shadow-sm no-print">
           <div className="flex flex-col">
-            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">現在のイベント</div>
+            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Current Event</div>
             <div className="relative group">
               <select 
                 className="appearance-none bg-transparent font-black text-lg text-indigo-900 pr-6 outline-none cursor-pointer"
