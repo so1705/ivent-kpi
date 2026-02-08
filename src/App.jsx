@@ -7,19 +7,19 @@ import {
 } from 'firebase/firestore';
 
 // ==========================================
-// 1. System Initialization
+// 1. System Initialization & Helpers
 // ==========================================
 const appId = 'tele-apo-manager-v17-final';
 
-// ★重要★: Firebaseコンソールから取得した設定値をここに貼り付けてください
-// (設定がない場合、自動的にオフラインモード(デモ)で動作します)
+// ★あなたのFirebase設定値
 const firebaseConfig = {
-  apiKey: "AIzaSy...",
-  authDomain: "your-project.firebaseapp.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef"
+  apiKey: "AIzaSyBnvOnuKhldjHQGGpKSpI4TGo4a74_eaj0",
+  authDomain: "ivent-kpi.firebaseapp.com",
+  projectId: "ivent-kpi",
+  storageBucket: "ivent-kpi.firebasestorage.app",
+  messagingSenderId: "176584893312",
+  appId: "1:176584893312:web:2e431cafad47d8cada1765",
+  measurementId: "G-7MMNJREWJ9"
 };
 
 let db = null;
@@ -27,7 +27,8 @@ let auth = null;
 let isOffline = false;
 
 try {
-  if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "AIzaSy...") {
+  // 設定値のチェック（空文字や初期値でないか）
+  if (firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY") {
     const app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     db = getFirestore(app);
@@ -66,8 +67,16 @@ const isSameWeek = (dateObj) => {
 };
 
 // ==========================================
-// 2. Icon & Graphic Assets
+// 2. Icon Definitions
 // ==========================================
+function Icon({ p, size=24, color="currentColor", className="" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      {p}
+    </svg>
+  );
+}
+
 const I = {
   Target: <><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></>,
   Users: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
@@ -90,16 +99,8 @@ const I = {
   Download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>
 };
 
-function Icon({ p, size=24, color="currentColor", className="" }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      {p}
-    </svg>
-  );
-}
-
 // ==========================================
-// 3. UI Components (Atomic & Molecular)
+// 3. UI Atomic Components
 // ==========================================
 
 function NavButton({ active, onClick, icon, label }) {
@@ -162,13 +163,13 @@ function MetricBar({ label, val, tgt, color, small }) {
   return (
     <div className={`flex flex-col ${small ? 'gap-1' : 'gap-1.5'}`}>
       <div className="flex justify-between items-end">
-        <span className={`font-bold text-slate-500 ${small ? 'text-[10px]' : 'text-xs'}`}>{label}</span>
-        <div className="font-bold text-slate-700 leading-none">
+        <span className={`font-bold text-gray-500 ${small ? 'text-[10px]' : 'text-xs'}`}>{label}</span>
+        <div className="font-bold text-gray-900 leading-none">
           <span className={small ? 'text-xs' : 'text-sm'}>{val}</span>
-          {tgt > 0 && <span className="text-[10px] text-slate-300 ml-0.5">/{tgt}</span>}
+          {tgt > 0 && <span className="text-[10px] text-gray-300 ml-1">/{tgt}</span>}
         </div>
       </div>
-      <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+      <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
         <div className={`h-full ${color} transition-all duration-1000`} style={{ width: `${percent}%` }} />
       </div>
     </div>
@@ -185,11 +186,11 @@ function MainMetric({ label, icon, current, target, color, bg }) {
           <span className="text-2xl tracking-tight">{label}</span>
         </div>
         <div className="text-right">
-          <span className="text-5xl font-black text-slate-800 tracking-tighter">{current}</span>
-          <span className="text-sm font-bold text-slate-300 ml-1">/ {target}</span>
+          <span className="text-5xl font-black text-black tracking-tighter">{current}</span>
+          <span className="text-sm font-bold text-gray-300 ml-1">/ {target}</span>
         </div>
       </div>
-      <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
+      <div className="h-4 w-full bg-gray-100 rounded-full overflow-hidden shadow-inner">
         <div className={`h-full ${bg} transition-all duration-1000 ease-out relative`} style={{ width: `${percent}%` }}>
           <div className="absolute top-0 right-0 bottom-0 w-1 bg-white/30"></div>
         </div>
@@ -425,6 +426,7 @@ function AttendanceView({ members, reports }) {
         </div>
       </div>
 
+      {/* Print Template - Premium Layout */}
       <div className="print-wrapper" style={{ display: 'none' }}>
         <div className="max-w-4xl mx-auto font-sans text-gray-900">
           <div className="flex justify-between items-end border-b-2 border-gray-900 pb-6 mb-10">
@@ -535,7 +537,7 @@ function InputModal({ members, onAdd, onClose }) {
             />
             <div className="flex flex-wrap gap-2">
               {members.map(m => (
-                <label key={m.id} className={`px-4 py-3 rounded-2xl border-2 cursor-pointer font-bold transition-all text-xs flex items-center gap-2 shadow-sm ${val.memberId===m.id ? 'border-gray-900 bg-gray-900 text-white transform scale-105' : 'border-gray-100 bg-white text-gray-600 hover:border-gray-300'}`}>
+                <label key={m.id} className={`px-4 py-3 rounded-2xl border cursor-pointer font-bold transition-all text-xs flex items-center gap-2 shadow-sm ${val.memberId===m.id ? 'border-gray-900 bg-gray-900 text-white transform scale-105' : 'border-gray-100 bg-white text-gray-600 hover:border-gray-300'}`}>
                   <input type="radio" name="mem" value={m.id} className="hidden" onChange={e=>setVal({...val, memberId: e.target.value})} />
                   <span className={`w-2 h-2 rounded-full ${m.role === 'closer' ? 'bg-amber-400' : 'bg-sky-400'}`}></span>
                   {m.name}
@@ -719,7 +721,7 @@ function Settings({ events, currentEventId, onAddEvent, onUpdateGoals, members, 
 };
 
 // ==========================================
-// 6. Main App Component
+// 6. App Entry Point
 // ==========================================
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -757,12 +759,22 @@ function App() {
 
     const init = async () => {
       try {
+        // 修正: トークン不一致エラーに対処するためのフォールバックロジック
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
+          try {
+            await signInWithCustomToken(auth, __initial_auth_token);
+          } catch (tokenError) {
+            // トークンがマッチしない場合（自分のFirebase Configを使っている場合など）は匿名ログイン
+            console.warn("Custom token failed, using anonymous auth", tokenError);
+            await signInAnonymously(auth);
+          }
         } else {
           await signInAnonymously(auth);
         }
-      } catch (e) { console.error(e); setConnectionStatus("offline"); }
+      } catch (e) { 
+        console.error("Auth init failed", e); 
+        setConnectionStatus("offline"); 
+      }
     };
     init();
 
