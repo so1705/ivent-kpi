@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { 
@@ -7,9 +7,9 @@ import {
 } from 'firebase/firestore';
 
 // ==========================================
-// 1. システム初期化
+// 1. システム初期化 (System Initialization)
 // ==========================================
-const appId = 'tele-apo-manager-v30-salary-fixed';
+const appId = 'tele-apo-manager-v33-fixed';
 
 // ★あなたのFirebase設定値
 const firebaseConfig = {
@@ -84,6 +84,7 @@ function Icon({ p, size=24, color="currentColor", className="" }) {
   );
 }
 
+// 必要なアイコンをすべて定義（ここがエラーの原因でした）
 const I = {
   Target: <><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></>,
   Users: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
@@ -279,21 +280,25 @@ function GoalSection({ title, subTitle, data, goals, variant, headerAction }) {
 function Dashboard({ event, totals, memberStats, currentBaseDate, setCurrentBaseDate }) {
   const g = event.goals || { total: {}, weekly: {} };
   
+  // 週の表示用
   const wr = getWeekRange(currentBaseDate);
   const weekRangeString = `${wr.start.getMonth()+1}/${wr.start.getDate()} - ${wr.end.getMonth()+1}/${wr.end.getDate()}`;
   
+  // 日付操作用
   const shiftWeek = (days) => {
     const newDate = new Date(currentBaseDate);
     newDate.setDate(newDate.getDate() + days);
     setCurrentBaseDate(newDate);
   };
   
+  // カレンダー変更用
   const handleDateChange = (e) => {
     if(e.target.value) {
       setCurrentBaseDate(new Date(e.target.value));
     }
   };
   
+  // input date用の文字列生成 (YYYY-MM-DD)
   const dateString = currentBaseDate.toISOString().slice(0, 10);
 
   return (
@@ -358,13 +363,22 @@ function Dashboard({ event, totals, memberStats, currentBaseDate, setCurrentBase
                 </div>
               </div>
               
-              <div className="grid grid-cols-6 gap-2 text-center pl-3">
-                <StatItem label="成約" val={m.deals} highlight color="text-amber-600" />
-                <StatItem label="商談" val={m.meetings} />
-                <StatItem label="見込" val={m.prospects} />
-                <StatItem label="失注" val={m.lost} />
-                <StatItem label="アポ" val={m.appts} highlight color="text-emerald-600" />
-                <StatItem label="架電" val={m.calls} />
+              <div className="grid grid-cols-4 gap-2 text-center pl-3">
+                {m.role === 'closer' ? (
+                  <>
+                    <StatItem label="商談" val={m.meetings} />
+                    <StatItem label="契約" val={m.deals} highlight color="text-amber-600" />
+                    <StatItem label="見込" val={m.prospects} />
+                    <StatItem label="失注" val={m.lost} />
+                  </>
+                ) : (
+                  <>
+                    <StatItem label="アポ" val={m.appts} highlight color="text-emerald-600" />
+                    <StatItem label="架電" val={m.calls} />
+                    <StatItem label="資料請求" val={m.requests} />
+                    <StatItem label="見込" val={m.prospects} />
+                  </>
+                )}
               </div>
             </div>
           ))}
@@ -394,7 +408,6 @@ function AttendanceView({ members, reports, onEdit }) {
     }).sort((a,b) => (a.date?.seconds || 0) - (b.date?.seconds || 0));
   }, [reports, selectedMonth, selectedMemberId]);
 
-  // 時給計算
   const calculateSalary = (hours, hourlyWage) => {
     if (!hourlyWage) return 0;
     return Math.floor(hours * hourlyWage);
@@ -418,9 +431,10 @@ function AttendanceView({ members, reports, onEdit }) {
     return ['日','月','火','水','木','金','土'][d.getDay()];
   };
 
-  const handlePrint = () => window.print();
+  const handlePrint = () => {
+    window.print();
+  };
 
-  // Print Data Generation
   const printData = useMemo(() => {
     const data = {};
     filteredReports.forEach(r => {
@@ -466,11 +480,12 @@ function AttendanceView({ members, reports, onEdit }) {
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Member</label>
               <select className="w-full bg-gray-50 p-3 rounded-xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all" value={selectedMemberId} onChange={e => setSelectedMemberId(e.target.value)}>
-                <option value="">全員</option>
+                <option value="">All Members</option>
                 {apoMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
             </div>
           </div>
+          
           <div className="grid grid-cols-2 gap-4">
             <div className="flex items-center justify-between bg-gradient-to-r from-gray-900 to-gray-800 p-5 rounded-2xl text-white shadow-lg shadow-gray-200">
               <span className="text-sm font-bold opacity-80">合計時間</span>
@@ -478,7 +493,7 @@ function AttendanceView({ members, reports, onEdit }) {
             </div>
             {selectedMemberId && (
               <div className="flex items-center justify-between bg-gradient-to-r from-emerald-600 to-emerald-500 p-5 rounded-2xl text-white shadow-lg shadow-emerald-200">
-                <span className="text-sm font-bold opacity-80">給与</span>
+                <span className="text-sm font-bold opacity-80">想定給与</span>
                 <span className="text-3xl font-black">¥{totalSalary.toLocaleString()}</span>
               </div>
             )}
@@ -488,8 +503,8 @@ function AttendanceView({ members, reports, onEdit }) {
         <div className="space-y-3 pb-20">
           <div className="text-[10px] font-bold text-gray-400 px-4 flex justify-between uppercase tracking-wider">
             <span>日付</span>
-            <span className="flex-1 text-center pl-8">稼働時間</span>
-            <span>合計</span>
+            <span className="flex-1 text-center pl-8">時間帯</span>
+            <span>合計時間</span>
           </div>
           {filteredReports.map(r => (
             <div 
@@ -524,7 +539,6 @@ function AttendanceView({ members, reports, onEdit }) {
         </div>
       </div>
 
-      {/* Print Template - Fixed Style */}
       <div className="print-wrapper" style={{ display: 'none' }}>
         <div className="max-w-4xl mx-auto font-sans text-gray-900">
           <div className="flex justify-between items-end border-b-2 border-gray-900 pb-6 mb-10">
@@ -593,7 +607,6 @@ function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData =
     startTime: '', endTime: ''
   });
   
-  // Initialize with data if editing
   useEffect(() => {
     if (initialData) {
       let dateStr = today;
@@ -635,7 +648,7 @@ function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData =
 
   const submit = (e) => {
     e.preventDefault();
-    if (!val.memberId) return alert("メンバーを選択してください");
+    if (!val.memberId) return alert("Please select a member");
     
     const data = {
       ...val,
@@ -825,7 +838,13 @@ function Settings({ events, currentEventId, onAddEvent, onUpdateGoals, members, 
               <div className="absolute left-4 top-4 text-gray-400"><Icon p={I.Yen} size={20}/></div>
             </div>
             <button 
-              onClick={()=>{if(newMem){onAddMember(newMem, newRole, newHourlyWage);setNewMem("");setNewHourlyWage("");}}} 
+              onClick={()=>{
+                if(newMem){
+                  onAddMember(newMem, newRole, newHourlyWage);
+                  setNewMem("");
+                  setNewHourlyWage("");
+                }
+              }} 
               className="w-full bg-indigo-50 text-indigo-600 py-3 rounded-2xl font-bold hover:bg-indigo-100 transition-colors mt-2"
             >
               メンバーを追加
@@ -908,12 +927,14 @@ function App() {
   
   const [editingReport, setEditingReport] = useState(null);
 
+  // Default goals including meetings
   const defaultGoals = {
     total: { deals: 15, meetings: 40, prospects: 30, lost: 10, appts: 100, calls: 1000, apoProspects: 50 },
     weekly: { deals: 2, meetings: 8, prospects: 5, lost: 2, appts: 20, calls: 200, apoProspects: 10 }
   };
 
   useEffect(() => {
+    // Load local data first
     const lEvents = loadLocal('events');
     const lMems = loadLocal('members');
     const lReps = loadLocal('reports');
@@ -944,6 +965,7 @@ function App() {
       if (u) {
         setConnectionStatus("connected");
 
+        // Events Listener
         onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'events'), (s) => {
           const list = s.docs.map(d => ({ id: d.id, ...d.data() }));
           if (list.length === 0) {
@@ -959,12 +981,14 @@ function App() {
           }
         });
 
+        // Members Listener
         onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'members'), (s) => {
           const list = s.docs.map(d => ({ id: d.id, ...d.data() }));
           setMembers(list);
           saveLocal('members', list);
         });
 
+        // Reports Listener
         onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'reports'), (s) => {
           const list = s.docs.map(d => ({ id: d.id, ...d.data() }));
           setReports(list);
@@ -975,6 +999,7 @@ function App() {
     return () => unsubAuth();
   }, []);
 
+  // --- Actions ---
   const addEvent = async (name, date) => {
     const newEvent = { name, date, goals: defaultGoals, createdAt: Timestamp.now() };
     if (db && user) await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'events'), newEvent);
@@ -993,6 +1018,7 @@ function App() {
       date: reportDate,
       createdAt: Timestamp.now()
     };
+    // ローカル即時反映
     setReports(prev => [ { id: "temp_" + Date.now(), ...reportData }, ...prev ]);
     
     if (db && user) {
@@ -1038,6 +1064,7 @@ function App() {
     if (db && user) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', id));
   };
 
+  // --- Aggregation ---
   const currentEvent = events.find(e => e.id === currentEventId) || { goals: defaultGoals, name: "Loading..." };
   const eventReports = reports.filter(r => r.eventId === currentEventId || (!r.eventId && events.length > 0 && events[0].id === currentEventId)); 
 
