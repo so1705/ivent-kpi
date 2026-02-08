@@ -9,7 +9,7 @@ import {
 // ==========================================
 // 1. 設定 & ヘルパー関数
 // ==========================================
-const appId = 'tele-apo-manager-v38-shift-feature';
+const appId = 'tele-apo-manager-v39-shift-calendar';
 
 // ★Firebase設定
 const firebaseConfig = {
@@ -94,7 +94,9 @@ const I = {
   FileText: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></>,
   Download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>,
   Yen: <><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>,
-  Sun: <><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></>
+  Sun: <><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></>,
+  Grid: <><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></>,
+  List: <><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></>
 };
 
 // ==========================================
@@ -465,103 +467,208 @@ const AttendanceView = ({ members, reports, onEdit }) => {
 };
 
 const ShiftView = ({ members, shifts, onDeleteShift, onAddShift }) => {
+  const [viewMode, setViewMode] = useState('month'); // 'month', 'week', 'day'
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showShiftInput, setShowShiftInput] = useState(false);
   const [targetDateForInput, setTargetDateForInput] = useState("");
-
-  const weekRange = getWeekRange(currentDate);
-  
-  // Create array of days for the current week
-  const weekDays = useMemo(() => {
-    const days = [];
-    const d = new Date(weekRange.start);
-    while (d <= weekRange.end) {
-      days.push(new Date(d));
-      d.setDate(d.getDate() + 1);
-    }
-    return days;
-  }, [weekRange]);
-
-  const shiftWeek = (days) => {
-    const newDate = new Date(currentDate);
-    newDate.setDate(newDate.getDate() + days);
-    setCurrentDate(newDate);
-  };
 
   const getShiftsForDay = (dateObj) => {
     const dateStr = dateObj.toISOString().slice(0, 10);
     return shifts.filter(s => s.date === dateStr).sort((a,b) => a.startTime.localeCompare(b.startTime));
   };
 
-  const formatDayOfWeek = (d) => ['日','月','火','水','木','金','土'][d.getDay()];
+  // Month View Helpers
+  const getMonthDays = (baseDate) => {
+    const year = baseDate.getFullYear();
+    const month = baseDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    
+    const days = [];
+    const paddingStart = firstDay.getDay();
+    
+    // Previous month padding
+    for(let i=0; i<paddingStart; i++) days.push(null);
+    // Current month days
+    for(let i=1; i<=lastDay.getDate(); i++) days.push(new Date(year, month, i));
+    
+    return days;
+  };
+
+  // Week View Helpers
+  const getWeekDays = (baseDate) => {
+    const wr = getWeekRange(baseDate);
+    const days = [];
+    const d = new Date(wr.start);
+    while (d <= wr.end) {
+      days.push(new Date(d));
+      d.setDate(d.getDate() + 1);
+    }
+    return days;
+  };
+
+  const shiftDate = (amount, unit) => {
+    const newDate = new Date(currentDate);
+    if(unit === 'month') newDate.setMonth(newDate.getMonth() + amount);
+    else if(unit === 'week') newDate.setDate(newDate.getDate() + (amount * 7));
+    else newDate.setDate(newDate.getDate() + amount);
+    setCurrentDate(newDate);
+  };
+
+  const handlePrev = () => shiftDate(-1, viewMode === 'day' ? 'day' : viewMode === 'week' ? 'week' : 'month');
+  const handleNext = () => shiftDate(1, viewMode === 'day' ? 'day' : viewMode === 'week' ? 'week' : 'month');
+  
+  const formatHeaderDate = () => {
+    if(viewMode === 'month') return `${currentDate.getFullYear()}年 ${currentDate.getMonth()+1}月`;
+    if(viewMode === 'day') return `${currentDate.getMonth()+1}/${currentDate.getDate()} (${['日','月','火','水','木','金','土'][currentDate.getDay()]})`;
+    const wr = getWeekRange(currentDate);
+    return `${wr.start.getMonth()+1}/${wr.start.getDate()} - ${wr.end.getMonth()+1}/${wr.end.getDate()}`;
+  };
+
+  const formatDayOfWeek = (i) => ['日','月','火','水','木','金','土'][i];
 
   return (
     <>
-      <div className="space-y-6 animate-in fade-in pb-24">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-3">
-            <div className="p-2 bg-pink-50 text-pink-500 rounded-xl"><Icon p={I.Calendar} size={20}/></div>
-            Shift Calendar
-          </h2>
-          <div className="flex items-center gap-1 bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
-            <button onClick={() => shiftWeek(-7)} className="p-2 hover:bg-gray-50 rounded-md text-gray-500"><Icon p={I.ChevronLeft} size={18}/></button>
-            <span className="text-xs font-bold text-gray-700 px-2">
-              {weekRange.start.getMonth()+1}/{weekRange.start.getDate()} - {weekRange.end.getMonth()+1}/{weekRange.end.getDate()}
-            </span>
-            <button onClick={() => shiftWeek(7)} className="p-2 hover:bg-gray-50 rounded-md text-gray-500"><Icon p={I.ChevronRight} size={18}/></button>
+      <div className="space-y-4 animate-in fade-in pb-24 h-full flex flex-col">
+        {/* Header Control */}
+        <div className="flex flex-col gap-4 bg-white p-4 rounded-3xl border border-gray-100 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-3">
+              <div className="p-2 bg-pink-50 text-pink-500 rounded-xl"><Icon p={I.Calendar} size={20}/></div>
+              Shift
+            </h2>
+            <div className="flex bg-gray-100 p-1 rounded-xl">
+              <button onClick={()=>setViewMode('month')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='month' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-400'}`}>Month</button>
+              <button onClick={()=>setViewMode('week')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='week' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-400'}`}>Week</button>
+              <button onClick={()=>setViewMode('day')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='day' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-400'}`}>Day</button>
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <button onClick={handlePrev} className="p-2 hover:bg-gray-50 rounded-xl text-gray-500"><Icon p={I.ChevronLeft}/></button>
+            <span className="text-lg font-black text-gray-800">{formatHeaderDate()}</span>
+            <button onClick={handleNext} className="p-2 hover:bg-gray-50 rounded-xl text-gray-500"><Icon p={I.ChevronRight}/></button>
           </div>
         </div>
 
-        <div className="space-y-4">
-          {weekDays.map(day => {
-            const dayShifts = getShiftsForDay(day);
-            const isToday = day.toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10);
-            return (
-              <div key={day.toISOString()} className={`bg-white rounded-2xl p-4 border transition-all ${isToday ? 'border-pink-200 shadow-md shadow-pink-50 ring-1 ring-pink-100' : 'border-gray-100 shadow-sm'}`}>
-                <div className="flex items-start gap-4">
-                  <div className="flex flex-col items-center min-w-[3rem]">
-                    <span className={`text-xs font-bold uppercase ${day.getDay()===0 ? 'text-red-400' : (day.getDay()===6 ? 'text-blue-400' : 'text-gray-400')}`}>{formatDayOfWeek(day)}</span>
-                    <span className={`text-2xl font-black ${isToday ? 'text-pink-500' : 'text-gray-800'}`}>{day.getDate()}</span>
-                  </div>
-                  
-                  <div className="flex-1 space-y-2">
-                    {dayShifts.length === 0 ? (
-                      <div className="text-xs font-bold text-gray-200 py-2">No Shifts</div>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {dayShifts.map(s => {
-                          const mem = members.find(m => m.id === s.memberId);
-                          if (!mem) return null;
-                          return (
-                            <div key={s.id} className="flex items-center justify-between bg-gray-50 rounded-xl p-2 border border-gray-100 hover:border-gray-300 transition-colors group">
-                              <div className="flex items-center gap-2">
-                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-black uppercase text-white ${mem.role === 'closer' ? 'bg-amber-400' : 'bg-sky-400'}`}>
-                                  {mem.name.slice(0,1)}
-                                </div>
-                                <div>
-                                  <div className="text-xs font-bold text-gray-800">{mem.name}</div>
-                                  <div className="text-[10px] font-mono font-bold text-gray-500">{s.startTime} - {s.endTime}</div>
-                                </div>
-                              </div>
-                              <button onClick={() => { if(window.confirm('シフトを削除しますか？')) onDeleteShift(s.id); }} className="p-1.5 text-gray-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
-                                <Icon p={I.X} size={14}/>
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                  
-                  <button onClick={() => { setTargetDateForInput(day.toISOString().slice(0, 10)); setShowShiftInput(true); }} className="p-2 text-gray-300 hover:text-pink-500 hover:bg-pink-50 rounded-full transition-all">
-                    <Icon p={I.Plus} size={20}/>
-                  </button>
-                </div>
+        {/* Calendar Views */}
+        <div className="flex-1 overflow-y-auto">
+          {/* MONTH VIEW */}
+          {viewMode === 'month' && (
+            <div className="bg-white rounded-2xl p-2 border border-gray-100 shadow-sm">
+              <div className="grid grid-cols-7 mb-2 text-center">
+                {[0,1,2,3,4,5,6].map(i => <div key={i} className={`text-[10px] font-bold uppercase ${i===0?'text-red-400':i===6?'text-blue-400':'text-gray-400'}`}>{formatDayOfWeek(i)}</div>)}
               </div>
-            );
-          })}
+              <div className="grid grid-cols-7 gap-1">
+                {getMonthDays(currentDate).map((d, i) => {
+                  if(!d) return <div key={i} className="aspect-square bg-gray-50/30 rounded-lg"></div>;
+                  const dayShifts = getShiftsForDay(d);
+                  const isToday = d.toISOString().slice(0,10) === new Date().toISOString().slice(0,10);
+                  return (
+                    <div 
+                      key={i} 
+                      onClick={() => { setTargetDateForInput(d.toISOString().slice(0,10)); setShowShiftInput(true); }}
+                      className={`aspect-square rounded-xl p-1 relative border transition-all cursor-pointer hover:border-pink-300 active:scale-95 ${isToday ? 'bg-pink-50 border-pink-200' : 'bg-white border-gray-100'}`}
+                    >
+                      <span className={`text-xs font-bold absolute top-1 left-1.5 ${isToday?'text-pink-600':'text-gray-700'}`}>{d.getDate()}</span>
+                      <div className="absolute bottom-1 right-1 left-1 flex flex-wrap gap-0.5 justify-end content-end">
+                        {dayShifts.slice(0, 4).map(s => {
+                          const m = members.find(m => m.id === s.memberId);
+                          return m ? <div key={s.id} className={`w-1.5 h-1.5 rounded-full ${m.role==='closer'?'bg-amber-400':'bg-sky-400'}`}></div> : null;
+                        })}
+                        {dayShifts.length > 4 && <div className="w-1.5 h-1.5 rounded-full bg-gray-300"></div>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* WEEK VIEW */}
+          {viewMode === 'week' && (
+            <div className="space-y-3">
+              {getWeekDays(currentDate).map(d => {
+                const dayShifts = getShiftsForDay(d);
+                const isToday = d.toISOString().slice(0,10) === new Date().toISOString().slice(0,10);
+                return (
+                  <div key={d.toISOString()} className={`bg-white rounded-2xl p-4 border ${isToday ? 'border-pink-200 ring-1 ring-pink-100' : 'border-gray-100'}`}>
+                    <div className="flex items-start gap-4">
+                      <div className="flex flex-col items-center min-w-[2.5rem]">
+                        <span className={`text-[10px] font-bold uppercase ${d.getDay()===0?'text-red-400':d.getDay()===6?'text-blue-400':'text-gray-400'}`}>{formatDayOfWeek(d.getDay())}</span>
+                        <span className={`text-xl font-black ${isToday?'text-pink-500':'text-gray-800'}`}>{d.getDate()}</span>
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        {dayShifts.length === 0 ? <div className="text-xs font-bold text-gray-200 py-1">No Shifts</div> : 
+                          <div className="grid grid-cols-1 gap-2">
+                            {dayShifts.map(s => {
+                              const mem = members.find(m => m.id === s.memberId);
+                              if (!mem) return null;
+                              return (
+                                <div key={s.id} className="flex items-center justify-between bg-gray-50 rounded-lg p-2 border border-gray-100">
+                                  <div className="flex items-center gap-2">
+                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-black text-white ${mem.role==='closer'?'bg-amber-400':'bg-sky-400'}`}>{mem.name.slice(0,1)}</div>
+                                    <span className="text-xs font-bold text-gray-700">{mem.name}</span>
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-[10px] font-mono font-bold text-gray-500">{s.startTime}-{s.endTime}</span>
+                                    <button onClick={(e) => { e.stopPropagation(); if(window.confirm('Delete?')) onDeleteShift(s.id); }} className="text-gray-300 hover:text-red-400"><Icon p={I.X} size={14}/></button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        }
+                      </div>
+                      <button onClick={() => { setTargetDateForInput(d.toISOString().slice(0,10)); setShowShiftInput(true); }} className="p-1 text-gray-300 hover:text-pink-500"><Icon p={I.Plus} size={18}/></button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* DAY VIEW */}
+          {viewMode === 'day' && (
+            <div className="bg-white rounded-3xl p-6 border border-gray-100 min-h-[50vh]">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-bold text-gray-800">Schedule</h3>
+                <button onClick={() => { setTargetDateForInput(currentDate.toISOString().slice(0,10)); setShowShiftInput(true); }} className="bg-black text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg">Add Shift</button>
+              </div>
+              <div className="space-y-4">
+                {getShiftsForDay(currentDate).length === 0 ? <div className="text-center py-10 text-gray-300 font-bold">No shifts scheduled</div> : 
+                  getShiftsForDay(currentDate).map(s => {
+                    const mem = members.find(m => m.id === s.memberId);
+                    if (!mem) return null;
+                    return (
+                      <div key={s.id} className="flex items-center p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-sm font-black text-white shadow-sm ${mem.role==='closer'?'bg-amber-400':'bg-sky-400'}`}>{mem.name.slice(0,1)}</div>
+                         <div className="ml-4 flex-1">
+                           <div className="font-bold text-gray-800">{mem.name}</div>
+                           <div className="text-xs font-bold text-gray-400 uppercase tracking-wider">{mem.role}</div>
+                         </div>
+                         <div className="text-right mr-4">
+                           <div className="text-lg font-black text-gray-800 font-mono">{s.startTime}</div>
+                           <div className="text-xs font-bold text-gray-400">to {s.endTime}</div>
+                         </div>
+                         <button onClick={() => { if(window.confirm('Delete?')) onDeleteShift(s.id); }} className="p-2 text-gray-300 hover:text-red-400"><Icon p={I.Trash} size={20}/></button>
+                      </div>
+                    );
+                  })
+                }
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Floating Action Button for Shift */}
+        <div className="fixed bottom-24 right-6 z-30 md:bottom-10 md:right-28">
+           <button onClick={() => { setTargetDateForInput(""); setShowShiftInput(true); }} className="bg-pink-500 text-white p-4 rounded-full shadow-xl shadow-pink-500/40 hover:scale-110 active:scale-95 transition-all border-4 border-white">
+             <Icon p={I.Plus} size={28} />
+           </button>
         </div>
       </div>
+
       {showShiftInput && (
         <ShiftInputModal 
           members={members} 
@@ -575,7 +682,7 @@ const ShiftView = ({ members, shifts, onDeleteShift, onAddShift }) => {
 };
 
 const ShiftInputModal = ({ members, initialDate, onAdd, onClose }) => {
-  const [val, setVal] = useState({ memberId: '', date: initialDate || '', startTime: '10:00', endTime: '19:00' });
+  const [val, setVal] = useState({ memberId: '', date: initialDate || new Date().toISOString().slice(0,10), startTime: '10:00', endTime: '19:00' });
   
   const submit = (e) => {
     e.preventDefault();
@@ -852,7 +959,6 @@ function App() {
           setReports(list);
           saveLocal('reports', list);
         });
-        // シフトの同期設定
         onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'shifts'), (s) => {
           const list = s.docs.map(d => ({ id: d.id, ...d.data() }));
           setShifts(list);
@@ -913,9 +1019,7 @@ function App() {
     if (db && user) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', id));
   };
 
-  // シフト追加関数
   const addShift = async (shiftData) => {
-    // shiftData: { memberId, date (string), startTime, endTime }
     const newShift = { ...shiftData, createdAt: Timestamp.now() };
     setShifts(prev => [...prev, { id: "temp_" + Date.now(), ...newShift }]);
     if (db && user) {
@@ -923,7 +1027,6 @@ function App() {
     }
   };
 
-  // シフト削除関数
   const deleteShift = async (id) => {
     setShifts(prev => prev.filter(s => s.id !== id));
     if (db && user && !id.startsWith("temp_")) {
