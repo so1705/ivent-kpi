@@ -9,9 +9,9 @@ import {
 // ==========================================
 // 1. 設定 & ヘルパー関数
 // ==========================================
-const appId = 'tele-apo-manager-v36-strict-order';
+const appId = 'tele-apo-manager-v38-shift-feature';
 
-// ★Firebase設定（ご自身のものを貼り付けてください）
+// ★Firebase設定
 const firebaseConfig = {
   apiKey: "AIzaSyBnvOnuKhldjHQGGpKSpI4TGo4a74_eaj0",
   authDomain: "ivent-kpi.firebaseapp.com",
@@ -59,18 +59,13 @@ const getWeekRange = (baseDate) => {
   return { start, end };
 };
 
-const isSameWeek = (dateObj) => {
-  if (!dateObj) return false;
-  const d = dateObj.toDate ? dateObj.toDate() : new Date(dateObj.seconds * 1000);
-  const now = new Date();
-  const day = now.getDay();
-  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-  const start = new Date(now.setDate(diff));
-  start.setHours(0,0,0,0);
-  const end = new Date(start);
-  end.setDate(start.getDate() + 6);
-  end.setHours(23,59,59,999);
-  return d >= start && d <= end;
+const getMondayKey = (dateObj) => {
+  const d = new Date(dateObj);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(d);
+  monday.setDate(diff);
+  return monday.toISOString().slice(0, 10);
 };
 
 // ==========================================
@@ -98,7 +93,8 @@ const I = {
   Ban: <><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></>,
   FileText: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></>,
   Download: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>,
-  Yen: <><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>
+  Yen: <><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>,
+  Sun: <><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></>
 };
 
 // ==========================================
@@ -128,7 +124,7 @@ const GoalRow = ({ label, val, set }) => (
     <input 
       type="number" 
       className="w-24 text-right bg-gray-50 rounded-lg px-2 py-1 font-bold text-gray-900 outline-none border border-transparent focus:border-gray-300 transition-all" 
-      value={val || 0} 
+      value={val !== undefined ? val : 0} 
       onChange={e=>set(e.target.value)} 
     />
   </div>
@@ -207,6 +203,8 @@ const GoalSection = ({ title, subTitle, data, goals, variant, headerAction }) =>
   const accentColor = isGold ? "text-amber-600" : "text-indigo-600";
   const barColor = isGold ? "bg-amber-500" : "bg-indigo-500";
   const headerBg = isGold ? "bg-amber-50/50" : "bg-indigo-50/50";
+  
+  const safeGoals = goals || {};
 
   return (
     <div className="bg-white p-6 rounded-[2rem] shadow-xl shadow-gray-100/50 border border-gray-100 relative overflow-hidden group hover:shadow-2xl transition-all duration-500">
@@ -230,7 +228,7 @@ const GoalSection = ({ title, subTitle, data, goals, variant, headerAction }) =>
           label="商談成約数" 
           icon={I.Briefcase}
           current={data.deals} 
-          target={goals.deals} 
+          target={safeGoals.deals} 
           color={accentColor} 
           bg={barColor}
         />
@@ -242,9 +240,9 @@ const GoalSection = ({ title, subTitle, data, goals, variant, headerAction }) =>
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
             <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Apointer</span>
           </div>
-          <MetricBar label="アポ数" val={data.appts} tgt={goals.appts} color="bg-emerald-500" />
-          <MetricBar label="架電数" val={data.calls} tgt={goals.calls} color="bg-slate-700" />
-          <MetricBar label="アポ見込み" val={data.apoProspects} tgt={goals.apoProspects} color="bg-cyan-500" />
+          <MetricBar label="アポ数" val={data.appts} tgt={safeGoals.appts} color="bg-emerald-500" />
+          <MetricBar label="架電数" val={data.calls} tgt={safeGoals.calls} color="bg-slate-700" />
+          <MetricBar label="アポ見込み" val={data.apoProspects} tgt={safeGoals.apoProspects} color="bg-cyan-500" />
         </div>
         
         <div className="space-y-5">
@@ -252,9 +250,9 @@ const GoalSection = ({ title, subTitle, data, goals, variant, headerAction }) =>
             <div className="w-1.5 h-1.5 rounded-full bg-purple-400"></div>
             <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Closer</span>
           </div>
-          <MetricBar label="商談数 (実施)" val={data.meetings} tgt={goals.meetings} color="bg-purple-600" />
-          <MetricBar label="商談見込み" val={data.dealProspects} tgt={goals.prospects} color="bg-amber-500" />
-          <MetricBar label="失注数" val={data.lost} tgt={goals.lost} color="bg-rose-400" />
+          <MetricBar label="商談数 (実施)" val={data.meetings} tgt={safeGoals.meetings} color="bg-purple-600" />
+          <MetricBar label="商談見込み" val={data.dealProspects} tgt={safeGoals.prospects} color="bg-amber-500" />
+          <MetricBar label="失注数" val={data.lost} tgt={safeGoals.lost} color="bg-rose-400" />
         </div>
       </div>
     </div>
@@ -265,8 +263,12 @@ const GoalSection = ({ title, subTitle, data, goals, variant, headerAction }) =>
 // 5. メイン画面コンポーネント (Views)
 // ==========================================
 
-const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBaseDate }) => {
-  const g = event.goals || { total: {}, weekly: {} };
+const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBaseDate, activeWeeklyGoals }) => {
+  const g = {
+    total: event.goals?.total || {},
+    weekly: activeWeeklyGoals || event.goals?.weekly || {} 
+  };
+
   const [filterType, setFilterType] = useState('all'); 
   
   const filteredMembers = memberStats.filter(m => {
@@ -462,6 +464,169 @@ const AttendanceView = ({ members, reports, onEdit }) => {
   );
 };
 
+const ShiftView = ({ members, shifts, onDeleteShift, onAddShift }) => {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [showShiftInput, setShowShiftInput] = useState(false);
+  const [targetDateForInput, setTargetDateForInput] = useState("");
+
+  const weekRange = getWeekRange(currentDate);
+  
+  // Create array of days for the current week
+  const weekDays = useMemo(() => {
+    const days = [];
+    const d = new Date(weekRange.start);
+    while (d <= weekRange.end) {
+      days.push(new Date(d));
+      d.setDate(d.getDate() + 1);
+    }
+    return days;
+  }, [weekRange]);
+
+  const shiftWeek = (days) => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(newDate.getDate() + days);
+    setCurrentDate(newDate);
+  };
+
+  const getShiftsForDay = (dateObj) => {
+    const dateStr = dateObj.toISOString().slice(0, 10);
+    return shifts.filter(s => s.date === dateStr).sort((a,b) => a.startTime.localeCompare(b.startTime));
+  };
+
+  const formatDayOfWeek = (d) => ['日','月','火','水','木','金','土'][d.getDay()];
+
+  return (
+    <>
+      <div className="space-y-6 animate-in fade-in pb-24">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-3">
+            <div className="p-2 bg-pink-50 text-pink-500 rounded-xl"><Icon p={I.Calendar} size={20}/></div>
+            Shift Calendar
+          </h2>
+          <div className="flex items-center gap-1 bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
+            <button onClick={() => shiftWeek(-7)} className="p-2 hover:bg-gray-50 rounded-md text-gray-500"><Icon p={I.ChevronLeft} size={18}/></button>
+            <span className="text-xs font-bold text-gray-700 px-2">
+              {weekRange.start.getMonth()+1}/{weekRange.start.getDate()} - {weekRange.end.getMonth()+1}/{weekRange.end.getDate()}
+            </span>
+            <button onClick={() => shiftWeek(7)} className="p-2 hover:bg-gray-50 rounded-md text-gray-500"><Icon p={I.ChevronRight} size={18}/></button>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          {weekDays.map(day => {
+            const dayShifts = getShiftsForDay(day);
+            const isToday = day.toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10);
+            return (
+              <div key={day.toISOString()} className={`bg-white rounded-2xl p-4 border transition-all ${isToday ? 'border-pink-200 shadow-md shadow-pink-50 ring-1 ring-pink-100' : 'border-gray-100 shadow-sm'}`}>
+                <div className="flex items-start gap-4">
+                  <div className="flex flex-col items-center min-w-[3rem]">
+                    <span className={`text-xs font-bold uppercase ${day.getDay()===0 ? 'text-red-400' : (day.getDay()===6 ? 'text-blue-400' : 'text-gray-400')}`}>{formatDayOfWeek(day)}</span>
+                    <span className={`text-2xl font-black ${isToday ? 'text-pink-500' : 'text-gray-800'}`}>{day.getDate()}</span>
+                  </div>
+                  
+                  <div className="flex-1 space-y-2">
+                    {dayShifts.length === 0 ? (
+                      <div className="text-xs font-bold text-gray-200 py-2">No Shifts</div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {dayShifts.map(s => {
+                          const mem = members.find(m => m.id === s.memberId);
+                          if (!mem) return null;
+                          return (
+                            <div key={s.id} className="flex items-center justify-between bg-gray-50 rounded-xl p-2 border border-gray-100 hover:border-gray-300 transition-colors group">
+                              <div className="flex items-center gap-2">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-black uppercase text-white ${mem.role === 'closer' ? 'bg-amber-400' : 'bg-sky-400'}`}>
+                                  {mem.name.slice(0,1)}
+                                </div>
+                                <div>
+                                  <div className="text-xs font-bold text-gray-800">{mem.name}</div>
+                                  <div className="text-[10px] font-mono font-bold text-gray-500">{s.startTime} - {s.endTime}</div>
+                                </div>
+                              </div>
+                              <button onClick={() => { if(window.confirm('シフトを削除しますか？')) onDeleteShift(s.id); }} className="p-1.5 text-gray-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
+                                <Icon p={I.X} size={14}/>
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <button onClick={() => { setTargetDateForInput(day.toISOString().slice(0, 10)); setShowShiftInput(true); }} className="p-2 text-gray-300 hover:text-pink-500 hover:bg-pink-50 rounded-full transition-all">
+                    <Icon p={I.Plus} size={20}/>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {showShiftInput && (
+        <ShiftInputModal 
+          members={members} 
+          initialDate={targetDateForInput} 
+          onAdd={onAddShift} 
+          onClose={() => setShowShiftInput(false)} 
+        />
+      )}
+    </>
+  );
+};
+
+const ShiftInputModal = ({ members, initialDate, onAdd, onClose }) => {
+  const [val, setVal] = useState({ memberId: '', date: initialDate || '', startTime: '10:00', endTime: '19:00' });
+  
+  const submit = (e) => {
+    e.preventDefault();
+    if (!val.memberId || !val.date || !val.startTime || !val.endTime) return alert("全ての項目を入力してください");
+    onAdd(val);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center animate-in fade-in duration-300 text-gray-900 p-4">
+      <div className="w-full max-w-md bg-white rounded-[2rem] shadow-2xl border border-gray-100 overflow-hidden">
+        <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+          <h2 className="font-bold text-lg text-gray-800 flex items-center gap-2"><Icon p={I.Calendar}/> シフト追加</h2>
+          <button onClick={onClose} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500 transition-colors"><Icon p={I.X}/></button>
+        </div>
+        <form onSubmit={submit} className="p-6 space-y-6">
+          <div className="space-y-2">
+            <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest pl-1">スタッフ</label>
+            <div className="flex flex-wrap gap-2">
+              {members.map(m => (
+                <label key={m.id} className={`px-3 py-2 rounded-xl border cursor-pointer font-bold transition-all text-xs flex items-center gap-2 ${val.memberId===m.id ? 'border-pink-500 bg-pink-50 text-pink-700 ring-2 ring-pink-200' : 'border-gray-100 bg-white text-gray-500 hover:border-gray-300'}`}>
+                  <input type="radio" name="mem" value={m.id} className="hidden" onChange={e=>setVal({...val, memberId: e.target.value})} />
+                  {m.name}
+                </label>
+              ))}
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest pl-1">日時</label>
+            <input type="date" className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-gray-900 outline-none focus:ring-2 focus:ring-pink-100" value={val.date} onChange={e => setVal({...val, date: e.target.value})} />
+          </div>
+
+          <div className="flex gap-4">
+            <div className="flex-1 space-y-2">
+              <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest pl-1">開始</label>
+              <input type="time" className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-gray-900 outline-none text-center focus:ring-2 focus:ring-pink-100" value={val.startTime} onChange={e => setVal({...val, startTime: e.target.value})} />
+            </div>
+            <div className="flex-1 space-y-2">
+              <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest pl-1">終了</label>
+              <input type="time" className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-gray-900 outline-none text-center focus:ring-2 focus:ring-pink-100" value={val.endTime} onChange={e => setVal({...val, endTime: e.target.value})} />
+            </div>
+          </div>
+
+          <button className="w-full bg-black text-white py-4 rounded-2xl font-bold text-lg shadow-xl hover:bg-gray-800 transition-all active:scale-95">シフトを保存</button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData = null }) {
   const today = new Date().toISOString().slice(0, 10);
   const [val, setVal] = useState({ memberId: '', date: today, calls: '', appts: '', requests: '', prospects: '', lost: '', deals: '', hours: '', startTime: '', endTime: '' });
@@ -543,17 +708,47 @@ function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData =
   );
 };
 
-function Settings({ events, currentEventId, onAddEvent, onUpdateGoals, members, onAddMember, onDelMember, onClose }) {
+function Settings({ events, currentEventId, onAddEvent, onUpdateGoals, onUpdateWeeklyGoals, members, onAddMember, onDelMember, onClose }) {
   const cur = events.find(e => e.id === currentEventId) || {};
-  const [goals, setGoals] = useState(cur.goals || { total: {}, weekly: {} });
+  const [targetDate, setTargetDate] = useState(new Date()); 
+  const [goals, setGoals] = useState({ total: {}, weekly: {} });
+  
   const [newEventName, setNewEventName] = useState("");
   const [newEventDate, setNewEventDate] = useState("");
   const [newMem, setNewMem] = useState("");
   const [newRole, setNewRole] = useState("apo");
   const [newHourlyWage, setNewHourlyWage] = useState("");
 
-  const saveGoals = () => { if (currentEventId) { onUpdateGoals(currentEventId, goals); alert("設定を保存しました"); } };
+  const targetWeekKey = useMemo(() => getMondayKey(targetDate), [targetDate]);
+
+  useEffect(() => {
+    if (cur.goals) {
+      const specificWeeklyGoal = cur.weeklyGoals?.[targetWeekKey] || cur.goals.weekly || {};
+      setGoals({
+        total: cur.goals.total || {},
+        weekly: specificWeeklyGoal
+      });
+    }
+  }, [cur, targetWeekKey]);
+
+  const saveGoals = () => { 
+    if (currentEventId) { 
+      onUpdateGoals(currentEventId, { ...cur.goals, total: goals.total });
+      onUpdateWeeklyGoals(currentEventId, targetWeekKey, goals.weekly);
+      alert(`${getWeekRange(targetDate).start.toLocaleDateString()} の週の目標設定を保存しました`); 
+    } 
+  };
+  
   const updateGoalVal = (type, key, val) => { setGoals(prev => ({ ...prev, [type]: { ...prev[type], [key]: Number(val) } })); };
+
+  const shiftWeek = (days) => {
+    const newDate = new Date(targetDate);
+    newDate.setDate(newDate.getDate() + days);
+    setTargetDate(newDate);
+  };
+
+  const wr = getWeekRange(targetDate);
+  const weekRangeLabel = `${wr.start.getMonth()+1}/${wr.start.getDate()} - ${wr.end.getMonth()+1}/${wr.end.getDate()}`;
 
   return (
     <div className="space-y-8 md:grid md:grid-cols-2 md:gap-8 md:space-y-0 pb-20 no-print">
@@ -574,7 +769,18 @@ function Settings({ events, currentEventId, onAddEvent, onUpdateGoals, members, 
         <div className="flex justify-between items-center"><div><h3 className="font-bold text-lg text-gray-900">目標値設定</h3><p className="text-xs text-gray-400 font-bold">{cur.name}</p></div><button onClick={saveGoals} className="bg-emerald-500 text-white px-6 py-2 rounded-xl text-xs font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-600 transition-all">保存</button></div>
         <div className="space-y-6">
           <div className="p-5 bg-amber-50 rounded-[2rem] border border-amber-100 space-y-3"><div className="text-xs font-extrabold text-amber-800 uppercase tracking-widest mb-2 flex items-center gap-2"><Icon p={I.Trophy} size={14}/> 全体目標</div><GoalRow label="商談成約" val={goals.total?.deals} set={v=>updateGoalVal('total','deals',v)} /><GoalRow label="商談数(実施)" val={goals.total?.meetings} set={v=>updateGoalVal('total','meetings',v)} /><GoalRow label="見込(CL)" val={goals.total?.prospects} set={v=>updateGoalVal('total','prospects',v)} /><GoalRow label="失注" val={goals.total?.lost} set={v=>updateGoalVal('total','lost',v)} /><div className="border-t border-amber-200/50 my-2"></div><GoalRow label="見込(AP)" val={goals.total?.apoProspects} set={v=>updateGoalVal('total','apoProspects',v)} /><GoalRow label="アポ" val={goals.total?.appts} set={v=>updateGoalVal('total','appts',v)} /><GoalRow label="架電" val={goals.total?.calls} set={v=>updateGoalVal('total','calls',v)} /></div>
-          <div className="p-5 bg-indigo-50 rounded-[2rem] border border-indigo-100 space-y-3"><div className="text-xs font-extrabold text-indigo-800 uppercase tracking-widest mb-2 flex items-center gap-2"><Icon p={I.Calendar} size={14}/> 週間目標</div><GoalRow label="商談成約" val={goals.weekly?.deals} set={v=>updateGoalVal('weekly','deals',v)} /><GoalRow label="商談数(実施)" val={goals.weekly?.meetings} set={v=>updateGoalVal('weekly','meetings',v)} /><GoalRow label="見込(CL)" val={goals.weekly?.prospects} set={v=>updateGoalVal('weekly','prospects',v)} /><GoalRow label="失注" val={goals.weekly?.lost} set={v=>updateGoalVal('weekly','lost',v)} /><div className="border-t border-indigo-200/50 my-2"></div><GoalRow label="見込(AP)" val={goals.weekly?.apoProspects} set={v=>updateGoalVal('weekly','apoProspects',v)} /><GoalRow label="アポ" val={goals.weekly?.appts} set={v=>updateGoalVal('weekly','appts',v)} /><GoalRow label="架電" val={goals.weekly?.calls} set={v=>updateGoalVal('weekly','calls',v)} /></div>
+          <div className="p-5 bg-indigo-50 rounded-[2rem] border border-indigo-100 space-y-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-extrabold text-indigo-800 uppercase tracking-widest flex items-center gap-2"><Icon p={I.Calendar} size={14}/> 週間目標</div>
+              
+              <div className="flex items-center gap-1 bg-white rounded-lg p-1 border border-indigo-100">
+                <button onClick={() => shiftWeek(-7)} className="p-1 hover:bg-indigo-50 rounded-md text-indigo-400"><Icon p={I.ChevronLeft} size={14}/></button>
+                <span className="text-[10px] font-bold text-indigo-900 w-24 text-center">{weekRangeLabel}</span>
+                <button onClick={() => shiftWeek(7)} className="p-1 hover:bg-indigo-50 rounded-md text-indigo-400"><Icon p={I.ChevronRight} size={14}/></button>
+              </div>
+            </div>
+            
+            <GoalRow label="商談成約" val={goals.weekly?.deals} set={v=>updateGoalVal('weekly','deals',v)} /><GoalRow label="商談数(実施)" val={goals.weekly?.meetings} set={v=>updateGoalVal('weekly','meetings',v)} /><GoalRow label="見込(CL)" val={goals.weekly?.prospects} set={v=>updateGoalVal('weekly','prospects',v)} /><GoalRow label="失注" val={goals.weekly?.lost} set={v=>updateGoalVal('weekly','lost',v)} /><div className="border-t border-indigo-200/50 my-2"></div><GoalRow label="見込(AP)" val={goals.weekly?.apoProspects} set={v=>updateGoalVal('weekly','apoProspects',v)} /><GoalRow label="アポ" val={goals.weekly?.appts} set={v=>updateGoalVal('weekly','appts',v)} /><GoalRow label="架電" val={goals.weekly?.calls} set={v=>updateGoalVal('weekly','calls',v)} /></div>
         </div>
       </div>
     </div>
@@ -589,13 +795,13 @@ function App() {
   const [showInput, setShowInput] = useState(false);
   const [user, setUser] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState("connecting");
-  const [weekOffset, setWeekOffset] = useState(0); 
   const [currentBaseDate, setCurrentBaseDate] = useState(new Date());
 
   const [events, setEvents] = useState([]);
   const [currentEventId, setCurrentEventId] = useState(null);
   const [members, setMembers] = useState([]);
   const [reports, setReports] = useState([]);
+  const [shifts, setShifts] = useState([]); // シフトデータ
   const [editingReport, setEditingReport] = useState(null);
 
   const defaultGoals = {
@@ -607,9 +813,11 @@ function App() {
     const lEvents = loadLocal('events');
     const lMems = loadLocal('members');
     const lReps = loadLocal('reports');
+    const lShifts = loadLocal('shifts');
     if (lEvents.length) { setEvents(lEvents); setCurrentEventId(lEvents[0].id); }
     if (lMems.length) setMembers(lMems);
     if (lReps.length) setReports(lReps);
+    if (lShifts.length) setShifts(lShifts);
 
     if (isOffline || !auth) { setConnectionStatus("offline"); return; }
 
@@ -623,7 +831,7 @@ function App() {
         onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'events'), (s) => {
           const list = s.docs.map(d => ({ id: d.id, ...d.data() }));
           if (list.length === 0) {
-            const newEvent = { name: "イベント 2026", date: "2026-06-30", goals: defaultGoals, createdAt: Timestamp.now() };
+            const newEvent = { name: "イベント 2026", date: "2026-06-30", goals: defaultGoals, weeklyGoals: {}, createdAt: Timestamp.now() };
             addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'events'), newEvent);
           } else {
             setEvents(prev => {
@@ -644,19 +852,34 @@ function App() {
           setReports(list);
           saveLocal('reports', list);
         });
+        // シフトの同期設定
+        onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'shifts'), (s) => {
+          const list = s.docs.map(d => ({ id: d.id, ...d.data() }));
+          setShifts(list);
+          saveLocal('shifts', list);
+        });
       }
     });
     return () => unsubAuth();
   }, []);
 
   const addEvent = async (name, date) => {
-    const newEvent = { name, date, goals: defaultGoals, createdAt: Timestamp.now() };
+    const newEvent = { name, date, goals: defaultGoals, weeklyGoals: {}, createdAt: Timestamp.now() };
     if (db && user) await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'events'), newEvent);
   };
 
   const updateEventGoals = async (eventId, newGoals) => {
     if (db && user) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', eventId), { goals: newGoals });
     setEvents(events.map(e => e.id === eventId ? { ...e, goals: newGoals } : e));
+  };
+  
+  const updateEventWeeklyGoals = async (eventId, weekKey, weeklyGoal) => {
+    const fieldPath = `weeklyGoals.${weekKey}`;
+    if (db && user) {
+      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', eventId), {
+        [fieldPath]: weeklyGoal
+      });
+    }
   };
 
   const addReport = async (data) => {
@@ -690,8 +913,31 @@ function App() {
     if (db && user) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', id));
   };
 
+  // シフト追加関数
+  const addShift = async (shiftData) => {
+    // shiftData: { memberId, date (string), startTime, endTime }
+    const newShift = { ...shiftData, createdAt: Timestamp.now() };
+    setShifts(prev => [...prev, { id: "temp_" + Date.now(), ...newShift }]);
+    if (db && user) {
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shifts'), newShift);
+    }
+  };
+
+  // シフト削除関数
+  const deleteShift = async (id) => {
+    setShifts(prev => prev.filter(s => s.id !== id));
+    if (db && user && !id.startsWith("temp_")) {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shifts', id));
+    }
+  };
+
   const currentEvent = events.find(e => e.id === currentEventId) || { goals: defaultGoals, name: "Loading..." };
   const eventReports = reports.filter(r => r.eventId === currentEventId || (!r.eventId && events.length > 0 && events[0].id === currentEventId)); 
+
+  const activeWeeklyGoals = useMemo(() => {
+    const currentWeekKey = getMondayKey(currentBaseDate);
+    return currentEvent.weeklyGoals?.[currentWeekKey] || currentEvent.goals?.weekly;
+  }, [currentEvent, currentBaseDate]);
 
   const memberRoleMap = useMemo(() => {
     return members.reduce((acc, m) => ({ ...acc, [m.id]: m.role }), {});
@@ -754,13 +1000,19 @@ function App() {
           <div className="flex gap-2">{connectionStatus === "offline" && <span className="text-red-400 bg-red-50 p-2 rounded-full"><Icon p={I.WifiOff} size={16}/></span>}<button onClick={() => setActiveTab('settings')} className="p-2 bg-slate-100 rounded-full text-slate-500 active:bg-slate-200"><Icon p={I.Settings} size={20} /></button></div>
         </header>
         <div className="flex-1 p-4 overflow-y-auto space-y-6">
-          {activeTab === 'dashboard' && (<div className="no-print"><Dashboard event={currentEvent} totals={totals} memberStats={memberStats} currentBaseDate={currentBaseDate} setCurrentBaseDate={setCurrentBaseDate} /></div>)}
+          {activeTab === 'dashboard' && (<div className="no-print"><Dashboard event={currentEvent} totals={totals} memberStats={memberStats} currentBaseDate={currentBaseDate} setCurrentBaseDate={setCurrentBaseDate} activeWeeklyGoals={activeWeeklyGoals} /></div>)}
           {activeTab === 'attendance' && (<AttendanceView members={members} reports={eventReports} onEdit={(report) => setEditingReport(report)} />)}
-          {activeTab === 'settings' && (<div className="no-print"><Settings events={events} currentEventId={currentEventId} onAddEvent={addEvent} onUpdateGoals={updateEventGoals} members={members} onAddMember={addMember} onDelMember={deleteMember} onClose={() => setActiveTab('dashboard')} /></div>)}
+          {activeTab === 'shift' && (<div className="no-print"><ShiftView members={members} shifts={shifts} onDeleteShift={deleteShift} onAddShift={addShift} /></div>)}
+          {activeTab === 'settings' && (<div className="no-print"><Settings events={events} currentEventId={currentEventId} onAddEvent={addEvent} onUpdateGoals={updateEventGoals} onUpdateWeeklyGoals={updateEventWeeklyGoals} members={members} onAddMember={addMember} onDelMember={deleteMember} onClose={() => setActiveTab('dashboard')} /></div>)}
         </div>
         {activeTab !== 'settings' && (<div className="fixed bottom-24 right-6 z-30 md:bottom-10 md:right-10 no-print"><button onClick={() => setShowInput(true)} className="bg-indigo-600 text-white p-4 rounded-full shadow-xl shadow-indigo-500/40 hover:scale-110 active:scale-95 transition-all border-4 border-white"><Icon p={I.Plus} size={28} /></button></div>)}
         {(showInput || editingReport) && (<div className="no-print"><InputModal members={members} initialData={editingReport} onAdd={addReport} onUpdate={updateReport} onDelete={deleteReport} onClose={() => { setShowInput(false); setEditingReport(null); }} /></div>)}
-        <nav className="fixed bottom-0 left-0 right-0 max-w-md md:max-w-4xl lg:max-w-6xl mx-auto bg-white border-t border-slate-100 flex justify-around items-center p-2 z-20 pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.05)] md:mb-4 md:mx-4 md:rounded-2xl md:border md:shadow-lg no-print"><NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={I.Briefcase} label="ホーム" /><NavButton active={activeTab === 'attendance'} onClick={() => setActiveTab('attendance')} icon={I.Clock} label="稼働管理" /><NavButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={I.Settings} label="設定" /></nav>
+        <nav className="fixed bottom-0 left-0 right-0 max-w-md md:max-w-4xl lg:max-w-6xl mx-auto bg-white border-t border-slate-100 flex justify-around items-center p-2 z-20 pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.05)] md:mb-4 md:mx-4 md:rounded-2xl md:border md:shadow-lg no-print">
+          <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={I.Briefcase} label="ホーム" />
+          <NavButton active={activeTab === 'attendance'} onClick={() => setActiveTab('attendance')} icon={I.Clock} label="稼働管理" />
+          <NavButton active={activeTab === 'shift'} onClick={() => setActiveTab('shift')} icon={I.Calendar} label="シフト" />
+          <NavButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={I.Settings} label="設定" />
+        </nav>
       </div>
     </div>
   );
