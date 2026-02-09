@@ -9,7 +9,7 @@ import {
 // ==========================================
 // 1. 設定 & ヘルパー関数
 // ==========================================
-const appId = 'tele-apo-manager-v39-shift-calendar';
+const appId = 'tele-apo-manager-v42-date-nav';
 
 // ★Firebase設定
 const firebaseConfig = {
@@ -265,18 +265,14 @@ const GoalSection = ({ title, subTitle, data, goals, variant, headerAction }) =>
 // 5. メイン画面コンポーネント (Views)
 // ==========================================
 
-const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBaseDate, activeWeeklyGoals }) => {
+const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBaseDate, activeWeeklyGoals, eventReports }) => {
+  const [statsPeriod, setStatsPeriod] = useState('total'); // 'total', 'month', 'week', 'day'
+  const [filterType, setFilterType] = useState('all');
+
   const g = {
     total: event.goals?.total || {},
     weekly: activeWeeklyGoals || event.goals?.weekly || {} 
   };
-
-  const [filterType, setFilterType] = useState('all'); 
-  
-  const filteredMembers = memberStats.filter(m => {
-    if (filterType === 'all') return true;
-    return m.role === filterType;
-  });
 
   const wr = getWeekRange(currentBaseDate);
   const weekRangeString = `${wr.start.getMonth()+1}/${wr.start.getDate()} - ${wr.end.getMonth()+1}/${wr.end.getDate()}`;
@@ -284,6 +280,14 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
   const shiftWeek = (days) => {
     const newDate = new Date(currentBaseDate);
     newDate.setDate(newDate.getDate() + days);
+    setCurrentBaseDate(newDate);
+  };
+
+  const shiftDate = (amount, unit) => {
+    const newDate = new Date(currentBaseDate);
+    if(unit === 'month') newDate.setMonth(newDate.getMonth() + amount);
+    else if(unit === 'week') newDate.setDate(newDate.getDate() + (amount * 7));
+    else newDate.setDate(newDate.getDate() + amount);
     setCurrentBaseDate(newDate);
   };
   
@@ -294,6 +298,63 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
   };
   
   const dateString = currentBaseDate.toISOString().slice(0, 10);
+
+  // Stats calculation based on period
+  const filteredMemberStats = useMemo(() => {
+    let targetReports = eventReports;
+    
+    if (statsPeriod === 'week') {
+      const { start, end } = getWeekRange(currentBaseDate);
+      targetReports = eventReports.filter(r => {
+         if (!r.date) return false;
+         const d = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
+         return d >= start && d <= end;
+      });
+    } else if (statsPeriod === 'month') {
+      const targetYear = currentBaseDate.getFullYear();
+      const targetMonth = currentBaseDate.getMonth();
+      targetReports = eventReports.filter(r => {
+         if (!r.date) return false;
+         const d = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
+         return d.getFullYear() === targetYear && d.getMonth() === targetMonth;
+      });
+    } else if (statsPeriod === 'day') {
+      const targetDateStr = currentBaseDate.toISOString().slice(0, 10);
+      targetReports = eventReports.filter(r => {
+         if (!r.date) return false;
+         const d = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
+         return d.toISOString().slice(0, 10) === targetDateStr;
+      });
+    }
+
+    return memberStats.map(m => {
+      const myReps = targetReports.filter(r => r.memberId === m.id);
+      const myTot = myReps.reduce((acc, r) => ({
+        deals: acc.deals + (Number(r.deals)||0),
+        prospects: acc.prospects + (Number(r.prospects)||0),
+        lost: acc.lost + (Number(r.lost)||0),
+        appts: acc.appts + (Number(r.appts)||0),
+        calls: acc.calls + (Number(r.calls)||0),
+        requests: acc.requests + (Number(r.requests)||0),
+        hours: acc.hours + (Number(r.hours)||0),
+      }), { deals: 0, prospects: 0, lost: 0, appts: 0, calls: 0, requests: 0, hours: 0 });
+      const meetings = myTot.deals + (m.role==='closer' ? myTot.prospects : 0) + myTot.lost;
+      return { ...m, ...myTot, meetings, cph: myTot.hours > 0 ? (myTot.calls / myTot.hours).toFixed(1) : "0.0" };
+    }).sort((a,b) => b.cph - a.cph);
+  }, [memberStats, eventReports, statsPeriod, currentBaseDate]);
+
+  const filteredMembers = filteredMemberStats.filter(m => {
+    if (filterType === 'all') return true;
+    return m.role === filterType;
+  });
+
+  const periodLabel = useMemo(() => {
+    if (statsPeriod === 'total') return '全期間';
+    if (statsPeriod === 'month') return `${currentBaseDate.getMonth() + 1}月`;
+    if (statsPeriod === 'week') return `${wr.start.getMonth()+1}/${wr.start.getDate()}週`;
+    if (statsPeriod === 'day') return `${currentBaseDate.getMonth()+1}/${currentBaseDate.getDate()}`;
+    return '';
+  }, [statsPeriod, currentBaseDate, wr]);
 
   return (
     <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-700 md:grid md:grid-cols-2 md:gap-8 md:space-y-0">
@@ -327,17 +388,58 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
       </div>
 
       <section className="md:h-full md:flex md:flex-col">
-        <div className="flex justify-between items-end mb-4 px-2">
-          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-3">
-            <div className="p-2 bg-gray-100 rounded-xl text-gray-600"><Icon p={I.Users} size={20}/></div>
-            Members
-          </h2>
-          <div className="flex bg-gray-100 rounded-lg p-1">
-            <button onClick={() => setFilterType('all')} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${filterType === 'all' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>All</button>
-            <button onClick={() => setFilterType('apo')} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${filterType === 'apo' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>Apo</button>
-            <button onClick={() => setFilterType('closer')} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${filterType === 'closer' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>Closer</button>
+        <div className="mb-4 px-2 space-y-3">
+          <div className="flex justify-between items-end">
+            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-3">
+              <div className="p-2 bg-gray-100 rounded-xl text-gray-600"><Icon p={I.Users} size={20}/></div>
+              Members
+            </h2>
+            <div className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg">
+              表示: {periodLabel}
+            </div>
           </div>
+          
+          <div className="flex flex-wrap gap-2 justify-between">
+             {/* Period Filter */}
+             <div className="flex bg-gray-100 rounded-lg p-1">
+              <button onClick={() => setStatsPeriod('total')} className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${statsPeriod === 'total' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>全体</button>
+              <button onClick={() => setStatsPeriod('month')} className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${statsPeriod === 'month' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>月</button>
+              <button onClick={() => setStatsPeriod('week')} className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${statsPeriod === 'week' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>週</button>
+              <button onClick={() => setStatsPeriod('day')} className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${statsPeriod === 'day' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>日</button>
+            </div>
+
+            {/* Role Filter */}
+            <div className="flex bg-gray-100 rounded-lg p-1">
+              <button onClick={() => setFilterType('all')} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${filterType === 'all' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>All</button>
+              <button onClick={() => setFilterType('apo')} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${filterType === 'apo' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>Apo</button>
+              <button onClick={() => setFilterType('closer')} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${filterType === 'closer' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>Closer</button>
+            </div>
+          </div>
+
+          {/* Date Navigation Control */}
+          {statsPeriod !== 'total' && (
+            <div className="flex items-center justify-between bg-white p-2 rounded-xl border border-gray-100 shadow-sm mt-2">
+              <button onClick={() => shiftDate(-1, statsPeriod)} className="p-2 hover:bg-gray-50 rounded-lg text-gray-500"><Icon p={I.ChevronLeft} size={16}/></button>
+              <div className="flex items-center gap-2 relative">
+                <span className="text-sm font-bold text-gray-800">
+                  {statsPeriod === 'day' && `${currentBaseDate.getMonth()+1}/${currentBaseDate.getDate()} (${['日','月','火','水','木','金','土'][currentBaseDate.getDay()]})`}
+                  {statsPeriod === 'month' && `${currentBaseDate.getFullYear()}年 ${currentBaseDate.getMonth()+1}月`}
+                  {statsPeriod === 'week' && `${getWeekRange(currentBaseDate).start.getMonth()+1}/${getWeekRange(currentBaseDate).start.getDate()} - ${getWeekRange(currentBaseDate).end.getMonth()+1}/${getWeekRange(currentBaseDate).end.getDate()}`}
+                </span>
+                {/* 日付ピッカー (Dayモード時のみ、あるいは常時) */}
+                <input 
+                  type="date" 
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                  onChange={handleDateChange}
+                  value={dateString}
+                />
+                <Icon p={I.Calendar} size={14} className="text-indigo-400"/>
+              </div>
+              <button onClick={() => shiftDate(1, statsPeriod)} className="p-2 hover:bg-gray-50 rounded-lg text-gray-500"><Icon p={I.ChevronRight} size={16}/></button>
+            </div>
+          )}
         </div>
+
         <div className="space-y-4 md:flex-1 md:overflow-y-auto md:pr-2 pb-20 md:pb-0">
           {filteredMembers.map((m, i) => (
             <div key={m.id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100/80 transition-all hover:shadow-lg hover:-translate-y-1 group relative overflow-hidden">
@@ -535,12 +637,12 @@ const ShiftView = ({ members, shifts, onDeleteShift, onAddShift }) => {
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-3">
               <div className="p-2 bg-pink-50 text-pink-500 rounded-xl"><Icon p={I.Calendar} size={20}/></div>
-              シフト
+              Shift
             </h2>
             <div className="flex bg-gray-100 p-1 rounded-xl">
-              <button onClick={()=>setViewMode('month')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='month' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-400'}`}>月</button>
-              <button onClick={()=>setViewMode('week')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='week' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-400'}`}>週</button>
-              <button onClick={()=>setViewMode('day')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='day' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-400'}`}>日</button>
+              <button onClick={()=>setViewMode('month')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='month' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-400'}`}>Month</button>
+              <button onClick={()=>setViewMode('week')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='week' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-400'}`}>Week</button>
+              <button onClick={()=>setViewMode('day')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='day' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-400'}`}>Day</button>
             </div>
           </div>
           
@@ -1133,7 +1235,7 @@ function App() {
           <div className="flex gap-2">{connectionStatus === "offline" && <span className="text-red-400 bg-red-50 p-2 rounded-full"><Icon p={I.WifiOff} size={16}/></span>}<button onClick={() => setActiveTab('settings')} className="p-2 bg-slate-100 rounded-full text-slate-500 active:bg-slate-200"><Icon p={I.Settings} size={20} /></button></div>
         </header>
         <div className="flex-1 p-4 overflow-y-auto space-y-6">
-          {activeTab === 'dashboard' && (<div className="no-print"><Dashboard event={currentEvent} totals={totals} memberStats={memberStats} currentBaseDate={currentBaseDate} setCurrentBaseDate={setCurrentBaseDate} activeWeeklyGoals={activeWeeklyGoals} /></div>)}
+          {activeTab === 'dashboard' && (<div className="no-print"><Dashboard event={currentEvent} totals={totals} memberStats={memberStats} currentBaseDate={currentBaseDate} setCurrentBaseDate={setCurrentBaseDate} activeWeeklyGoals={activeWeeklyGoals} eventReports={eventReports} /></div>)}
           {activeTab === 'attendance' && (<AttendanceView members={members} reports={eventReports} onEdit={(report) => setEditingReport(report)} />)}
           {activeTab === 'shift' && (<div className="no-print"><ShiftView members={members} shifts={shifts} onDeleteShift={deleteShift} onAddShift={addShift} /></div>)}
           {activeTab === 'settings' && (<div className="no-print"><Settings events={events} currentEventId={currentEventId} onAddEvent={addEvent} onDeleteEvent={deleteEvent} onUpdateGoals={updateEventGoals} onUpdateWeeklyGoals={updateEventWeeklyGoals} members={members} onAddMember={addMember} onDelMember={deleteMember} onClose={() => setActiveTab('dashboard')} /></div>)}
