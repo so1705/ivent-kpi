@@ -59,13 +59,28 @@ const getWeekRange = (baseDate) => {
   return { start, end };
 };
 
+const toLocalDateString = (date) => {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const toLocalMonthString = (date) => {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+};
+
 const getMondayKey = (dateObj) => {
   const d = new Date(dateObj);
   const day = d.getDay();
   const diff = d.getDate() - day + (day === 0 ? -6 : 1);
   const monday = new Date(d);
   monday.setDate(diff);
-  return monday.toISOString().slice(0, 10);
+  return toLocalDateString(monday);
 };
 
 // ==========================================
@@ -297,7 +312,7 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
     }
   };
   
-  const dateString = currentBaseDate.toISOString().slice(0, 10);
+  const dateString = toLocalDateString(currentBaseDate);
 
   // Stats calculation based on period
   const filteredMemberStats = useMemo(() => {
@@ -319,7 +334,7 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
          return d.getFullYear() === targetYear && d.getMonth() === targetMonth;
       });
     } else if (statsPeriod === 'day') {
-      const targetDateStr = currentBaseDate.toISOString().slice(0, 10);
+      const targetDateStr = toLocalDateString(currentBaseDate);
       targetReports = eventReports.filter(r => {
          if (!r.date) return false;
          const d = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
@@ -487,7 +502,7 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
 };
 
 const AttendanceView = ({ members, reports, onEdit }) => {
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); 
+  const [selectedMonth, setSelectedMonth] = useState(toLocalMonthString(new Date())); 
   const [selectedMemberId, setSelectedMemberId] = useState("");
   const apoMembers = members.filter(m => m.role !== 'closer');
   
@@ -495,7 +510,7 @@ const AttendanceView = ({ members, reports, onEdit }) => {
     return reports.filter(r => {
       if (!r.date) return false;
       const d = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
-      return d.toISOString().slice(0, 7) === selectedMonth && 
+      return toLocalMonthString(d) === selectedMonth && 
              (selectedMemberId ? r.memberId === selectedMemberId : true) && 
              (r.hours > 0 || (r.startTime && r.endTime));
     }).sort((a,b) => (a.date?.seconds || 0) - (b.date?.seconds || 0));
@@ -575,7 +590,7 @@ const ShiftView = ({ members, shifts, onDeleteShift, onAddShift }) => {
   const [targetDateForInput, setTargetDateForInput] = useState("");
 
   const getShiftsForDay = (dateObj) => {
-    const dateStr = dateObj.toISOString().slice(0, 10);
+    const dateStr = toLocalDateString(dateObj);
     return shifts.filter(s => s.date === dateStr).sort((a,b) => a.startTime.localeCompare(b.startTime));
   };
 
@@ -665,11 +680,11 @@ const ShiftView = ({ members, shifts, onDeleteShift, onAddShift }) => {
                 {getMonthDays(currentDate).map((d, i) => {
                   if(!d) return <div key={i} className="aspect-square bg-gray-50/30 rounded-lg"></div>;
                   const dayShifts = getShiftsForDay(d);
-                  const isToday = d.toISOString().slice(0,10) === new Date().toISOString().slice(0,10);
+                  const isToday = toLocalDateString(d) === toLocalDateString(new Date());
                   return (
                     <div 
                       key={i} 
-                      onClick={() => { setTargetDateForInput(d.toISOString().slice(0,10)); setShowShiftInput(true); }}
+                      onClick={() => { setTargetDateForInput(toLocalDateString(d)); setShowShiftInput(true); }}
                       className={`aspect-square rounded-xl p-1 relative border transition-all cursor-pointer hover:border-pink-300 active:scale-95 ${isToday ? 'bg-pink-50 border-pink-200' : 'bg-white border-gray-100'}`}
                     >
                       <span className={`text-xs font-bold absolute top-1 left-1.5 ${isToday?'text-pink-600':'text-gray-700'}`}>{d.getDate()}</span>
@@ -692,7 +707,7 @@ const ShiftView = ({ members, shifts, onDeleteShift, onAddShift }) => {
             <div className="space-y-3">
               {getWeekDays(currentDate).map(d => {
                 const dayShifts = getShiftsForDay(d);
-                const isToday = d.toISOString().slice(0,10) === new Date().toISOString().slice(0,10);
+                const isToday = toLocalDateString(d) === toLocalDateString(new Date());
                 return (
                   <div key={d.toISOString()} className={`bg-white rounded-2xl p-4 border ${isToday ? 'border-pink-200 ring-1 ring-pink-100' : 'border-gray-100'}`}>
                     <div className="flex items-start gap-4">
@@ -735,7 +750,7 @@ const ShiftView = ({ members, shifts, onDeleteShift, onAddShift }) => {
             <div className="bg-white rounded-3xl p-6 border border-gray-100 min-h-[50vh]">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-bold text-gray-800">Schedule</h3>
-                <button onClick={() => { setTargetDateForInput(currentDate.toISOString().slice(0,10)); setShowShiftInput(true); }} className="bg-black text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg">Add Shift</button>
+                <button onClick={() => { setTargetDateForInput(toLocalDateString(currentDate)); setShowShiftInput(true); }} className="bg-black text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg">Add Shift</button>
               </div>
               <div className="space-y-4">
                 {getShiftsForDay(currentDate).length === 0 ? <div className="text-center py-10 text-gray-300 font-bold">No shifts scheduled</div> : 
@@ -763,8 +778,8 @@ const ShiftView = ({ members, shifts, onDeleteShift, onAddShift }) => {
           )}
         </div>
 
-        {/* Floating Action Button for Shift */}
-        <div className="fixed bottom-24 right-6 z-30 md:bottom-10 md:right-28">
+        {/* Floating Action Button for Shift - Adjusted position on mobile to avoid overlap */}
+        <div className="fixed bottom-44 right-6 z-30 md:bottom-10 md:right-28">
            <button onClick={() => { setTargetDateForInput(""); setShowShiftInput(true); }} className="bg-pink-500 text-white p-4 rounded-full shadow-xl shadow-pink-500/40 hover:scale-110 active:scale-95 transition-all border-4 border-white">
              <Icon p={I.Plus} size={28} />
            </button>
@@ -784,7 +799,7 @@ const ShiftView = ({ members, shifts, onDeleteShift, onAddShift }) => {
 };
 
 const ShiftInputModal = ({ members, initialDate, onAdd, onClose }) => {
-  const [val, setVal] = useState({ memberId: '', date: initialDate || new Date().toISOString().slice(0,10), startTime: '10:00', endTime: '19:00' });
+  const [val, setVal] = useState({ memberId: '', date: initialDate || toLocalDateString(new Date()), startTime: '10:00', endTime: '19:00' });
   
   const submit = (e) => {
     e.preventDefault();
@@ -837,7 +852,7 @@ const ShiftInputModal = ({ members, initialDate, onAdd, onClose }) => {
 };
 
 function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData = null }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toLocalDateString(new Date());
   const [val, setVal] = useState({ memberId: '', date: today, calls: '', appts: '', requests: '', prospects: '', lost: '', deals: '', hours: '', startTime: '', endTime: '' });
   
   useEffect(() => {
@@ -845,7 +860,7 @@ function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData =
       let dateStr = today;
       if (initialData.date) {
         const d = initialData.date.toDate ? initialData.date.toDate() : new Date(initialData.date);
-        dateStr = d.toISOString().slice(0, 10);
+        dateStr = toLocalDateString(d);
       }
       setVal({ ...initialData, date: dateStr, calls: initialData.calls || '', appts: initialData.appts || '', requests: initialData.requests || '', prospects: initialData.prospects || '', lost: initialData.lost || '', deals: initialData.deals || '', hours: initialData.hours || '', startTime: initialData.startTime || '', endTime: initialData.endTime || '' });
     }
