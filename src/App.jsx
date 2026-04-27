@@ -587,39 +587,8 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift }) => {
   );
 };
 
-const AnalyticsView = ({ members, reports, event, userRole }) => {
-  const [selectedMid, setSelectedMid] = useState('all');
-  const fReports = selectedMid === 'all' ? reports : reports.filter(r => r.memberId === selectedMid);
-  
-  const stats = useMemo(() => {
-    return fReports.reduce((acc, r)=>({ 
-      calls: acc.calls+(Number(r.calls)||0), 
-      appts: acc.appts+(Number(r.appts)||0), 
-      requests: acc.requests+(Number(r.requests)||0), 
-      picConnected: acc.picConnected+(Number(r.picConnected)||0),
-    }), { calls: 0, appts: 0, requests: 0, picConnected: 0 });
-  }, [fReports]);
 
-  const dailyTrend = useMemo(() => {
-  }, [fReports]);
 
-  const apptR = (stats.appts / (stats.calls || 1)) * 100;
-  const maxVal = Math.max(stats.calls, stats.appts, stats.requests, stats.deals, 1);
-
-  return (
-    <div className="space-y-8 animate-in fade-in duration-700 pb-24 font-sans">
-       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <h2 className="text-3xl font-black flex items-center gap-4 text-slate-900 leading-tight">
-               <div className="p-4 bg-indigo-600 text-white rounded-[1.5rem] shadow-2xl shadow-indigo-100 flex items-center justify-center"><Icon p={I.PieChart} size={28}/></div> 
-               戦略データ分析
-            </h2>
-            <p className="text-slate-400 font-bold text-sm mt-1 ml-16">個人のクセを見抜き、最適なアクションを導き出す</p>
-          </div>
-          <div className="flex items-center gap-3">
-             <div className="flex bg-slate-100 p-1 rounded-2xl">
-               <button onClick={()=>setChartMode('bar')} className={`p-2 rounded-xl transition-all ${chartMode==='bar'?'bg-white shadow-sm':'text-slate-400'}`}><Icon p={I.Grid} size={18}/></button>
-               <button onClick={()=>setChartMode('line')} className={`p-2 rounded-xl transition-all ${chartMode==='line'?'bg-white shadow-sm':'text-slate-400'}`}><Icon p={I.TrendingUp} size={18}/></button>
 const AnalyticsView = ({ members, reports }) => {
   const [selectedMid, setSelectedMid] = useState('all');
   const fReports = selectedMid === 'all' ? reports : reports.filter(r => r.memberId === selectedMid);
