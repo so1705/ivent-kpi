@@ -39,6 +39,9 @@ try {
   isOffline = true;
 }
 
+// 管理者メールアドレス
+const ADMIN_EMAIL = "sotaro50017@gmail.com";
+
 const saveLocal = (key, data) => {
   try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) {}
 };
@@ -115,7 +118,10 @@ const I = {
   Zap: <><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></>,
   TrendingUp: <><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></>,
   Activity: <><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></>,
-  PieChart: <><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></>
+  PieChart: <><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></>,
+  LogOut: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></>,
+  Info: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></>,
+  User: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>
 };
 
 const BREAKDOWN_LABELS = {
@@ -298,16 +304,17 @@ const GoalSection = ({ title, subTitle, data, goals, variant, headerAction }) =>
 
 
 
-const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBaseDate, activeWeeklyGoals, eventReports, members }) => {
-  const [statsPeriod, setStatsPeriod] = useState('total');
-  const [filterType, setFilterType] = useState('all');
-  const [viewMode, setViewMode] = useState('team'); // 'team' or 'personal'
-  const [myMemberId, setMyMemberId] = useState(members[0]?.id || "");
+const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBaseDate, activeWeeklyGoals, eventReports, members, userRole, currentUserEmail }) => {
+  const [activeSubTab, setActiveSubTab] = useState('summary'); // 'summary' or 'my' or 'charts'
+  const [showHelp, setShowHelp] = useState(false);
+  const [drilldownMember, setDrilldownMember] = useState(null);
 
   const g = {
     total: event.goals?.total || {},
     weekly: activeWeeklyGoals || event.goals?.weekly || {} 
   };
+
+  const currentMember = useMemo(() => members.find(m => m.email === currentUserEmail) || members[0], [members, currentUserEmail]);
 
   const wr = getWeekRange(currentBaseDate);
   const weekRangeString = `${wr.start.getMonth()+1}/${wr.start.getDate()} - ${wr.end.getMonth()+1}/${wr.end.getDate()}`;
@@ -319,277 +326,278 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
     else newDate.setDate(newDate.getDate() + amount);
     setCurrentBaseDate(newDate);
   };
-  
-  const handleDateChange = (e) => {
-    if(e.target.value) setCurrentBaseDate(new Date(e.target.value));
-  };
-  
-  const dateString = toLocalDateString(currentBaseDate);
 
-  const predictionStats = useMemo(() => {
-    const activeMembers = members.filter(m => m.role === 'apo');
-    const memberCount = activeMembers.length || 1;
-    const remainingNeeded = Math.max(0, (g.total.appts || 0) - (totals.total.appts || 0));
-    const individualTarget = (remainingNeeded / memberCount).toFixed(1);
-
-    const memberStatsWithPredictions = memberStats.map(m => {
-      const avgApptPerHour = m.hours > 0 ? (m.appts / m.hours) : 0;
-      const target = individualTarget;
-      const hoursNeeded = avgApptPerHour > 0 ? (target / avgApptPerHour).toFixed(1) : "??";
-      
-      return { 
-        ...m, 
-        avgApptPerHour, 
-        target, 
-        hoursNeeded,
-        gap: (m.appts - target).toFixed(1)
-      };
-    });
-
-    return { individualTarget, members: memberStatsWithPredictions };
-  }, [memberStats, members, totals, g.total]);
-
-  const funnelData = useMemo(() => {
-    const counts = { noAnswer: 0, receptionRefusal: 0, picAbsent: 0, picConnected: 0, requestInfo: 0, appt: 0, outOfTarget: 0 };
-    eventReports.forEach(r => {
-      Object.keys(BREAKDOWN_LABELS).forEach(key => {
-        counts[key] += (Number(r[key]) || 0);
-      });
-    });
-    return counts;
-  }, [eventReports]);
-
-  const filteredMembers = predictionStats.members.filter(m => {
-    if (filterType === 'all') return true;
-    return m.role === filterType;
-  });
-
+  // 自分の統計（今日・今週）
   const myStats = useMemo(() => {
-    const s = memberStats.find(s => s.id === myMemberId) || {};
-    const weeklyReps = eventReports.filter(r => {
-      if (!r.date || r.memberId !== myMemberId) return false;
+    if (!currentMember) return null;
+    const mid = currentMember.id;
+    const now = new Date();
+    const todayStr = toLocalDateString(now);
+
+    const todayReps = eventReports.filter(r => r.memberId === mid && r.date && toLocalDateString(r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000)) === todayStr);
+    const weekReps = eventReports.filter(r => {
+      if (!r.date || r.memberId !== mid) return false;
       const d = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
       return d >= wr.start && d <= wr.end;
     });
+
     return {
-      ...s,
+      today: {
+        appts: todayReps.reduce((s, r) => s + (Number(r.appts)||0), 0),
+        calls: todayReps.reduce((s, r) => s + (Number(r.calls)||0), 0),
+        requests: todayReps.reduce((s, r) => s + (Number(r.requests)||0), 0),
+      },
       weekly: {
-        appts: weeklyReps.reduce((sum, r) => sum + (Number(r.appts)||0), 0),
-        calls: weeklyReps.reduce((sum, r) => sum + (Number(r.calls)||0), 0),
-        requests: weeklyReps.reduce((sum, r) => sum + (Number(r.requests)||0), 0),
+        appts: weekReps.reduce((s, r) => s + (Number(r.appts)||0), 0),
+        calls: weekReps.reduce((s, r) => s + (Number(r.calls)||0), 0),
+        requests: weekReps.reduce((s, r) => s + (Number(r.requests)||0), 0),
       }
     };
-  }, [memberStats, myMemberId, eventReports, wr]);
+  }, [currentMember, eventReports, wr]);
+
+  const statsToShow = drilldownMember ? memberStats.find(s => s.id === drilldownMember.id) : null;
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-700">
-      {/* 表示モード切り替えスイッチ */}
-      <div className="flex justify-center md:justify-start px-2">
-         <div className="bg-slate-100 p-1 rounded-2xl flex shadow-inner">
-            <button 
-              onClick={() => setViewMode('personal')} 
-              className={`px-6 py-3 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${viewMode === 'personal' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              <Icon p={I.Users} size={14} /> 自分モード
-            </button>
-            <button 
-              onClick={() => setViewMode('team')} 
-              className={`px-6 py-3 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${viewMode === 'team' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
-            >
-              <Icon p={I.Briefcase} size={14} /> 俯瞰モード
-            </button>
-         </div>
+    <div className="space-y-6 animate-in fade-in duration-700">
+      {/* モバイル版サブタブ（デスクトップでは非表示） */}
+      <div className="flex md:hidden bg-slate-100 p-1 rounded-2xl shadow-inner mb-4">
+        <button onClick={() => setActiveSubTab('my')} className={`flex-1 py-3 rounded-xl text-[10px] font-black transition-all ${activeSubTab === 'my' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>
+          自分
+        </button>
+        <button onClick={() => setActiveSubTab('summary')} className={`flex-1 py-3 rounded-xl text-[10px] font-black transition-all ${activeSubTab === 'summary' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>
+          全体
+        </button>
+        <button onClick={() => setActiveSubTab('charts')} className={`flex-1 py-3 rounded-xl text-[10px] font-black transition-all ${activeSubTab === 'charts' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>
+          分析
+        </button>
       </div>
 
-      {viewMode === 'personal' ? (
-        /* 自分専用モードの表示 */
-        <div className="space-y-10 animate-in slide-in-from-left-4">
-           <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden shadow-2xl">
-              <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
-              <div className="relative z-10 space-y-6">
-                <div className="flex items-center justify-between">
-                   <div className="flex items-center gap-4">
-                     <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center text-2xl font-black">{members.find(m=>m.id===myMemberId)?.name.slice(0,2)}</div>
-                     <div>
-                       <h2 className="text-3xl font-black tracking-tight">{members.find(m=>m.id===myMemberId)?.name} さんの目標</h2>
-                       <p className="text-indigo-300 text-sm font-medium">今週の成果を最大化しましょう</p>
-                     </div>
-                   </div>
-                   <select 
-                     className="bg-white/10 border border-white/20 p-2 rounded-xl text-[10px] font-black focus:outline-none"
-                     value={myMemberId}
-                     onChange={(e)=>setMyMemberId(e.target.value)}
-                   >
-                     {members.map(m => <option key={m.id} value={m.id} className="text-black">{m.name}</option>)}
-                   </select>
-                </div>
+      {/* ヘルプアイコン */}
+      <div className="fixed top-6 right-6 z-40 md:relative md:top-0 md:right-0 md:flex md:justify-end">
+        <button onClick={() => setShowHelp(true)} className="p-3 bg-white/80 backdrop-blur-md rounded-full shadow-lg border border-slate-100 text-slate-400 hover:text-indigo-600 hover:scale-110 transition-all">
+          <Icon p={I.Info} size={24} />
+        </button>
+      </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
-                   {/* 個別の週次進捗 */}
-                   <div className="md:col-span-2 space-y-6">
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="text-center">
-                           <div className="text-4xl font-black text-emerald-400">{myStats.weekly.appts}</div>
-                           <div className="text-[10px] font-black uppercase text-slate-400 mt-1">今週のアポ</div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* 左側：個人・チームサマリー (lg:span-8) */}
+        <div className={`lg:col-span-8 space-y-8 ${(activeSubTab !== 'my' && activeSubTab !== 'summary') ? 'hidden md:block' : ''}`}>
+          
+          {/* 自分モード (今日・今週の結果) */}
+          {(activeSubTab === 'my' || !window.innerWidth < 768) && (
+            <div className="space-y-6">
+               <h3 className="text-xl font-black text-slate-800 flex items-center gap-2 px-2">
+                 <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Icon p={I.User} size={18}/></div>
+                 自分モード
+               </h3>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* 今日 */}
+                  <div className="premium-card p-8 bg-gradient-to-br from-indigo-600 to-indigo-800 text-white relative overflow-hidden shadow-2xl">
+                     <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-16 -mt-16"></div>
+                     <div className="relative z-10">
+                        <p className="text-indigo-200 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Today's Results</p>
+                        <h4 className="text-sm font-bold opacity-80 mb-6">今日の結果</h4>
+                        <div className="grid grid-cols-3 gap-4">
+                           <div className="text-center">
+                              <div className="text-4xl font-black">{myStats?.today.appts || 0}</div>
+                              <div className="text-[9px] font-black uppercase opacity-60 mt-1">アポ</div>
+                           </div>
+                           <div className="text-center">
+                              <div className="text-4xl font-black">{myStats?.today.requests || 0}</div>
+                              <div className="text-[9px] font-black uppercase opacity-60 mt-1">資料</div>
+                           </div>
+                           <div className="text-center border-l border-white/10">
+                              <div className="text-4xl font-black opacity-40">{myStats?.today.calls || 0}</div>
+                              <div className="text-[9px] font-black uppercase opacity-30 mt-1">架電</div>
+                           </div>
                         </div>
-                        <div className="text-center">
-                           <div className="text-4xl font-black text-blue-400">{myStats.weekly.requests}</div>
-                           <div className="text-[10px] font-black uppercase text-slate-400 mt-1">今週の資料</div>
+                     </div>
+                  </div>
+                  {/* 今週 */}
+                  <div className="premium-card p-8 bg-white border border-slate-100 shadow-sm relative overflow-hidden">
+                     <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-full -mr-16 -mt-16 pointer-events-none"></div>
+                     <div className="relative z-10">
+                        <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Weekly Performance</p>
+                        <h4 className="text-sm font-bold text-slate-800 mb-6">今週の成果</h4>
+                        <div className="space-y-4">
+                           <MetricBar label="アポ数" val={myStats?.weekly.appts || 0} tgt={event.individualWeeklyGoals?.[getMondayKey(currentBaseDate)]?.[currentMember?.id]?.appts || 0} color="bg-emerald-500" />
+                           <MetricBar label="資料送付数" val={myStats?.weekly.requests || 0} tgt={event.individualWeeklyGoals?.[getMondayKey(currentBaseDate)]?.[currentMember?.id]?.requests || 0} color="bg-blue-500" />
                         </div>
-                        <div className="text-center">
-                           <div className="text-4xl font-black text-slate-300">{myStats.weekly.calls}</div>
-                           <div className="text-[10px] font-black uppercase text-slate-400 mt-1">今週の架電</div>
-                        </div>
-                      </div>
-                      <div className="space-y-4 pt-4 border-t border-white/5">
-                        <MetricBar label="アポ達成度" val={myStats.weekly.appts} tgt={event.individualWeeklyGoals?.[getMondayKey(currentBaseDate)]?.[myMemberId]?.appts || 0} color="bg-emerald-500" />
-                      </div>
+                     </div>
+                  </div>
+               </div>
+            </div>
+          )}
+
+          {/* 全体ファネル分析 (タブ：全体) */}
+          {(activeSubTab === 'summary' || !window.innerWidth < 768) && (
+            <div className="premium-card p-8 bg-white border border-slate-100 shadow-sm relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-48 h-48 bg-slate-50/50 rounded-full blur-3xl -ml-24 -mt-24 pointer-events-none"></div>
+              <div className="flex items-center justify-between mb-8 relative z-10">
+                <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
+                  <div className="p-2 bg-slate-900 text-white rounded-xl shadow-lg"><Icon p={I.TrendingUp} size={20}/></div>
+                  プロジェクト全体ファネル
+                </h3>
+                <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
+                   <button onClick={() => shiftDate(-7, 'week')} className="p-2 hover:bg-white rounded-lg text-slate-400 transition-all"><Icon p={I.ChevronLeft} size={16}/></button>
+                   <span className="text-[10px] font-black text-slate-600 px-2">{weekRangeString}</span>
+                   <button onClick={() => shiftDate(7, 'week')} className="p-2 hover:bg-white rounded-lg text-slate-400 transition-all"><Icon p={I.ChevronRight} size={16}/></button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 relative z-10">
+                {Object.entries(BREAKDOWN_LABELS).map(([key, label]) => (
+                  <div key={key} className="p-5 rounded-3xl bg-slate-50/50 border border-transparent hover:border-indigo-100 hover:bg-white transition-all group">
+                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">{label}</div>
+                    <div className="text-2xl font-black text-slate-800 group-hover:text-indigo-600">{funnelData[key] || 0}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* メンバー一覧・ドリルダウン */}
+          {(activeSubTab === 'summary' || !window.innerWidth < 768) && (
+            <div className="space-y-6">
+               <h3 className="text-xl font-black text-slate-800 flex items-center gap-2 px-2">
+                 <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><Icon p={I.Users} size={18}/></div>
+                 メンバー別状況
+               </h3>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {members.map(m => (
+                    <button 
+                      key={m.id} 
+                      onClick={() => setDrilldownMember(m)}
+                      className="premium-card p-6 flex items-center justify-between hover:scale-[1.02] active:scale-95 transition-all text-left bg-white border border-slate-100 shadow-sm group"
+                    >
+                       <div className="flex items-center gap-4">
+                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-sm font-black ${m.role==='closer' ? 'bg-amber-100 text-amber-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                            {m.name.slice(0, 2)}
+                          </div>
+                          <div>
+                            <div className="font-black text-slate-800">{m.name}</div>
+                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{m.role === 'closer' ? 'クローザー' : 'アポインター'}</div>
+                          </div>
+                       </div>
+                       <Icon p={I.ChevronRight} size={20} className="text-slate-200 group-hover:text-indigo-400 transition-colors" />
+                    </button>
+                  ))}
+               </div>
+            </div>
+          )}
+        </div>
+
+        {/* 右側：全体目標・サマリー (lg:span-4) */}
+        <div className={`lg:col-span-4 space-y-8 ${(activeSubTab !== 'charts') ? 'hidden md:block' : ''}`}>
+           {/* 管理者のみ：予測収益/金額データ */}
+           {userRole === 'admin' && (
+             <div className="premium-card p-8 bg-slate-900 text-white shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-400/10 rounded-full blur-2xl -mr-16 -mt-16"></div>
+                <h3 className="text-xs font-black text-emerald-400 uppercase tracking-widest mb-6">管理者専用パネル</h3>
+                <div className="space-y-8">
+                   <div>
+                      <p className="text-[10px] font-black opacity-50 uppercase mb-1">予測成約収益</p>
+                      <div className="text-3xl font-black text-white">¥{(totals.total.deals * 300000).toLocaleString()}<span className="text-sm font-medium opacity-40 ml-2">est.</span></div>
                    </div>
-                   <div className="bg-white/5 backdrop-blur-sm rounded-3xl p-6 border border-white/10 flex flex-col justify-center">
-                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">総計アポ貢献</div>
-                      <div className="text-5xl font-black text-white">{myStats.appts}<span className="text-xl text-slate-500 ml-1">pts</span></div>
-                      <div className="mt-4 p-3 rounded-2xl bg-white/5 text-[10px] font-medium text-indigo-200">
-                        CPH: {myStats.cph} 件 / 時
-                      </div>
+                   <div>
+                      <p className="text-[10px] font-black opacity-50 uppercase mb-1">現在のコスト (概算)</p>
+                      <p className="text-xl font-black text-slate-400">¥{(totals.total.hours * 1500).toLocaleString()}</p>
                    </div>
                 </div>
+             </div>
+           )}
+
+           <div className="premium-card p-8 bg-white border border-slate-100 shadow-sm h-fit">
+              <h3 className="font-black text-lg text-slate-800 mb-8 border-b border-slate-50 pb-4 flex items-center justify-between">
+                 <span>プロジェクト目標</span>
+                 <Icon p={I.Target} size={20} className="text-indigo-600" />
+              </h3>
+              <div className="space-y-8">
+                 <MainMetric label="通算アポ" icon={I.Check} current={totals.total.appts} target={g.total.appts} color="text-emerald-500" bg="bg-emerald-500" />
+                 <MainMetric label="今週アポ" icon={I.Calendar} current={totals.weekly.appts} target={g.weekly.appts} color="text-indigo-500" bg="bg-indigo-500" />
+                 <MainMetric label="通算成約" icon={I.Trophy} current={totals.total.deals} target={g.total.deals} color="text-amber-500" bg="bg-amber-500" />
+              </div>
+           </div>
+
+           <div className="bg-indigo-600 rounded-[2.5rem] p-8 text-white shadow-xl shadow-indigo-100 relative overflow-hidden">
+              <Icon p={I.Zap} size={32} className="absolute top-4 right-4 opacity-20" />
+              <h3 className="font-black text-lg mb-4">目標ペース分析</h3>
+              <p className="text-xs text-indigo-100 font-bold leading-relaxed">
+                今週の目標達成には、あと <span className="text-white text-lg">{Math.max(0, g.weekly.appts - totals.weekly.appts)} 件</span> のアポが必要です。
+                平均アポ率から逆算すると、チーム全体で <span className="text-white text-lg">{Math.ceil((g.weekly.appts - totals.weekly.appts) / 0.05)} 回</span> の架電が推奨されます。
+              </p>
+           </div>
+        </div>
+      </div>
+
+      {/* ドリルダウン・メンバー詳細モーダル */}
+      {drilldownMember && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300">
+           <div className="flex-1 overflow-y-auto w-full max-w-4xl mx-auto p-4 md:py-10">
+              <div className="bg-white rounded-[2.5rem] shadow-2xl relative overflow-hidden">
+                 <div className="p-8 border-b border-slate-50 flex justify-between items-center sticky top-0 bg-white/90 backdrop-blur-xl z-20">
+                    <div className="flex items-center gap-4">
+                       <button onClick={() => setDrilldownMember(null)} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200 transition-all active:scale-90"><Icon p={I.X}/></button>
+                       <div>
+                          <h2 className="text-2xl font-black text-slate-900 leading-none">{drilldownMember.name} さんの分析</h2>
+                          <p className="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-widest">{drilldownMember.role}</p>
+                       </div>
+                    </div>
+                 </div>
+                 <div className="p-8 space-y-10">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                       <StatItem label="累計架電" val={statsToShow?.calls || 0} highlight />
+                       <StatItem label="累計アポ" val={statsToShow?.appts || 0} highlight color="text-emerald-500" />
+                       <StatItem label="アポ率" val={`${statsToShow?.calls > 0 ? ((statsToShow.appts/statsToShow.calls)*100).toFixed(1) : 0}%`} highlight color="text-indigo-600" />
+                       <StatItem label="稼働時間" val={`${statsToShow?.hours || 0}h`} highlight />
+                    </div>
+                    
+                    <div className="premium-card p-8 bg-slate-50 border border-slate-100">
+                       <h4 className="text-sm font-black text-slate-800 mb-6 uppercase tracking-widest">重要KPI 進捗</h4>
+                       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                          <MetricBar label="架電数" val={statsToShow?.calls || 0} tgt={1000} color="bg-slate-600" />
+                          <MetricBar label="アポ数" val={statsToShow?.appts || 0} tgt={20} color="bg-emerald-500" />
+                          <MetricBar label="資料送付" val={statsToShow?.requests || 0} tgt={50} color="bg-blue-500" />
+                       </div>
+                    </div>
+
+                    <div className="bg-indigo-600 rounded-3xl p-8 text-white">
+                      <h4 className="text-lg font-black mb-4">メンバー個別アドバイス</h4>
+                      <p className="text-sm text-indigo-50 font-bold leading-relaxed">
+                        {drilldownMember.name}さんは現在、リード獲得後の「資料送付率」が非常に高い水準にあります。
+                        一方でアポ獲得率がやや平均を下回っているため、資料送付の打診時に「資料だけでは伝わらない具体的な導入事例」をセットで提示することを意識してみてください。
+                      </p>
+                    </div>
+                 </div>
               </div>
            </div>
         </div>
-      ) : (
-        /* 全体（俯瞰）モードの表示 */
-        <div className="space-y-10 animate-in slide-in-from-right-4">
-          <section className="space-y-4">
-            <div className="flex justify-between items-end px-2">
-               <h2 className="text-2xl font-black flex items-center gap-3 text-slate-900">
-                 <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Icon p={I.Target} size={20}/></div>
-                 チーム全体進捗・週次状況
-               </h2>
-               <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl border border-slate-100">
-                  <button onClick={() => shiftDate(-7, 'week')} className="p-2 hover:bg-white rounded-lg text-slate-400 transition-all"><Icon p={I.ChevronLeft} size={16}/></button>
-                  <span className="text-[10px] font-black text-slate-600 px-2">{weekRangeString}</span>
-                  <button onClick={() => shiftDate(7, 'week')} className="p-2 hover:bg-white rounded-lg text-slate-400 transition-all"><Icon p={I.ChevronRight} size={16}/></button>
-               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {members.filter(m => m.role === 'apo').map(m => {
-                const weeklyReps = eventReports.filter(r => {
-                  if (!r.date || r.memberId !== m.id) return false;
-                  const d = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
-                  return d >= wr.start && d <= wr.end;
-                });
-                const w = {
-                  appts: weeklyReps.reduce((s, r) => s + (Number(r.appts)||0), 0),
-                  calls: weeklyReps.reduce((s, r) => s + (Number(r.calls)||0), 0),
-                  requests: weeklyReps.reduce((s, r) => s + (Number(r.requests)||0), 0),
-                };
-                const target = event.individualWeeklyGoals?.[getMondayKey(currentBaseDate)]?.[m.id] || { appts: 0, calls: 0, requests: 0 };
-                
-                return (
-                  <div key={m.id} className="premium-card p-6 border-l-4 border-indigo-500">
-                    <div className="flex justify-between items-start mb-6">
-                      <div className="font-black text-lg text-slate-800">{m.name}</div>
-                      {w.appts >= target.appts && target.appts > 0 ? (
-                        <span className="bg-emerald-100 text-emerald-700 text-[8px] font-black px-2 py-1 rounded-full uppercase">目標達成</span>
-                      ) : (
-                        <span className="bg-slate-50 text-slate-400 text-[8px] font-black px-2 py-1 rounded-full uppercase">集計中</span>
-                      )}
-                    </div>
-                    <div className="space-y-4">
-                      <MetricBar label="アポ進捗" val={w.appts} tgt={target.appts} color="bg-emerald-500" small />
-                      <MetricBar label="資料送付率" val={w.requests} tgt={target.requests} color="bg-blue-500" small />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-
-          <section className="space-y-6">
-            <div className="flex justify-between items-end px-2">
-               <h2 className="text-2xl font-black flex items-center gap-3 text-slate-900">
-                 <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><Icon p={I.Zap} size={20}/></div>
-                 パフォーマンス予測
-               </h2>
-               <div className="flex bg-slate-100 p-1 rounded-xl">
-                  <button onClick={() => setFilterType('all')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${filterType==='all' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'}`}>全員</button>
-                  <button onClick={() => setFilterType('apo')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${filterType==='apo' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'}`}>アポインター</button>
-               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {filteredMembers.map((m) => (
-                <div key={m.id} className="premium-card p-8 group">
-                  <div className="flex justify-between items-start mb-8">
-                    <div className="flex items-center gap-5">
-                      <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-xl font-black shadow-inner shadow-black/5 ${m.role === 'closer' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
-                        {m.name.slice(0, 2)}
-                      </div>
-                      <div>
-                        <h4 className="text-xl font-black text-slate-900 mb-1">{m.name}</h4>
-                        <div className="flex items-center gap-3">
-                          <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${m.role==='closer'?'bg-amber-50 text-amber-600':'bg-indigo-50 text-indigo-600'}`}>{m.role==='closer'?'クローザー':'アポインター'}</span>
-                          <span className="text-[10px] text-slate-400 font-black tracking-wider uppercase">CPH: {m.cph}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className={`text-2xl font-black ${Number(m.gap) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                        {Number(m.gap) > 0 ? `+${m.gap}` : m.gap}
-                      </div>
-                      <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">目標貢献差分</div>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-4 pt-6 border-t border-slate-50">
-                    <div className="text-center p-3 bg-slate-50/50 rounded-2xl">
-                      <div className="text-lg font-black text-slate-900 leading-none mb-2">{m.appts}</div>
-                      <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">現在実績</div>
-                    </div>
-                    <div className="text-center p-3 bg-slate-50/50 rounded-2xl border border-indigo-100 shadow-indigo-100 shadow-sm">
-                      <div className="text-lg font-black text-indigo-600 leading-none mb-2">{m.hoursNeeded}h</div>
-                      <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">完遂想定</div>
-                    </div>
-                    <div className="text-center p-3 bg-slate-50/50 rounded-2xl">
-                      <div className="text-lg font-black text-slate-900 leading-none mb-2">{(m.appts / (m.calls || 1) * 100).toFixed(1)}%</div>
-                      <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">アポ率</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
       )}
 
-      {/* 以下は共通表示（ファネル/全体目標） */}
-      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-48 h-48 bg-slate-50 rounded-full -mr-24 -mt-24 pointer-events-none"></div>
-        <h3 className="text-xl font-bold mb-8 flex items-center gap-3 text-slate-800 relative z-10">
-          <div className="p-2 bg-slate-900 text-white rounded-xl shadow-lg shadow-slate-200"><Icon p={I.TrendingUp} size={20}/></div>
-          全体ファネル分析
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 relative z-10">
-          {Object.entries(BREAKDOWN_LABELS).map(([key, label]) => (
-            <div key={key} className="p-5 rounded-3xl bg-white border border-slate-50 group hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/10 transition-all duration-300">
-              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{label}</div>
-              <div className="text-2xl font-black text-slate-800 group-hover:text-indigo-600">{funnelData[key] || 0}</div>
-            </div>
-          ))}
+      {/* 用語解説モーダル */}
+      {showHelp && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-md animate-in zoom-in-95 duration-300 p-4">
+           <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl relative overflow-hidden">
+              <div className="p-8 border-b border-slate-50 flex justify-between items-center">
+                 <h3 className="text-2xl font-black text-slate-900">指標の見方・解説</h3>
+                 <button onClick={() => setShowHelp(false)} className="p-2 bg-slate-100 rounded-full text-slate-500"><Icon p={I.X}/></button>
+              </div>
+              <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                 <div className="space-y-2">
+                    <h4 className="font-black text-indigo-600 flex items-center gap-2"><Icon p={I.TrendingUp} size={16}/> パフォーマンス予測</h4>
+                    <p className="text-sm text-slate-600 leading-relaxed">現在の「CPH（時間あたりのアポ数）」と残りの目標数から、目標達成に必要な稼働時間を逆算しています。+の数字が出ている場合は、目標を前倒しで達成できるペースです。</p>
+                 </div>
+                 <div className="space-y-2">
+                    <h4 className="font-black text-emerald-600 flex items-center gap-2"><Icon p={I.Zap} size={16}/> 必要強度 (Pace)</h4>
+                    <p className="text-sm text-slate-600 leading-relaxed">目標達成のために「今日」「今週」どれだけの行動量が必要かを示します。赤字で不足分が出ている場合は、架電のスピードを上げるか、時間を確保する必要があります。</p>
+                 </div>
+                 <div className="space-y-2">
+                    <h4 className="font-black text-amber-600 flex items-center gap-2"><Icon p={I.Briefcase} size={16}/> 俯瞰モード (チーム)</h4>
+                    <p className="text-sm text-slate-600 leading-relaxed">プロジェクト全体の進捗を把握するためのモードです。メンバーの役割（アポインター/クローザー）ごとに、どのプロセスで滞留が起きているかを可視化します。</p>
+                 </div>
+              </div>
+           </div>
         </div>
-      </div>
-
-      <div className="space-y-6 pb-12">
-        <h2 className="text-2xl font-black flex items-center gap-3 text-slate-900 px-2">
-          <div className="p-2 bg-amber-50 text-amber-600 rounded-xl"><Icon p={I.Trophy} size={20}/></div>
-          プロジェクト全体目標
-        </h2>
-        <div className="dashboard-grid no-print">
-          <GoalSection title="今週の" subTitle="全体進捗" data={totals.weekly} goals={g.weekly} variant="indigo" />
-          <GoalSection title="全体の" subTitle={`終了予定日: ${event.date}`} data={totals.total} goals={g.total} variant="gold" />
-        </div>
-      </div>
+      )}
     </div>
   );
 };
@@ -945,7 +953,7 @@ const ShiftInputModal = ({ members, initialDate, onAdd, onClose }) => {
     </div>
   );
 };
-const AnalyticsView = ({ members, reports, event }) => {
+const AnalyticsView = ({ members, reports, event, userRole }) => {
   const [selectedMemberId, setSelectedMemberId] = useState("all");
   
   const filteredReports = useMemo(() => {
@@ -958,46 +966,49 @@ const AnalyticsView = ({ members, reports, event }) => {
       calls: acc.calls + (Number(r.calls)||0),
       requests: acc.requests + (Number(r.requests)||0),
       deals: acc.deals + (Number(r.deals)||0),
-    }), { appts: 0, calls: 0, requests: 0, deals: 0 });
+      picConnected: acc.picConnected + (Number(r.picConnected)||0) + (Number(r.appts)||0),
+    }), { appts: 0, calls: 0, requests: 0, deals: 0, picConnected: 0 });
   }, [filteredReports]);
 
-  const ChartBar = ({ label, value, max, color }) => {
-    const height = max > 0 ? (value / max) * 100 : 0;
-    return (
-      <div className="flex flex-col items-center gap-2 flex-1">
-        <div className="flex-1 w-full bg-slate-50 rounded-2xl relative flex items-end overflow-hidden border border-slate-100">
-           <div className={`w-full ${color} rounded-t-lg transition-all duration-1000 animate-in slide-in-from-bottom-full`} style={{ height: `${height}%` }}>
-              <div className="absolute top-2 left-0 right-0 text-center text-[10px] font-black mix-blend-overlay">{value}</div>
-           </div>
-        </div>
-        <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter text-center h-8 flex items-center leading-tight">{label}</span>
-      </div>
-    );
-  };
+  const apptRate = (stats.appts / (stats.calls || 1)) * 100;
+  const requestRate = (stats.requests / (stats.calls || 1)) * 100;
+  const connectionRate = (stats.picConnected / (stats.calls || 1)) * 100;
+  const closeRate = stats.appts > 0 ? (stats.deals / stats.appts) * 100 : 0;
 
   const aiAdvice = useMemo(() => {
-    if (!stats.calls) return "データがまだ不足しています。まずは100件の架電を目指して記録を開始しましょう。";
+    const memName = selectedMemberId === 'all' ? 'チーム全体' : members.find(m => m.id === selectedMemberId)?.name;
     
-    const apptRate = (stats.appts / stats.calls) * 100;
-    const requestRate = (stats.requests / stats.calls) * 100;
-    const closeRate = stats.appts > 0 ? (stats.deals / stats.appts) * 100 : 0;
-    const connectionRate = stats.calls > 0 ? (filteredReports.reduce((s,r)=>s+(Number(r.picConnected)||0),0) / stats.calls) * 100 : 0;
+    if (!stats.calls) return "まだ十分な活動データが蓄積されていません。まずは100件程度の架電を目指して数値を入力していきましょう。";
+    
+    let advice = `【${memName}さんの深層分析レポート】\n\n`;
 
-    if (apptRate < 1 && connectionRate > 30) return "本人接続はできていますが、アポに繋がっていません。ベネフィットの提示や、ヒアリングの質を見直すチャンスです。";
-    if (connectionRate < 20) return "本人接続率が低めです。架電する時間帯や、受付突破のトークスクリプトを改善することで効率が上がります。";
-    if (requestRate > 5 && apptRate < 1) return "資料送付は順調ですが、そこからアポを打診するタイミングが遅いかもしれません。資料で解決できる課題をその場で伝えましょう。";
-    if (closeRate < 10 && stats.appts > 5) return "商談数は稼げていますが、成約率に課題があります。クロージングのトークや、プレヒアリングの項目を増やしてみましょう。";
-    if (apptRate >= 3) return "素晴らしいアポ率です！現在のトークの質を落とさず、分母（架電数）を増やすことで爆発的な成果が期待できます。";
-    
-    return "全体的に安定しています。日々の活動を継続しつつ、さらに上の目標にチャレンジしてみましょう。";
-  }, [stats, filteredReports]);
+    if (apptRate < 1) {
+      advice += "現状、架電数に対するアポ率が1%を下回っており、大きなボトルネックとなっています。";
+      if (connectionRate > 30) {
+        advice += "本人接続はできているものの、そこからの『ベネフィット提示』で断られているケースが多いようです。相手の課題を深掘りする質問から始めてみてください。";
+      } else {
+        advice += "そもそも受付突破の段階で苦戦している可能性があります。架電の時間帯を14:00〜16:00の『比較的手が空きやすい時間』にスライドしてみるか、フロントトークのトーンを0.5音分高く設定して『信頼感』を演出してみてください。";
+      }
+    } else if (apptRate >= 3) {
+      advice += "非常に高いアポ率（3.0%以上）を維持できています！これはトークの質が極めて高い証拠です。";
+      advice += "現在の質の高さを維持しつつ、もし行動量を1.2倍に増やすことができれば、チーム内で圧倒的なトップパフォーマーとして君臨できます。";
+    } else {
+      advice += "アポ率は安定していますが、さらなる向上の余地があります。";
+    }
+
+    if (requestRate > 8) {
+      advice += "\n\nまた、資料送付率が非常に高いですね。これは『まずは資料だけでも』という断り文句を逆手に取れているか、あるいはアポの打診が少し慎重になりすぎているかもしれません。資料送付が決まった瞬間に『お手元に届く頃を見計らって、5分だけ解説の時間をいただけませんか？』とアポへの布石を打つ練習をしましょう。";
+    }
+
+    return advice;
+  }, [stats, selectedMemberId, members, apptRate, requestRate, connectionRate]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2">
         <h2 className="text-2xl font-black flex items-center gap-3 text-slate-900">
           <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100"><Icon p={I.PieChart} size={20}/></div>
-          データ詳細・可視化
+          データ詳細・AI分析
         </h2>
         <select 
           className="bg-white border border-slate-200 p-3 rounded-2xl font-bold text-slate-700 outline-none shadow-sm focus:ring-4 focus:ring-indigo-50"
@@ -1009,127 +1020,107 @@ const AnalyticsView = ({ members, reports, event }) => {
         </select>
       </div>
 
+      {/* サマリーカード */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: '累計アポ', val: stats.appts, icon: I.Check, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { label: '累計資料送付', val: stats.requests, icon: I.FileText, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: '累計架電', val: stats.calls, icon: I.Phone, color: 'text-slate-600', bg: 'bg-slate-50' },
-          { label: '累計成約', val: stats.deals, icon: I.Trophy, color: 'text-amber-600', bg: 'bg-amber-50' },
-        ].map((item, i) => (
-          <div key={i} className="premium-card p-6 flex flex-col items-center justify-center text-center group">
-            <div className={`p-3 rounded-2xl ${item.bg} ${item.color} mb-3 group-hover:scale-110 transition-transform`}>
-              <Icon p={item.icon} size={24} />
-            </div>
-            <div className="text-2xl font-black text-slate-900">{item.val.toLocaleString()}</div>
-            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{item.label}</div>
+        <div className="premium-card p-6 border-b-4 border-slate-400">
+           <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">架電数</div>
+           <div className="text-3xl font-black text-slate-800">{stats.calls}</div>
+        </div>
+        <div className="premium-card p-6 border-b-4 border-blue-500">
+           <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">資料送付</div>
+           <div className="text-3xl font-black text-blue-600">{stats.requests}</div>
+        </div>
+        <div className="premium-card p-6 border-b-4 border-emerald-500">
+           <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">アポ数</div>
+           <div className="text-3xl font-black text-emerald-600">{stats.appts}</div>
+        </div>
+        {userRole === 'admin' && (
+          <div className="premium-card p-6 border-b-4 border-amber-500">
+             <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">成約数</div>
+             <div className="text-3xl font-black text-amber-600">{stats.deals}</div>
           </div>
-        ))}
+        )}
       </div>
 
-      <div className="premium-card p-8 space-y-8">
-        <div className="flex items-center justify-between">
-          <h3 className="font-black text-lg text-slate-800">重要KPIのボリューム</h3>
-          <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">累計ベース</span>
-        </div>
-        <div className="h-64 flex items-end gap-4 md:gap-8 px-4">
-          <ChartBar label="架電" value={stats.calls} max={Math.max(stats.calls * 1.2, 100)} color="bg-slate-400" />
-          <ChartBar label="本人接続" value={filteredReports.reduce((s,r)=>s+(Number(r.picConnected)||0),0)} max={stats.calls} color="bg-indigo-300" />
-          <ChartBar label="資料送付" value={stats.requests} max={stats.calls} color="bg-blue-500" />
-          <ChartBar label="アポ数" value={stats.appts} max={stats.calls} color="bg-emerald-500" />
-          <ChartBar label="成約数" value={stats.deals} max={stats.calls} color="bg-amber-500" />
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+         {/* グラフエリア */}
+         <div className="premium-card p-8 space-y-8">
+            <h3 className="font-black text-lg text-slate-800">ファネルボリューム</h3>
+            <div className="h-64 flex items-end gap-4 md:gap-8 px-4">
+              <ChartBar label="架電" value={stats.calls} max={Math.max(stats.calls * 1.1, 100)} color="bg-slate-400" />
+              <ChartBar label="送付" value={stats.requests} max={stats.calls} color="bg-blue-500" />
+              <ChartBar label="アポ" value={stats.appts} max={stats.calls} color="bg-emerald-500" />
+            </div>
+         </div>
+
+         {/* AIアドバイザー（強化版） */}
+         <div className="premium-card p-8 bg-slate-900 border-none relative overflow-hidden flex flex-col">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-32 -mt-32"></div>
+            <div className="relative z-10 flex items-center gap-3 mb-6">
+               <div className="p-2 bg-indigo-500 rounded-lg animate-pulse"><Icon p={I.Zap} size={20} color="white" /></div>
+               <h3 className="font-black text-xl text-white">AIアドバイザー・深層分析</h3>
+            </div>
+            <div className="relative z-10 flex-1">
+               <pre className="text-indigo-100 text-sm leading-relaxed font-bold whitespace-pre-wrap font-sans">
+                 {aiAdvice}
+               </pre>
+            </div>
+            <div className="mt-8 pt-8 border-t border-white/5 flex gap-4">
+               <div className="flex-1 text-center">
+                  <div className="text-xl font-black text-emerald-400">{connectionRate.toFixed(1)}%</div>
+                  <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest">接続率</div>
+               </div>
+               <div className="flex-1 text-center">
+                  <div className="text-xl font-black text-indigo-400">{apptRate.toFixed(1)}%</div>
+                  <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest">アポ率</div>
+               </div>
+            </div>
+         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="premium-card p-8">
-          <h3 className="font-black text-lg text-slate-800 mb-6 flex items-center gap-2">
-            <Icon p={I.TrendingUp} size={18} className="text-indigo-600" /> 
-            生産性指標分析
-          </h3>
-          <div className="space-y-6">
-            <div className="flex justify-between items-center group">
-               <span className="text-sm font-bold text-slate-500 group-hover:text-indigo-600 transition-colors">アポ獲得率 (架電比)</span>
-               <span className="text-xl font-black text-slate-900">{stats.calls > 0 ? ((stats.appts / stats.calls)*100).toFixed(1) : 0}%</span>
-            </div>
-            <div className="flex justify-between items-center group">
-               <span className="text-sm font-bold text-slate-500 group-hover:text-blue-600 transition-colors">資料送付率 (架電比)</span>
-               <span className="text-xl font-black text-slate-900">{stats.calls > 0 ? ((stats.requests / stats.calls)*100).toFixed(1) : 0}%</span>
-            </div>
-            <div className="flex justify-between items-center group">
-               <span className="text-sm font-bold text-slate-500 group-hover:text-amber-600 transition-colors">商談成約率 (アポ比)</span>
-               <span className="text-xl font-black text-slate-900">{stats.appts > 0 ? ((stats.deals / stats.appts)*100).toFixed(1) : 0}%</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="premium-card p-8 bg-indigo-600 text-white relative overflow-hidden">
-          <div className="absolute bottom-0 right-0 w-32 h-32 bg-white/10 rounded-full -mb-10 -mr-10"></div>
-          <div className="absolute top-4 right-4 animate-bounce">
-             <div className="bg-white/20 p-2 rounded-full backdrop-blur-md"><Icon p={I.Zap} size={16}/></div>
-          </div>
-          <h3 className="font-black text-lg mb-6 relative z-10 flex items-center gap-2">
-            AI アドバイザー分析
-          </h3>
-          <p className="text-indigo-100 text-sm leading-relaxed font-bold relative z-10">
-            {aiAdvice}
-          </p>
-        </div>
-      </div>
-
+      {/* メンバー比較テーブル */}
       {selectedMemberId === "all" && (
-        <div className="premium-card p-8 animate-in slide-in-from-bottom-6">
-          <h3 className="font-black text-lg text-slate-800 mb-8 border-b border-slate-100 pb-4">メンバー間パフォーマンス比較</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  <th className="pb-4 pl-2">メンバー</th>
-                  <th className="pb-4">架電数</th>
-                  <th className="pb-4">アポ率</th>
-                  <th className="pb-4">資料送付率</th>
-                  <th className="pb-4">受付突破率</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {members.map(m => {
-                  const mReports = reports.filter(r => r.memberId === m.id);
-                  const mStats = mReports.reduce((acc, r) => ({
-                    calls: acc.calls + (Number(r.calls)||0),
-                    appts: acc.appts + (Number(r.appts)||0),
-                    requests: acc.requests + (Number(r.requests)||0),
-                    connected: acc.connected + (Number(r.picConnected)||0) + (Number(r.appts)||0),
-                  }), { calls: 0, appts: 0, requests: 0, connected: 0 });
-                  
-                  return (
-                    <tr key={m.id} className="group hover:bg-slate-50 transition-colors">
-                      <td className="py-4 pl-2">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-[10px] font-black">{m.name.slice(0,2)}</div>
-                          <span className="font-black text-slate-700">{m.name}</span>
-                        </div>
-                      </td>
-                      <td className="py-4 font-bold text-slate-600">{mStats.calls}</td>
-                      <td className="py-4">
-                        <span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded-md text-[10px] font-black">
-                          {mStats.calls > 0 ? ((mStats.appts / mStats.calls)*100).toFixed(1) : 0}%
-                        </span>
-                      </td>
-                      <td className="py-4">
-                        <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded-md text-[10px] font-black">
-                          {mStats.calls > 0 ? ((mStats.requests / mStats.calls)*100).toFixed(1) : 0}%
-                        </span>
-                      </td>
-                      <td className="py-4">
-                        <span className="bg-amber-50 text-amber-600 px-2 py-1 rounded-md text-[10px] font-black">
-                          {mStats.calls > 0 ? ((mStats.connected / mStats.calls)*100).toFixed(1) : 0}%
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+        <div className="premium-card p-8 bg-white border border-slate-100">
+           <h3 className="font-black text-xl text-slate-800 mb-8">リーグ・ランキング (架電効率)</h3>
+           <div className="overflow-x-auto">
+             <table className="w-full">
+               <thead>
+                 <tr className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50">
+                   <th className="pb-4 text-left">Player</th>
+                   <th className="pb-4 text-center">Efficiency (Appt%)</th>
+                   <th className="pb-4 text-center">Volume</th>
+                   <th className="pb-4 text-right">Trend</th>
+                 </tr>
+               </thead>
+               <tbody className="divide-y divide-slate-50">
+                 {members.map(m => {
+                   const mReps = reports.filter(r => r.memberId === m.id);
+                   const mC = mReps.reduce((s,r)=>s+(Number(r.calls)||0), 0);
+                   const mA = mReps.reduce((s,r)=>s+(Number(r.appts)||0), 0);
+                   const rate = mC > 0 ? (mA / mC) * 100 : 0;
+                   return (
+                     <tr key={m.id} className="group">
+                       <td className="py-6">
+                         <div className="flex items-center gap-4">
+                           <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
+                           <span className="font-black text-slate-700">{m.name}</span>
+                         </div>
+                       </td>
+                       <td className="py-6 text-center">
+                          <div className={`text-lg font-black ${rate > 3 ? 'text-emerald-500' : 'text-slate-900'}`}>{rate.toFixed(1)}%</div>
+                       </td>
+                       <td className="py-6 text-center font-bold text-slate-400">{mC} calls</td>
+                       <td className="py-6 text-right">
+                          <div className="inline-flex items-center gap-1 text-emerald-500 font-black text-xs">
+                             <Icon p={I.TrendingUp} size={14} /> Stable
+                          </div>
+                       </td>
+                     </tr>
+                   );
+                 })}
+               </tbody>
+             </table>
+           </div>
         </div>
       )}
     </div>
@@ -1466,10 +1457,13 @@ function Settings({ events, currentEventId, onAddEvent, onDeleteEvent, onUpdateG
 // ==========================================
 // 6. アプリ本体
 // ==========================================
+import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showInput, setShowInput] = useState(false);
   const [user, setUser] = useState(null);
+  const [userRole, setUserRole] = useState('member');
   const [connectionStatus, setConnectionStatus] = useState("connecting");
   const [currentBaseDate, setCurrentBaseDate] = useState(new Date());
 
@@ -1477,7 +1471,7 @@ function App() {
   const [currentEventId, setCurrentEventId] = useState(null);
   const [members, setMembers] = useState([]);
   const [reports, setReports] = useState([]);
-  const [shifts, setShifts] = useState([]); // シフトデータ
+  const [shifts, setShifts] = useState([]);
   const [editingReport, setEditingReport] = useState(null);
 
   const defaultGoals = {
@@ -1485,119 +1479,214 @@ function App() {
     weekly: { deals: 2, meetings: 8, prospects: 5, lost: 2, appts: 20, calls: 200, apoProspects: 10 }
   };
 
-  useEffect(() => {
-    const lEvents = loadLocal('events');
-    const lMems = loadLocal('members');
-    const lReps = loadLocal('reports');
-    const lShifts = loadLocal('shifts');
-    if (lEvents.length) { setEvents(lEvents); setCurrentEventId(lEvents[0].id); }
-    if (lMems.length) setMembers(lMems);
-    if (lReps.length) setReports(lReps);
-    if (lShifts.length) setShifts(lShifts);
+  const handleLogin = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (e) {
+      console.error(e);
+      alert("ログインに失敗しました。");
+    }
+  };
 
+  const handleLogout = () => signOut(auth);
+
+  useEffect(() => {
     if (isOffline || !auth) { setConnectionStatus("offline"); return; }
 
-    const init = async () => { try { await signInAnonymously(auth); } catch (e) { setConnectionStatus("offline"); } };
-    init();
-
-    const unsubAuth = onAuthStateChanged(auth, (u) => {
+    const unsubAuth = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       if (u) {
         setConnectionStatus("connected");
+        // ロール判定
+        if (u.email === ADMIN_EMAIL) {
+          setUserRole('admin');
+        } else {
+          // Firestoreのmembersコレクションから引くことも可能だが、一旦安全策
+          setUserRole('member');
+        }
+
         onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'events'), (s) => {
           const list = s.docs.map(d => ({ id: d.id, ...d.data() }));
           if (list.length === 0) {
             const newEvent = { name: "イベント 2026", date: "2026-06-30", goals: defaultGoals, weeklyGoals: {}, createdAt: Timestamp.now() };
             addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'events'), newEvent);
           } else {
-            setEvents(prev => {
-              const next = list;
-              saveLocal('events', next);
-              if (!currentEventId && next.length > 0) setCurrentEventId(next[0].id);
-              return next;
-            });
+            setEvents(list);
+            if (!currentEventId && list.length > 0) setCurrentEventId(list[0].id);
           }
         });
         onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'members'), (s) => {
           const list = s.docs.map(d => ({ id: d.id, ...d.data() }));
           setMembers(list);
-          saveLocal('members', list);
+          // ログインユーザーがメンバー一覧にいない場合、自動追加（簡易紐付け）
+          if (u.email && !list.find(m => m.email === u.email)) {
+            addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'members'), { 
+              name: u.displayName || "New Member", 
+              email: u.email, 
+              role: u.email === ADMIN_EMAIL ? 'closer' : 'apo',
+              hourlyWage: 0,
+              createdAt: Timestamp.now() 
+            });
+          }
         });
         onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'reports'), (s) => {
-          const list = s.docs.map(d => ({ id: d.id, ...d.data() }));
-          setReports(list);
-          saveLocal('reports', list);
+          setReports(s.docs.map(d => ({ id: d.id, ...d.data() })));
         });
         onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'shifts'), (s) => {
-          const list = s.docs.map(d => ({ id: d.id, ...d.data() }));
-          setShifts(list);
-          saveLocal('shifts', list);
+          setShifts(s.docs.map(d => ({ id: d.id, ...d.data() })));
         });
+      } else {
+        setConnectionStatus("unauthenticated");
       }
     });
     return () => unsubAuth();
-  }, []);
+  }, [currentEventId]);
 
-  const addEvent = async (name, date) => {
-    const newEvent = { name, date, goals: defaultGoals, weeklyGoals: {}, createdAt: Timestamp.now() };
-    if (db && user) await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'events'), newEvent);
-  };
-
-  const updateEventGoals = async (eventId, newGoals) => {
-    if (db && user) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', eventId), { goals: newGoals });
-    setEvents(events.map(e => e.id === eventId ? { ...e, goals: newGoals } : e));
-  };
+  const activeEvent = useMemo(() => events.find(e => e.id === currentEventId) || { goals: defaultGoals }, [events, currentEventId]);
   
-  const updateEventWeeklyGoals = async (eventId, weekKey, weeklyGoal, individualGoal) => {
-    const weeklyPath = `weeklyGoals.${weekKey}`;
-    const individualPath = `individualWeeklyGoals.${weekKey}`;
-    if (db && user) {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', eventId), {
-        [weeklyPath]: weeklyGoal,
-        [individualPath]: individualGoal
-      });
-    }
-  };
+  const totals = useMemo(() => {
+    const wr = getWeekRange(currentBaseDate);
+    const weeklyData = reports.filter(r => {
+      if (!r.date || r.eventId !== currentEventId) return false;
+      const d = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
+      return d >= wr.start && d <= wr.end;
+    });
+    const totalData = reports.filter(r => r.eventId === currentEventId);
 
-  const deleteEvent = async (id) => {
-    if (db && user) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', id));
-    // If the deleted event was selected, switch to another one
-    if (currentEventId === id) {
-      const remaining = events.filter(e => e.id !== id);
-      setCurrentEventId(remaining.length > 0 ? remaining[0].id : null);
-    }
-  };
+    const sum = (arr) => arr.reduce((acc, r) => ({
+      appts: acc.appts + (Number(r.appts) || 0),
+      calls: acc.calls + (Number(r.calls) || 0),
+      requests: acc.requests + (Number(r.requests) || 0),
+      meetings: acc.meetings + (Number(r.meetings) || 0),
+      deals: acc.deals + (Number(r.deals) || 0),
+      lost: acc.lost + (Number(r.lost) || 0),
+      hours: acc.hours + (Number(r.hours) || 0),
+    }), { appts: 0, calls: 0, requests: 0, meetings: 0, deals: 0, lost: 0, hours: 0 });
 
-  const addReport = async (data) => {
-    const reportDate = data.date ? Timestamp.fromDate(new Date(data.date)) : Timestamp.now();
-    const reportData = { ...data, eventId: currentEventId, date: reportDate, createdAt: Timestamp.now() };
-    setReports(prev => [ { id: "temp_" + Date.now(), ...reportData }, ...prev ]);
-    if (db && user) await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reports'), reportData);
-  };
+    return { weekly: sum(weeklyData), total: sum(totalData) };
+  }, [reports, currentEventId, currentBaseDate]);
 
-  const updateReport = async (data) => {
-    const reportDate = data.date ? Timestamp.fromDate(new Date(data.date)) : Timestamp.now();
-    const reportId = data.id;
-    const { id, ...updateData } = data;
-    updateData.date = reportDate;
-    setReports(prev => prev.map(r => r.id === reportId ? { ...r, ...updateData } : r));
-    if (db && user && !reportId.startsWith("temp_")) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reports', reportId), updateData);
-    setEditingReport(null);
-  };
+  const memberStats = useMemo(() => {
+    return members.map(m => {
+      const mReps = reports.filter(r => r.memberId === m.id && r.eventId === currentEventId);
+      const appts = mReps.reduce((s, r) => s + (Number(r.appts) || 0), 0);
+      const hours = mReps.reduce((s, r) => s + (Number(r.hours) || 0), 0);
+      const calls = mReps.reduce((s, r) => s + (Number(r.calls) || 0), 0);
+      const requests = mReps.reduce((s, r) => s + (Number(r.requests) || 0), 0);
+      return { 
+        id: m.id, name: m.name, role: m.role, appts, hours, calls, requests,
+        cph: hours > 0 ? (appts / hours).toFixed(2) : "0.00"
+      };
+    });
+  }, [members, reports, currentEventId]);
 
-  const deleteReport = async (id) => {
-    setReports(prev => prev.filter(r => r.id !== id));
-    if (db && user && !id.startsWith("temp_")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reports', id));
-    setEditingReport(null);
-  };
+  if (connectionStatus === "unauthenticated" || !user) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-slate-900">
+         <div className="w-full max-w-md bg-white rounded-[3rem] p-12 shadow-2xl space-y-10 text-center animate-in zoom-in-95 duration-700">
+            <div className="space-y-4">
+               <div className="w-24 h-24 bg-indigo-600 rounded-[2rem] mx-auto flex items-center justify-center shadow-xl shadow-indigo-100 mb-8">
+                  <Icon p={I.Target} size={48} color="white" strokeWidth={2.5} />
+               </div>
+               <h1 className="text-3xl font-black tracking-tighter">Event KPI Manager</h1>
+               <p className="text-slate-400 text-sm font-bold">チームの成果を最大化する、<br/>次世代KPI管理プラットフォーム</p>
+            </div>
+            <button 
+               onClick={handleLogin}
+               className="w-full bg-slate-900 text-white py-5 rounded-[2rem] font-black text-lg shadow-2xl flex items-center justify-center gap-4 hover:bg-black transition-all active:scale-95"
+            >
+               <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+               Googleでログイン
+            </button>
+            <div className="pt-6 border-t border-slate-50 flex items-center justify-center gap-2">
+               <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+               <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">System Operational</span>
+            </div>
+         </div>
+      </div>
+    );
+  }
 
-  const addMember = async (name, role, hourlyWage) => {
-    if (db && user) await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'members'), { name, role, hourlyWage: Number(hourlyWage), createdAt: Timestamp.now() });
-  };
-  
-  const deleteMember = async (id) => {
-    if (db && user) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', id));
-  };
+  return (
+    <div className="min-h-screen bg-slate-50 pb-32 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900">
+      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-2xl border-b border-slate-100 px-6 py-4 flex items-center justify-between no-print shadow-sm">
+        <div className="flex items-center gap-3">
+           <div className="p-2 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-100">
+             <Icon p={I.Target} size={20} color="white" strokeWidth={2.5} />
+           </div>
+           <h1 className="text-xl font-black tracking-tighter">KPI<span className="text-indigo-600">Sync</span></h1>
+        </div>
+        
+        <div className="flex items-center gap-4">
+           {connectionStatus === "offline" && <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-rose-50 text-rose-500 rounded-full text-[10px] font-black uppercase tracking-widest"><Icon p={I.WifiOff} size={12}/> Offline Mode</div>}
+           <div className="h-8 w-px bg-slate-100 mx-2"></div>
+           <div className="flex items-center gap-3">
+              <div className="text-right hidden md:block">
+                 <div className="text-xs font-black leading-none mb-0.5">{user.displayName}</div>
+                 <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{userRole === 'admin' ? 'Administrator' : 'Team Member'}</div>
+              </div>
+              <button onClick={handleLogout} className="p-2.5 bg-slate-50 hover:bg-rose-50 hover:text-rose-500 rounded-xl transition-all active:scale-90">
+                 <Icon p={I.LogOut} size={20} />
+              </button>
+           </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto p-6 md:p-10">
+        {activeTab === 'dashboard' && (
+          <Dashboard 
+            event={activeEvent} totals={totals} memberStats={memberStats} 
+            eventReports={reports} members={members}
+            currentBaseDate={currentBaseDate} setCurrentBaseDate={setCurrentBaseDate}
+            activeWeeklyGoals={activeEvent.weeklyGoals?.[getMondayKey(currentBaseDate)]}
+            userRole={userRole}
+            currentUserEmail={user.email}
+          />
+        )}
+        {activeTab === 'analytics' && <AnalyticsView members={members} reports={reports} event={activeEvent} userRole={userRole} />}
+        {activeTab === 'attendance' && <AttendanceView members={members} reports={reports} onEdit={setEditingReport} />}
+        {activeTab === 'shifts' && (
+          <ShiftView 
+            members={members} shifts={shifts} 
+            onAddShift={async (s) => await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shifts'), { ...s, createdAt: Timestamp.now() })} 
+            onDeleteShift={async (id) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shifts', id))} 
+          />
+        )}
+        {activeTab === 'settings' && (
+          <Settings 
+            events={events} currentEventId={currentEventId} 
+            onAddEvent={addEvent} onDeleteEvent={deleteEvent}
+            onUpdateGoals={updateEventGoals} onUpdateWeeklyGoals={updateEventWeeklyGoals}
+            members={members} onAddMember={addMember} onDelMember={deleteMember}
+            onClose={() => setActiveTab('dashboard')}
+          />
+        )}
+      </main>
+
+      {/* モバイル ナビゲーション */}
+      <nav className="fixed bottom-6 left-6 right-6 z-50 bg-white/80 backdrop-blur-2xl border border-slate-200/50 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] p-2 flex items-center justify-between no-print">
+        <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={I.Grid} label="HOME" />
+        <NavButton active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} icon={I.Chart} label="ANALYSIS" />
+        <div className="relative -mt-12">
+           <button 
+             onClick={() => setShowInput(true)} 
+             className="w-16 h-16 bg-slate-900 text-white rounded-full flex items-center justify-center shadow-xl shadow-slate-200 hover:scale-110 active:scale-95 transition-all border-4 border-white"
+           >
+             <Icon p={I.Plus} size={32} strokeWidth={3} />
+           </button>
+        </div>
+        <NavButton active={activeTab === 'shifts'} onClick={() => setActiveTab('shifts')} icon={I.Calendar} label="SHIFTS" />
+        <NavButton active={activeTab === 'settings' || activeTab === 'attendance'} onClick={() => setActiveTab(userRole === 'admin' ? 'settings' : 'attendance')} icon={userRole === 'admin' ? I.Settings : I.Clock} label={userRole === 'admin' ? 'ADMIN' : 'WORK'} />
+      </nav>
+
+      {showInput && <InputModal members={members} onAdd={addReport} onClose={() => setShowInput(false)} />}
+      {editingReport && <InputModal members={members} initialData={editingReport} onUpdate={updateReport} onDelete={deleteReport} onClose={() => setEditingReport(null)} />}
+    </div>
+  );
+}
+
+export default App;
 
   const addShift = async (shiftData) => {
     const newShift = { ...shiftData, createdAt: Timestamp.now() };

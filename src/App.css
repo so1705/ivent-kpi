@@ -1,86 +1,128 @@
-@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&family=Noto+Sans+JP:wght@400;700;900&display=swap');
 
 :root {
-  --primary: #6366f1;
-  --primary-glow: rgba(99, 102, 241, 0.15);
-  --accent: #10b981;
+  --primary: #4f46e5;
+  --primary-light: #818cf8;
+  --indigo-glow: rgba(79, 70, 229, 0.15);
   --background: #f8fafc;
   --surface: #ffffff;
-  --text-main: #1e293b;
+  --text-main: #0f172a;
   --text-muted: #64748b;
-  --glass: rgba(255, 255, 255, 0.7);
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2.5rem;
 }
 
 body {
   background-color: var(--background);
   color: var(--text-main);
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  font-family: 'Noto Sans JP', 'Montserrat', sans-serif;
+  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Glassmorphism utility */
-.glass {
-  background: var(--glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
+/* --- Premium Components --- */
 
-/* Premium Card Style */
 .premium-card {
   background: white;
-  border-radius: 24px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 10px 15px -3px rgba(0, 0, 0, 0.03);
-  border: 1px solid rgba(241, 245, 249, 1);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: var(--radius-2xl);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(241, 245, 249, 0.8);
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .premium-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.03);
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.08);
+  border-color: rgba(79, 70, 229, 0.1);
 }
 
-/* Animations */
-@keyframes float {
-  0% { transform: translateY(0px); }
-  50% { transform: translateY(-5px); }
-  100% { transform: translateY(0px); }
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
-.animate-float {
-  animation: float 3s ease-in-out infinite;
+/* --- Animations --- */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
 }
-::-webkit-scrollbar-track {
+
+.animate-fade-in {
+  animation: fadeIn 0.6s ease-out forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* --- Layout Utilities --- */
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
-::-webkit-scrollbar-thumb {
+.custom-scrollbar::-webkit-scrollbar-thumb {
   background: #e2e8f0;
   border-radius: 10px;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: #cbd5e1;
+
+/* --- Navigation --- */
+
+nav {
+  transition: all 0.4s ease;
 }
 
-/* PDF/Print Specifics */
-@media print {
-  .no-print { display: none !important; }
-  .print-only { display: block !important; }
+nav:hover {
+  transform: translateY(-2px);
 }
 
-/* Dashboard Grid Layout */
+/* --- Dashboard Grid --- */
+
 .dashboard-grid {
   display: grid;
   gap: 1.5rem;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
+  :root {
+    --radius-2xl: 2rem;
+  }
+  
   .dashboard-grid {
     grid-template-columns: 1fr;
   }
+  
+  /* Mobile padding adjustments */
+  .p-10 { padding: 1.5rem !important; }
+  .p-8 { padding: 1.25rem !important; }
+  .text-5xl { font-size: 2.5rem !important; }
+}
+
+/* --- Admin Only Styles --- */
+.admin-badge {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+/* --- Printing --- */
+@media print {
+  .no-print { display: none !important; }
+  body { background: white; }
+  .premium-card { box-shadow: none; border: 1px solid #eee; }
 }
