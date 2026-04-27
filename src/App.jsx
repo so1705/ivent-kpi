@@ -301,6 +301,8 @@ const GoalSection = ({ title, subTitle, data, goals, variant, headerAction }) =>
 const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBaseDate, activeWeeklyGoals, eventReports, members }) => {
   const [statsPeriod, setStatsPeriod] = useState('total');
   const [filterType, setFilterType] = useState('all');
+  const [viewMode, setViewMode] = useState('team'); // 'team' or 'personal'
+  const [myMemberId, setMyMemberId] = useState(members[0]?.id || "");
 
   const g = {
     total: event.goals?.total || {},
@@ -362,120 +364,211 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
     return m.role === filterType;
   });
 
+  const myStats = useMemo(() => {
+    const s = memberStats.find(s => s.id === myMemberId) || {};
+    const weeklyReps = eventReports.filter(r => {
+      if (!r.date || r.memberId !== myMemberId) return false;
+      const d = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
+      return d >= wr.start && d <= wr.end;
+    });
+    return {
+      ...s,
+      weekly: {
+        appts: weeklyReps.reduce((sum, r) => sum + (Number(r.appts)||0), 0),
+        calls: weeklyReps.reduce((sum, r) => sum + (Number(r.calls)||0), 0),
+        requests: weeklyReps.reduce((sum, r) => sum + (Number(r.requests)||0), 0),
+      }
+    };
+  }, [memberStats, myMemberId, eventReports, wr]);
+
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
-      {/* 1. 今週の個人目標と進捗 (TOP) */}
-      <section className="space-y-4">
-        <div className="flex justify-between items-end px-2">
-           <h2 className="text-2xl font-black flex items-center gap-3 text-slate-900">
-             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Icon p={I.Target} size={20}/></div>
-             今週の個人目標・進捗状況
-           </h2>
-           <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl border border-slate-100">
-              <button onClick={() => shiftDate(-7, 'week')} className="p-2 hover:bg-white rounded-lg text-slate-400 transition-all"><Icon p={I.ChevronLeft} size={16}/></button>
-              <span className="text-[10px] font-black text-slate-600 px-2">{weekRangeString}</span>
-              <button onClick={() => shiftDate(7, 'week')} className="p-2 hover:bg-white rounded-lg text-slate-400 transition-all"><Icon p={I.ChevronRight} size={16}/></button>
-           </div>
-        </div>
+      {/* 表示モード切り替えスイッチ */}
+      <div className="flex justify-center md:justify-start px-2">
+         <div className="bg-slate-100 p-1 rounded-2xl flex shadow-inner">
+            <button 
+              onClick={() => setViewMode('personal')} 
+              className={`px-6 py-3 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${viewMode === 'personal' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <Icon p={I.Users} size={14} /> 自分モード
+            </button>
+            <button 
+              onClick={() => setViewMode('team')} 
+              className={`px-6 py-3 rounded-xl text-xs font-black transition-all flex items-center gap-2 ${viewMode === 'team' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <Icon p={I.Briefcase} size={14} /> 俯瞰モード
+            </button>
+         </div>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {members.filter(m => m.role === 'apo').map(m => {
-            const stats = memberStats.find(s => s.id === m.id) || {};
-            const weeklyReps = eventReports.filter(r => {
-              if (!r.date || r.memberId !== m.id) return false;
-              const d = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
-              return d >= wr.start && d <= wr.end;
-            });
-            const w = {
-              appts: weeklyReps.reduce((s, r) => s + (Number(r.appts)||0), 0),
-              calls: weeklyReps.reduce((s, r) => s + (Number(r.calls)||0), 0),
-              requests: weeklyReps.reduce((s, r) => s + (Number(r.requests)||0), 0),
-            };
-            const target = event.individualWeeklyGoals?.[getMondayKey(currentBaseDate)]?.[m.id] || { appts: 0, calls: 0, requests: 0 };
-            
-            return (
-              <div key={m.id} className="premium-card p-6 border-l-4 border-indigo-500">
-                <div className="flex justify-between items-start mb-6">
-                  <div className="font-black text-lg text-slate-800">{m.name}</div>
-                  {w.appts >= target.appts && target.appts > 0 ? (
-                    <span className="bg-emerald-50 text-emerald-600 text-[8px] font-black px-2 py-1 rounded-full uppercase">目標達成中！</span>
-                  ) : (
-                    <span className="bg-slate-50 text-slate-400 text-[8px] font-black px-2 py-1 rounded-full uppercase">集計中</span>
-                  )}
+      {viewMode === 'personal' ? (
+        /* 自分専用モードの表示 */
+        <div className="space-y-10 animate-in slide-in-from-left-4">
+           <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden shadow-2xl">
+              <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl -mr-20 -mt-20"></div>
+              <div className="relative z-10 space-y-6">
+                <div className="flex items-center justify-between">
+                   <div className="flex items-center gap-4">
+                     <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center text-2xl font-black">{members.find(m=>m.id===myMemberId)?.name.slice(0,2)}</div>
+                     <div>
+                       <h2 className="text-3xl font-black tracking-tight">{members.find(m=>m.id===myMemberId)?.name} さんの目標</h2>
+                       <p className="text-indigo-300 text-sm font-medium">今週の成果を最大化しましょう</p>
+                     </div>
+                   </div>
+                   <select 
+                     className="bg-white/10 border border-white/20 p-2 rounded-xl text-[10px] font-black focus:outline-none"
+                     value={myMemberId}
+                     onChange={(e)=>setMyMemberId(e.target.value)}
+                   >
+                     {members.map(m => <option key={m.id} value={m.id} className="text-black">{m.name}</option>)}
+                   </select>
                 </div>
-                <div className="space-y-4">
-                  <MetricBar label="今週のアポ" val={w.appts} tgt={target.appts} color="bg-emerald-500" small />
-                  <MetricBar label="今週の資料送付" val={w.requests} tgt={target.requests} color="bg-blue-500" small />
-                  <MetricBar label="今週の架電数" val={w.calls} tgt={target.calls} color="bg-slate-400" small />
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6">
+                   {/* 個別の週次進捗 */}
+                   <div className="md:col-span-2 space-y-6">
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="text-center">
+                           <div className="text-4xl font-black text-emerald-400">{myStats.weekly.appts}</div>
+                           <div className="text-[10px] font-black uppercase text-slate-400 mt-1">今週のアポ</div>
+                        </div>
+                        <div className="text-center">
+                           <div className="text-4xl font-black text-blue-400">{myStats.weekly.requests}</div>
+                           <div className="text-[10px] font-black uppercase text-slate-400 mt-1">今週の資料</div>
+                        </div>
+                        <div className="text-center">
+                           <div className="text-4xl font-black text-slate-300">{myStats.weekly.calls}</div>
+                           <div className="text-[10px] font-black uppercase text-slate-400 mt-1">今週の架電</div>
+                        </div>
+                      </div>
+                      <div className="space-y-4 pt-4 border-t border-white/5">
+                        <MetricBar label="アポ達成度" val={myStats.weekly.appts} tgt={event.individualWeeklyGoals?.[getMondayKey(currentBaseDate)]?.[myMemberId]?.appts || 0} color="bg-emerald-500" />
+                      </div>
+                   </div>
+                   <div className="bg-white/5 backdrop-blur-sm rounded-3xl p-6 border border-white/10 flex flex-col justify-center">
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">総計アポ貢献</div>
+                      <div className="text-5xl font-black text-white">{myStats.appts}<span className="text-xl text-slate-500 ml-1">pts</span></div>
+                      <div className="mt-4 p-3 rounded-2xl bg-white/5 text-[10px] font-medium text-indigo-200">
+                        CPH: {myStats.cph} 件 / 時
+                      </div>
+                   </div>
                 </div>
               </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* 2. 個人別の詳細予測分析 (MIDDLE TOP) */}
-      <section className="space-y-6">
-        <div className="flex justify-between items-end px-2">
-           <h2 className="text-2xl font-black flex items-center gap-3 text-slate-900">
-             <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><Icon p={I.Zap} size={20}/></div>
-             個人別の予測・改善指標
-           </h2>
-           <div className="flex bg-slate-100 p-1 rounded-xl">
-              <button onClick={() => setFilterType('all')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${filterType==='all' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'}`}>全員</button>
-              <button onClick={() => setFilterType('apo')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${filterType==='apo' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'}`}>アポインター</button>
            </div>
         </div>
+      ) : (
+        /* 全体（俯瞰）モードの表示 */
+        <div className="space-y-10 animate-in slide-in-from-right-4">
+          <section className="space-y-4">
+            <div className="flex justify-between items-end px-2">
+               <h2 className="text-2xl font-black flex items-center gap-3 text-slate-900">
+                 <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Icon p={I.Target} size={20}/></div>
+                 チーム全体進捗・週次状況
+               </h2>
+               <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl border border-slate-100">
+                  <button onClick={() => shiftDate(-7, 'week')} className="p-2 hover:bg-white rounded-lg text-slate-400 transition-all"><Icon p={I.ChevronLeft} size={16}/></button>
+                  <span className="text-[10px] font-black text-slate-600 px-2">{weekRangeString}</span>
+                  <button onClick={() => shiftDate(7, 'week')} className="p-2 hover:bg-white rounded-lg text-slate-400 transition-all"><Icon p={I.ChevronRight} size={16}/></button>
+               </div>
+            </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredMembers.map((m) => (
-            <div key={m.id} className="premium-card p-8 group">
-              <div className="flex justify-between items-start mb-8">
-                <div className="flex items-center gap-5">
-                  <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-xl font-black shadow-inner shadow-black/5 ${m.role === 'closer' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
-                    {m.name.slice(0, 2)}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {members.filter(m => m.role === 'apo').map(m => {
+                const weeklyReps = eventReports.filter(r => {
+                  if (!r.date || r.memberId !== m.id) return false;
+                  const d = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
+                  return d >= wr.start && d <= wr.end;
+                });
+                const w = {
+                  appts: weeklyReps.reduce((s, r) => s + (Number(r.appts)||0), 0),
+                  calls: weeklyReps.reduce((s, r) => s + (Number(r.calls)||0), 0),
+                  requests: weeklyReps.reduce((s, r) => s + (Number(r.requests)||0), 0),
+                };
+                const target = event.individualWeeklyGoals?.[getMondayKey(currentBaseDate)]?.[m.id] || { appts: 0, calls: 0, requests: 0 };
+                
+                return (
+                  <div key={m.id} className="premium-card p-6 border-l-4 border-indigo-500">
+                    <div className="flex justify-between items-start mb-6">
+                      <div className="font-black text-lg text-slate-800">{m.name}</div>
+                      {w.appts >= target.appts && target.appts > 0 ? (
+                        <span className="bg-emerald-100 text-emerald-700 text-[8px] font-black px-2 py-1 rounded-full uppercase">目標達成</span>
+                      ) : (
+                        <span className="bg-slate-50 text-slate-400 text-[8px] font-black px-2 py-1 rounded-full uppercase">集計中</span>
+                      )}
+                    </div>
+                    <div className="space-y-4">
+                      <MetricBar label="アポ進捗" val={w.appts} tgt={target.appts} color="bg-emerald-500" small />
+                      <MetricBar label="資料送付率" val={w.requests} tgt={target.requests} color="bg-blue-500" small />
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-xl font-black text-slate-900 mb-1">{m.name}</h4>
-                    <div className="flex items-center gap-3">
-                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${m.role==='closer'?'bg-amber-50 text-amber-600':'bg-indigo-50 text-indigo-600'}`}>{m.role==='closer'?'クローザー':'アポインター'}</span>
-                      <span className="text-[10px] text-slate-400 font-black tracking-wider uppercase">CPH: {m.cph}</span>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="space-y-6">
+            <div className="flex justify-between items-end px-2">
+               <h2 className="text-2xl font-black flex items-center gap-3 text-slate-900">
+                 <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><Icon p={I.Zap} size={20}/></div>
+                 パフォーマンス予測
+               </h2>
+               <div className="flex bg-slate-100 p-1 rounded-xl">
+                  <button onClick={() => setFilterType('all')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${filterType==='all' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'}`}>全員</button>
+                  <button onClick={() => setFilterType('apo')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${filterType==='apo' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'}`}>アポインター</button>
+               </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {filteredMembers.map((m) => (
+                <div key={m.id} className="premium-card p-8 group">
+                  <div className="flex justify-between items-start mb-8">
+                    <div className="flex items-center gap-5">
+                      <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-xl font-black shadow-inner shadow-black/5 ${m.role === 'closer' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                        {m.name.slice(0, 2)}
+                      </div>
+                      <div>
+                        <h4 className="text-xl font-black text-slate-900 mb-1">{m.name}</h4>
+                        <div className="flex items-center gap-3">
+                          <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${m.role==='closer'?'bg-amber-50 text-amber-600':'bg-indigo-50 text-indigo-600'}`}>{m.role==='closer'?'クローザー':'アポインター'}</span>
+                          <span className="text-[10px] text-slate-400 font-black tracking-wider uppercase">CPH: {m.cph}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className={`text-2xl font-black ${Number(m.gap) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                        {Number(m.gap) > 0 ? `+${m.gap}` : m.gap}
+                      </div>
+                      <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">目標貢献差分</div>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-4 pt-6 border-t border-slate-50">
+                    <div className="text-center p-3 bg-slate-50/50 rounded-2xl">
+                      <div className="text-lg font-black text-slate-900 leading-none mb-2">{m.appts}</div>
+                      <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">現在実績</div>
+                    </div>
+                    <div className="text-center p-3 bg-slate-50/50 rounded-2xl border border-indigo-100 shadow-indigo-100 shadow-sm">
+                      <div className="text-lg font-black text-indigo-600 leading-none mb-2">{m.hoursNeeded}h</div>
+                      <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">完遂想定</div>
+                    </div>
+                    <div className="text-center p-3 bg-slate-50/50 rounded-2xl">
+                      <div className="text-lg font-black text-slate-900 leading-none mb-2">{(m.appts / (m.calls || 1) * 100).toFixed(1)}%</div>
+                      <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">アポ率</div>
                     </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className={`text-2xl font-black ${Number(m.gap) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                    {Number(m.gap) > 0 ? `+${m.gap}` : m.gap}
-                  </div>
-                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">完遂までの差分</div>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-3 gap-4 pt-6 border-t border-slate-50">
-                <div className="text-center p-3 bg-slate-50/50 rounded-2xl">
-                  <div className="text-lg font-black text-slate-900 leading-none mb-2">{m.appts}</div>
-                  <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">現在実績</div>
-                </div>
-                <div className="text-center p-3 bg-slate-50/50 rounded-2xl">
-                  <div className="text-lg font-black text-slate-900 leading-none mb-2">{m.target}</div>
-                  <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">プロジェクト分配目標</div>
-                </div>
-                <div className="text-center p-3 bg-indigo-50/30 rounded-2xl border border-indigo-50">
-                  <div className="text-lg font-black text-indigo-600 leading-none mb-2">{m.hoursNeeded}h</div>
-                  <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">完遂までの想定時間</div>
-                </div>
-              </div>
+              ))}
             </div>
-          ))}
+          </section>
         </div>
-      </section>
+      )}
 
-      {/* 3. 架電状況のファネル分析 (MIDDLE BOTTOM) */}
+      {/* 以下は共通表示（ファネル/全体目標） */}
       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm relative overflow-hidden">
         <div className="absolute top-0 right-0 w-48 h-48 bg-slate-50 rounded-full -mr-24 -mt-24 pointer-events-none"></div>
         <h3 className="text-xl font-bold mb-8 flex items-center gap-3 text-slate-800 relative z-10">
           <div className="p-2 bg-slate-900 text-white rounded-xl shadow-lg shadow-slate-200"><Icon p={I.TrendingUp} size={20}/></div>
-          架電結果の状況（全体ファネル）
+          全体ファネル分析
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 relative z-10">
           {Object.entries(BREAKDOWN_LABELS).map(([key, label]) => (
@@ -487,11 +580,10 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
         </div>
       </div>
 
-      {/* 4. プロジェクト全体目標 (BOTTOM) */}
-      <div className="space-y-6">
+      <div className="space-y-6 pb-12">
         <h2 className="text-2xl font-black flex items-center gap-3 text-slate-900 px-2">
           <div className="p-2 bg-amber-50 text-amber-600 rounded-xl"><Icon p={I.Trophy} size={20}/></div>
-          プロジェクト全体目標の進捗状況
+          プロジェクト全体目標
         </h2>
         <div className="dashboard-grid no-print">
           <GoalSection title="今週の" subTitle="全体進捗" data={totals.weekly} goals={g.weekly} variant="indigo" />
@@ -883,6 +975,23 @@ const AnalyticsView = ({ members, reports, event }) => {
     );
   };
 
+  const aiAdvice = useMemo(() => {
+    if (!stats.calls) return "データがまだ不足しています。まずは100件の架電を目指して記録を開始しましょう。";
+    
+    const apptRate = (stats.appts / stats.calls) * 100;
+    const requestRate = (stats.requests / stats.calls) * 100;
+    const closeRate = stats.appts > 0 ? (stats.deals / stats.appts) * 100 : 0;
+    const connectionRate = stats.calls > 0 ? (filteredReports.reduce((s,r)=>s+(Number(r.picConnected)||0),0) / stats.calls) * 100 : 0;
+
+    if (apptRate < 1 && connectionRate > 30) return "本人接続はできていますが、アポに繋がっていません。ベネフィットの提示や、ヒアリングの質を見直すチャンスです。";
+    if (connectionRate < 20) return "本人接続率が低めです。架電する時間帯や、受付突破のトークスクリプトを改善することで効率が上がります。";
+    if (requestRate > 5 && apptRate < 1) return "資料送付は順調ですが、そこからアポを打診するタイミングが遅いかもしれません。資料で解決できる課題をその場で伝えましょう。";
+    if (closeRate < 10 && stats.appts > 5) return "商談数は稼げていますが、成約率に課題があります。クロージングのトークや、プレヒアリングの項目を増やしてみましょう。";
+    if (apptRate >= 3) return "素晴らしいアポ率です！現在のトークの質を落とさず、分母（架電数）を増やすことで爆発的な成果が期待できます。";
+    
+    return "全体的に安定しています。日々の活動を継続しつつ、さらに上の目標にチャレンジしてみましょう。";
+  }, [stats, filteredReports]);
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2">
@@ -951,11 +1060,14 @@ const AnalyticsView = ({ members, reports, event }) => {
         </div>
         <div className="premium-card p-8 bg-indigo-600 text-white relative overflow-hidden">
           <div className="absolute bottom-0 right-0 w-32 h-32 bg-white/10 rounded-full -mb-10 -mr-10"></div>
-          <h3 className="font-black text-lg mb-6 relative z-10">アドバイス</h3>
-          <p className="text-indigo-100 text-sm leading-relaxed font-medium relative z-10">
-            {stats.appts > 20 ? "高い成果が出ています！このペースを維持しましょう。" : 
-             stats.calls > 100 ? "活動量は十分です。クロージングのトークを強化しましょう。" : 
-             "まずは架電数を増やすことに集中し、分母を大きくしましょう。"}
+          <div className="absolute top-4 right-4 animate-bounce">
+             <div className="bg-white/20 p-2 rounded-full backdrop-blur-md"><Icon p={I.Zap} size={16}/></div>
+          </div>
+          <h3 className="font-black text-lg mb-6 relative z-10 flex items-center gap-2">
+            AI アドバイザー分析
+          </h3>
+          <p className="text-indigo-100 text-sm leading-relaxed font-bold relative z-10">
+            {aiAdvice}
           </p>
         </div>
       </div>
