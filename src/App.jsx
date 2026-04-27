@@ -111,7 +111,8 @@ const I = {
   PieChart: <><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></>,
   LogOut: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></>,
   Info: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></>,
-  User: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>
+  User: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
+  Search: <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>
 };
 
 const BREAKDOWN_LABELS = {
@@ -198,13 +199,53 @@ const InputItem = ({ label, icon, val, set }) => (
 const ChartBar = ({ label, value, max, color }) => {
   const h = max > 0 ? (value / max) * 100 : 0;
   return (
-    <div className="flex-1 flex flex-col items-center gap-3 group">
-      <div className="relative w-full flex-1 flex flex-col justify-end">
-        <div className={`w-full rounded-t-xl transition-all duration-1000 ${color} group-hover:brightness-110`} style={{ height: `${h}%` }}>
-          <div className="absolute -top-8 left-1/2 -translate-x-1/2 text-sm font-black text-slate-800 opacity-0 group-hover:opacity-100 transition-opacity">{value}</div>
+    <div className="flex-1 flex flex-col items-center gap-2 group">
+      <div className="relative w-full flex-1 flex flex-col justify-end bg-slate-50/50 rounded-t-2xl overflow-hidden shadow-inner">
+        <div className={`w-full rounded-t-2xl transition-all duration-1000 ${color} group-hover:brightness-110 relative`} style={{ height: `${h}%` }}>
+           <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[10px] font-black text-white drop-shadow-sm">{value}</div>
+           <div className="absolute top-0 left-0 right-0 h-4 bg-white/20 blur-sm"></div>
         </div>
       </div>
-      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</span>
+      <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter text-center leading-tight h-8 flex items-center">{label}</span>
+    </div>
+  );
+};
+
+const LineChart = ({ data, color, label }) => {
+  if (!data || data.length === 0) return <div className="h-40 flex items-center justify-center text-slate-300 font-bold">データなし</div>;
+  const max = Math.max(...data.map(d => d.value), 10);
+  const points = data.map((d, i) => {
+    const x = (i / (data.length - 1)) * 100;
+    const y = 100 - (d.value / max) * 100;
+    return `${x},${y}`;
+  }).join(' ');
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-end px-2">
+         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label} - 時系列推移</span>
+         <span className="text-sm font-black text-slate-800">MAX: {max}</span>
+      </div>
+      <div className="h-40 w-full relative">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full overflow-visible">
+          <defs>
+            <linearGradient id={`grad-${color}`} x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" style={{ stopColor: color, stopOpacity: 0.3 }} />
+              <stop offset="100%" style={{ stopColor: color, stopOpacity: 0 }} />
+            </linearGradient>
+          </defs>
+          <path d={`M0,100 L${points} L100,100 Z`} fill={`url(#grad-${color})`} />
+          <polyline fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" points={points} />
+          {data.map((d, i) => (
+            <circle key={i} cx={(i / (data.length - 1)) * 100} cy={100 - (d.value / max) * 100} r="1.5" fill="white" stroke={color} strokeWidth="1" />
+          ))}
+        </svg>
+        <div className="flex justify-between mt-4">
+          {data.map((d, i) => (
+            <span key={i} className="text-[8px] font-black text-slate-300 transform -rotate-45">{d.day}</span>
+          ))}
+        </div>
+      </div>
     </div>
   );
 };
@@ -283,24 +324,25 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
                 <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Icon p={I.User} size={18}/></div> 自分モード
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="premium-card p-8 bg-gradient-to-br from-indigo-600 to-indigo-800 text-white relative overflow-hidden shadow-2xl">
+                <div className="premium-card p-10 bg-gradient-to-br from-slate-900 to-indigo-900 text-white relative overflow-hidden shadow-2xl">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-[80px] -mr-32 -mt-32"></div>
                   <div className="relative z-10">
-                    <p className="text-indigo-200 text-[10px] font-black uppercase tracking-[0.2em] mb-2">本日の速報</p>
-                    <h4 className="text-sm font-bold opacity-80 mb-6 font-sans">今日の結果</h4>
-                    <div className="grid grid-cols-3 gap-4 font-sans">
-                      <div className="text-center"><div className="text-4xl font-black">{myStats?.today.appts || 0}</div><div className="text-[9px] font-black uppercase opacity-60 mt-1">アポ</div></div>
-                      <div className="text-center"><div className="text-4xl font-black">{myStats?.today.requests || 0}</div><div className="text-[9px] font-black uppercase opacity-60 mt-1">資料</div></div>
-                      <div className="text-center opacity-40"><div className="text-4xl font-black">{myStats?.today.calls || 0}</div><div className="text-[9px] font-black uppercase opacity-60 mt-1">架電</div></div>
+                    <p className="text-indigo-300 text-[10px] font-black uppercase tracking-[0.3em] mb-4">Daily Performance Pulse</p>
+                    <h4 className="text-xl font-black mb-8 flex items-center gap-3"><Icon p={I.Zap} size={20} className="text-amber-400"/> 本日の速報結果</h4>
+                    <div className="grid grid-cols-3 gap-6">
+                      <div className="bg-white/5 backdrop-blur-md p-4 rounded-3xl border border-white/10 text-center"><div className="text-5xl font-black text-white">{myStats?.today.appts || 0}</div><div className="text-[10px] font-black uppercase text-indigo-300 mt-2">アポ</div></div>
+                      <div className="bg-white/5 backdrop-blur-md p-4 rounded-3xl border border-white/10 text-center"><div className="text-5xl font-black text-white">{myStats?.today.requests || 0}</div><div className="text-[10px] font-black uppercase text-indigo-300 mt-2">資料</div></div>
+                      <div className="bg-white/5 backdrop-blur-md p-4 rounded-3xl border border-white/10 text-center opacity-40"><div className="text-5xl font-black text-white">{myStats?.today.calls || 0}</div><div className="text-[10px] font-black uppercase text-indigo-300 mt-2">架電</div></div>
                     </div>
                   </div>
                 </div>
-                <div className="premium-card p-8 bg-white border border-slate-100 shadow-sm relative overflow-hidden">
+                <div className="premium-card p-10 bg-white border border-slate-100 shadow-xl relative overflow-hidden">
                   <div className="relative z-10 font-sans">
-                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2">今週の成果推移</p>
-                    <h4 className="text-sm font-bold text-slate-800 mb-6">週間目標の達成度</h4>
-                    <div className="space-y-4">
-                      <MetricBar label="アポ数" val={myStats?.weekly.appts || 0} tgt={event.individualWeeklyGoals?.[mondayKey]?.[currentMember?.id]?.appts || 0} color="bg-emerald-500" />
-                      <MetricBar label="資料送送付" val={myStats?.weekly.requests || 0} tgt={event.individualWeeklyGoals?.[mondayKey]?.[currentMember?.id]?.requests || 0} color="bg-blue-500" />
+                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mb-4">Conversion funnel status</p>
+                    <h4 className="text-xl font-black text-slate-800 mb-8 border-b border-slate-50 pb-4">今週の成果達成度</h4>
+                    <div className="space-y-8">
+                      <MetricBar label="アポ件数 (目標比)" val={myStats?.weekly.appts || 0} tgt={event.individualWeeklyGoals?.[mondayKey]?.[currentMember?.id]?.appts || 0} color="bg-indigo-600" />
+                      <MetricBar label="資料送付件数" val={myStats?.weekly.requests || 0} tgt={event.individualWeeklyGoals?.[mondayKey]?.[currentMember?.id]?.requests || 0} color="bg-emerald-500" />
                     </div>
                   </div>
                 </div>
@@ -410,20 +452,46 @@ const AttendanceView = ({ members, reports, onEdit }) => {
   const [selectedMonth, setSelectedMonth] = useState(toLocalMonthString(new Date()));
   const fReports = useMemo(() => reports.filter(r => r.date && toLocalMonthString(r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000)) === selectedMonth).sort((a,b)=>b.date.seconds-a.date.seconds), [reports, selectedMonth]);
   const totalH = fReports.reduce((s, r)=>s+(Number(r.hours)||0), 0);
+  const totalCost = fReports.reduce((s, r) => {
+    const m = members.find(mem => mem.id === r.memberId);
+    return s + (Number(r.hours)||0) * (Number(m?.hourlyWage)||1500);
+  }, 0);
+
   return (
-    <div className="space-y-6 animate-in fade-in pb-24 font-sans">
-       <div className="flex items-center justify-between"><h2 className="text-xl font-black flex items-center gap-3"><div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Icon p={I.Clock} size={20}/></div> 稼働履歴</h2><input type="month" className="bg-white border p-3 rounded-2xl font-bold" value={selectedMonth} onChange={e=>setSelectedMonth(e.target.value)} /></div>
-       <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white flex justify-between items-center"><span className="font-bold opacity-60 uppercase tracking-widest text-xs">合計稼働時間</span><span className="text-4xl font-black">{totalH}<span className="text-lg opacity-40 ml-1">h</span></span></div>
-       <div className="space-y-3">
+    <div className="space-y-8 animate-in fade-in pb-24 font-sans">
+       <div className="flex items-center justify-between"><h2 className="text-2xl font-black flex items-center gap-3"><div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Icon p={I.Clock} size={20}/></div> 稼働・コスト統計</h2><input type="month" className="bg-white border-2 border-slate-100 p-3 rounded-2xl font-bold shadow-sm" value={selectedMonth} onChange={e=>setSelectedMonth(e.target.value)} /></div>
+       
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white flex justify-between items-center shadow-2xl relative overflow-hidden">
+             <div className="absolute top-0 right-0 p-8 opacity-5"><Icon p={I.Clock} size={120} /></div>
+             <div className="relative z-10"><span className="font-black opacity-60 uppercase tracking-widest text-[10px] block mb-2">Total Project Hours</span><span className="text-5xl font-black">{totalH}<span className="text-xl opacity-30 ml-2">h</span></span></div>
+          </div>
+          <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 p-8 rounded-[2.5rem] text-white flex justify-between items-center shadow-2xl relative overflow-hidden">
+             <div className="absolute top-0 right-0 p-8 opacity-10"><Icon p={I.Trophy} size={120} /></div>
+             <div className="relative z-10"><span className="font-black opacity-60 uppercase tracking-widest text-[10px] block mb-2">Estimated Personnel Cost</span><span className="text-4xl font-black">¥{totalCost.toLocaleString()}</span></div>
+          </div>
+       </div>
+
+       <div className="space-y-4">
+          <h3 className="font-black text-slate-400 text-xs uppercase tracking-widest px-2">個別稼働詳細</h3>
           {fReports.map(r => (
-            <button key={r.id} onClick={()=>onEdit(r)} className="w-full bg-white p-5 rounded-2xl border border-slate-100 flex items-center justify-between text-left hover:border-indigo-200 transition-all">
-               <div className="flex flex-col">
-                  <span className="text-xs font-black text-slate-400 mb-1">{toLocalDateString(r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000))}</span>
-                  <span className="font-black text-slate-800">{members.find(m=>m.id===r.memberId)?.name || 'Unknown'}</span>
-               </div>
+            <button key={r.id} onClick={()=>onEdit(r)} className="w-full bg-white p-6 rounded-3xl border border-slate-100 flex items-center justify-between text-left hover:border-indigo-200 transition-all shadow-sm group">
                <div className="flex items-center gap-6">
-                  {r.startTime && <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1 rounded">{r.startTime} - {r.endTime}</span>}
-                  <span className="text-2xl font-black text-slate-800">{r.hours}<span className="text-xs opacity-30 ml-0.5">h</span></span>
+                  <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center font-black text-indigo-600 group-hover:scale-110 transition-transform"> {members.find(m=>m.id===r.memberId)?.name?.slice(0,1)} </div>
+                  <div className="flex flex-col">
+                     <span className="text-[10px] font-black text-slate-400 mb-1 tracking-widest uppercase">{toLocalDateString(r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000))}</span>
+                     <span className="font-black text-lg text-slate-800">{members.find(m=>m.id===r.memberId)?.name || 'Unknown'}</span>
+                  </div>
+               </div>
+               <div className="flex items-center gap-10">
+                  <div className="hidden md:flex flex-col items-end">
+                     <span className="text-[10px] font-black text-slate-300 uppercase">Cost</span>
+                     <span className="font-bold text-slate-400">¥{((Number(r.hours)||0) * (Number(members.find(m=>m.id===r.memberId)?.hourlyWage)||1500)).toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center gap-6">
+                     {r.startTime && <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-xl">{r.startTime} - {r.endTime}</span>}
+                     <span className="text-3xl font-black text-slate-900">{r.hours}<span className="text-sm opacity-30 ml-1">h</span></span>
+                  </div>
                </div>
             </button>
           ))}
@@ -434,99 +502,150 @@ const AttendanceView = ({ members, reports, onEdit }) => {
 
 const ShiftView = ({ members, shifts, onAddShift, onDeleteShift }) => {
   const [showModal, setShowModal] = useState(false);
-  const [viewMode, setViewMode] = useState('day'); // 'day', 'week'
+  const [viewMode, setViewMode] = useState('day'); // 'day', 'week', 'month'
   const [selectedDate, setSelectedDate] = useState(toLocalDateString(new Date()));
 
   const wr = getWeekRange(selectedDate);
+  const currentMonthArr = useMemo(() => {
+    const d = new Date(selectedDate);
+    const y = d.getFullYear();
+    const m = d.getMonth();
+    const first = new Date(y, m, 1);
+    const last = new Date(y, m + 1, 0);
+    const days = [];
+    for (let i = 1; i <= last.getDate(); i++) {
+       days.push(toLocalDateString(new Date(y, m, i)));
+    }
+    return days;
+  }, [selectedDate]);
   
   const displayShifts = useMemo(() => {
     if (viewMode === 'day') {
       return shifts.filter(s => s.date === selectedDate).sort((a,b)=>a.startTime.localeCompare(b.startTime));
-    } else {
+    } else if (viewMode === 'week') {
       return shifts.filter(s => {
         const d = new Date(s.date);
         return d >= wr.start && d <= wr.end;
       }).sort((a,b)=>a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+    } else {
+      const monthPrefix = toLocalMonthString(selectedDate);
+      return shifts.filter(s => s.date.startsWith(monthPrefix)).sort((a,b)=>a.date.localeCompare(b.date));
     }
   }, [shifts, selectedDate, viewMode, wr]);
 
   return (
-    <div className="space-y-6 animate-in fade-in pb-24 font-sans">
-       <div className="flex flex-col gap-4">
+    <div className="space-y-8 animate-in fade-in pb-24 font-sans">
+       <div className="flex flex-col gap-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-black flex items-center gap-3"><div className="p-2 bg-pink-50 text-pink-500 rounded-xl"><Icon p={I.Calendar} size={20}/></div> シフト管理</h2>
-            <div className="flex bg-slate-100 p-1 rounded-xl">
-               <button onClick={()=>setViewMode('day')} className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${viewMode==='day'?'bg-white text-pink-500 shadow-sm':'text-slate-400'}`}>日別</button>
-               <button onClick={()=>setViewMode('week')} className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${viewMode==='week'?'bg-white text-pink-500 shadow-sm':'text-slate-400'}`}>週間</button>
+            <h2 className="text-2xl font-black flex items-center gap-3"><div className="p-3 bg-pink-500 text-white rounded-2xl shadow-xl shadow-pink-100"><Icon p={I.Calendar} size={24}/></div> シフト高度管理</h2>
+            <div className="flex bg-slate-100 p-1.5 rounded-2xl shadow-inner">
+               <button onClick={()=>setViewMode('day')} className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${viewMode==='day'?'bg-white text-pink-500 shadow-sm':'text-slate-400'}`}>日別</button>
+               <button onClick={()=>setViewMode('week')} className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${viewMode==='week'?'bg-white text-pink-500 shadow-sm':'text-slate-400'}`}>週別</button>
+               <button onClick={()=>setViewMode('month')} className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${viewMode==='month'?'bg-white text-pink-500 shadow-sm':'text-slate-400'}`}>月間</button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-             <input type="date" className="flex-1 bg-white border p-3 rounded-2xl font-bold" value={selectedDate} onChange={e=>setSelectedDate(e.target.value)} />
-             {viewMode === 'week' && <span className="text-[10px] font-black text-slate-400 whitespace-nowrap">選択日の週を表示中</span>}
+          <div className="flex items-center gap-4 bg-white p-4 rounded-3xl border border-slate-100 shadow-sm">
+             <Icon p={I.Search} size={20} className="text-slate-300" />
+             <input type="date" className="flex-1 bg-transparent font-black text-slate-800 outline-none" value={selectedDate} onChange={e=>setSelectedDate(e.target.value)} />
           </div>
        </div>
 
-       <div className="space-y-4">
-          {displayShifts.length === 0 ? (
-            <div className="p-20 text-center text-slate-300 font-bold bg-white rounded-[2.5rem] border border-dashed border-slate-200">
-               シフトが登録されていません
-            </div>
-          ) : (
-            displayShifts.map(s => {
-              const m = members.find(mem=>mem.id===s.memberId);
-              return (
-                <div key={s.id} className="bg-white p-5 rounded-3xl border border-slate-100 flex items-center justify-between hover:shadow-lg hover:shadow-slate-100 transition-all">
-                   <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white ${m?.role==='closer'?'bg-amber-400':'bg-sky-400'}`}>
-                        {m?.name?.slice(0,1)}
-                      </div>
-                      <div>
-                        <div className="font-black text-slate-800">{m?.name}</div>
-                        {viewMode === 'week' && <div className="text-[9px] font-black text-slate-400">{s.date}</div>}
-                      </div>
-                   </div>
-                   <div className="flex items-center gap-4">
-                      <span className="font-black text-slate-500 bg-slate-50 px-3 py-1.5 rounded-xl text-xs">{s.startTime} - {s.endTime}</span>
-                      <button onClick={()=>{if(window.confirm('削除しますか？')) onDeleteShift(s.id)}} className="p-2 text-rose-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"><Icon p={I.Trash} size={18}/></button>
-                   </div>
-                </div>
-              );
-            })
-          )}
-       </div>
+       {viewMode === 'month' ? (
+         <div className="premium-card p-8 bg-white border border-slate-100 shadow-xl">
+           <h3 className="font-black text-slate-800 mb-8 flex justify-between items-center">
+             <span>{selectedDate.split('-')[0]}年 {selectedDate.split('-')[1]}月のシフト布陣</span>
+             <span className="text-xs font-black text-slate-400 uppercase tracking-widest">{displayShifts.length} 勤務予定</span>
+           </h3>
+           <div className="grid grid-cols-7 gap-3 mb-4">
+              {['日','月','火','水','木','金','土'].map(d => <div key={d} className="text-center text-[10px] font-black text-slate-300">{d}</div>)}
+              {currentMonthArr.map(d => {
+                const dayShifts = displayShifts.filter(s => s.date === d);
+                return (
+                  <div key={d} className={`aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 border-2 transition-all ${d === selectedDate ? 'border-pink-200 bg-pink-50' : 'border-transparent bg-slate-50'}`}>
+                    <span className={`text-[10px] font-black ${d===selectedDate?'text-pink-600':'text-slate-400'}`}>{d.split('-')[2]}</span>
+                    {dayShifts.length > 0 && <div className="flex gap-0.5"><div className="w-1.5 h-1.5 rounded-full bg-pink-500"></div>{dayShifts.length > 1 && <div className="w-1.5 h-1.5 rounded-full bg-pink-300"></div>}</div>}
+                  </div>
+                );
+              })}
+           </div>
+           <div className="mt-8 space-y-3">
+              {displayShifts.map(s => {
+                const m = members.find(mem=>mem.id===s.memberId);
+                return (
+                  <div key={s.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl">
+                    <span className="text-[10px] font-black text-slate-400">{s.date}</span>
+                    <span className="font-black text-xs text-slate-800">{m?.name}</span>
+                    <span className="text-[10px] font-black text-pink-500 bg-white px-2 py-1 rounded-lg border">{s.startTime}-{s.endTime}</span>
+                  </div>
+                );
+              })}
+           </div>
+         </div>
+       ) : (
+         <div className="space-y-4">
+            {displayShifts.length === 0 ? (
+              <div className="p-20 text-center text-slate-300 font-bold bg-white rounded-[2.5rem] border-2 border-dashed border-slate-100">
+                 登録されたシフトはありません
+              </div>
+            ) : (
+              displayShifts.map(s => {
+                const m = members.find(mem=>mem.id===s.memberId);
+                return (
+                  <div key={s.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 flex items-center justify-between hover:scale-[1.02] transition-all shadow-sm">
+                     <div className="flex items-center gap-5">
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-white text-lg shadow-lg ${m?.role==='closer'?'bg-amber-400 shadow-amber-100':'bg-sky-500 shadow-sky-100'}`}>
+                          {m?.name?.slice(0,1)}
+                        </div>
+                        <div>
+                          <div className="font-black text-slate-900 text-lg">{m?.name}</div>
+                          <div className="text-[10px] font-black text-slate-400 flex gap-4 uppercase tracking-widest mt-1">
+                             {viewMode === 'week' && <span className="flex items-center gap-1"><Icon p={I.Calendar} size={10}/>{s.date}</span>}
+                             <span className="flex items-center gap-1 font-sans text-[11px]"><Icon p={I.Clock} size={10}/>{s.startTime}-{s.endTime}</span>
+                          </div>
+                        </div>
+                     </div>
+                     <button onClick={()=>{if(window.confirm('このシフトを削除しますか？')) onDeleteShift(s.id)}} className="p-3 text-rose-200 hover:text-rose-500 hover:bg-rose-50 rounded-2xl transition-all"><Icon p={I.Trash} size={20}/></button>
+                  </div>
+                );
+              })
+            )}
+         </div>
+       )}
        
-       <button onClick={()=>setShowModal(true)} className="fixed bottom-32 right-8 w-16 h-16 bg-pink-500 text-white rounded-full shadow-2xl flex items-center justify-center border-4 border-white transition-all active:scale-90 hover:scale-105 z-40">
-         <Icon p={I.Plus} size={32} strokeWidth={3}/>
+       <button onClick={()=>setShowModal(true)} className="fixed bottom-32 right-8 w-20 h-20 bg-pink-500 text-white rounded-[2.5rem] shadow-2xl flex flex-col items-center justify-center border-4 border-white transition-all active:scale-90 hover:scale-105 hover:rotate-3 z-40">
+         <Icon p={I.Plus} size={28} strokeWidth={3}/>
+         <span className="text-[8px] font-black uppercase mt-1">Add Shift</span>
        </button>
 
        {showModal && (
          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 space-y-6 shadow-2xl">
-               <div className="flex justify-between items-center">
-                 <h3 className="text-xl font-black">シフトを追加</h3>
-                 <button onClick={()=>setShowModal(false)} className="text-slate-400"><Icon p={I.X} /></button>
+            <div className="bg-white w-full max-w-sm rounded-[3rem] p-10 space-y-8 shadow-2xl relative">
+               <button onClick={()=>setShowModal(false)} className="absolute top-6 right-6 p-2 text-slate-300 hover:text-slate-900 transition-colors"><Icon p={I.X} /></button>
+               <div>
+                  <h3 className="text-2xl font-black text-slate-900 mb-2">シフト新規登録</h3>
+                  <p className="text-xs text-slate-400 font-bold">メンバーを選択して勤務時間を入力してください</p>
                </div>
-               <div className="space-y-4">
+               <div className="space-y-6">
                  <div>
-                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">スタッフ選択</label>
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">担当スタッフ</label>
                    <div className="flex flex-wrap gap-2">
                      {members.map(m => (
-                       <button key={m.id} className="px-3 py-2 border rounded-xl font-bold text-xs hover:bg-slate-50"> {m.name} </button>
+                       <button key={m.id} className="px-4 py-2 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-xs hover:border-pink-500 hover:text-pink-500 transition-all"> {m.name} </button>
                      ))}
                    </div>
                  </div>
-                 <div className="grid grid-cols-2 gap-4">
+                 <div className="grid grid-cols-2 gap-6">
                     <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">開始時間</label>
-                      <input type="time" className="w-full p-3 border rounded-xl font-bold" defaultValue="10:00" />
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">開始</label>
+                      <input type="time" className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-black focus:border-pink-500 outline-none" defaultValue="10:00" />
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">終了時間</label>
-                      <input type="time" className="w-full p-3 border rounded-xl font-bold" defaultValue="19:00" />
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">終了</label>
+                      <input type="time" className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-black focus:border-pink-500 outline-none" defaultValue="19:00" />
                     </div>
                  </div>
                </div>
-               <button onClick={()=>setShowModal(false)} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black hover:bg-black transition-all">登録する (デモ保存不可)</button>
+               <button onClick={()=>setShowModal(false)} className="w-full bg-slate-900 text-white py-5 rounded-[2rem] font-black text-lg hover:bg-black shadow-xl transition-all">この内容で登録</button>
             </div>
          </div>
        )}
@@ -536,88 +655,174 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift }) => {
 
 const AnalyticsView = ({ members, reports, event, userRole }) => {
   const [selectedMid, setSelectedMid] = useState('all');
-  const fReports = selectedMid === 'all' ? reports : reports.filter(r => r.memberId === selectedMid);
-  const s = fReports.reduce((acc, r)=>({ 
-    calls: acc.calls+(Number(r.calls)||0), 
-    appts: acc.appts+(Number(r.appts)||0), 
-    requests: acc.requests+(Number(r.requests)||0), 
-    deals: acc.deals+(Number(r.deals)||0),
-    noAnswer: acc.noAnswer+(Number(r.noAnswer)||0),
-    picAbsent: acc.picAbsent+(Number(r.picAbsent)||0),
-  }), { calls: 0, appts: 0, requests: 0, deals: 0, noAnswer: 0, picAbsent: 0 });
+  const [chartMode, setChartMode] = useState('bar'); // 'bar', 'line'
   
-  const apptR = (s.appts / (s.calls || 1)) * 100;
-  const maxVal = Math.max(s.calls, s.appts, s.requests, s.deals, 1);
+  const fReports = selectedMid === 'all' ? reports : reports.filter(r => r.memberId === selectedMid);
+  
+  const stats = useMemo(() => {
+    const s = fReports.reduce((acc, r)=>({ 
+      calls: acc.calls+(Number(r.calls)||0), 
+      appts: acc.appts+(Number(r.appts)||0), 
+      requests: acc.requests+(Number(r.requests)||0), 
+      deals: acc.deals+(Number(r.deals)||0),
+      noAnswer: acc.noAnswer+(Number(r.noAnswer)||0),
+      picAbsent: acc.picAbsent+(Number(r.picAbsent)||0),
+      picConnected: acc.picConnected+(Number(r.picConnected)||0),
+    }), { calls: 0, appts: 0, requests: 0, deals: 0, noAnswer: 0, picAbsent: 0, picConnected: 0 });
+    return s;
+  }, [fReports]);
+
+  const dailyTrend = useMemo(() => {
+    const sorted = [...fReports].sort((a,b) => a.date.seconds - b.date.seconds);
+    const last7 = sorted.slice(-7);
+    return last7.map(r => ({
+      day: toLocalDateString(r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000)).split('-')[2] + '日',
+      value: Number(r.appts) || 0
+    }));
+  }, [fReports]);
+
+  const apptR = (stats.appts / (stats.calls || 1)) * 100;
+  const maxVal = Math.max(stats.calls, stats.appts, stats.requests, stats.deals, 1);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700 pb-24 font-sans">
-       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <h2 className="text-2xl font-black flex items-center gap-3"><div className="p-2 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100"><Icon p={I.PieChart} size={20}/></div> データ詳細分析</h2>
-          <select className="bg-white border border-slate-200 p-3 rounded-2xl font-bold text-slate-700 outline-none shadow-sm" value={selectedMid} onChange={e=>setSelectedMid(e.target.value)}>
-             <option value="all">プロジェクト全体を表示</option>
-             {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-          </select>
-       </div>
-
-       <div className="premium-card p-8 bg-white border border-slate-100 shadow-sm">
-          <h3 className="font-black text-slate-400 text-xs uppercase tracking-widest mb-10">架電〜アポ・成約のボリューム推移</h3>
-          <div className="h-48 flex items-end gap-2 md:gap-8 px-4">
-             <ChartBar label="架電" value={s.calls} max={maxVal} color="bg-slate-200" />
-             <ChartBar label="不在" value={s.noAnswer} max={maxVal} color="bg-slate-100" />
-             <ChartBar label="担当不在" value={s.picAbsent} max={maxVal} color="bg-slate-100" />
-             <ChartBar label="資料請求" value={s.requests} max={maxVal} color="bg-blue-400" />
-             <ChartBar label="アポ" value={s.appts} max={maxVal} color="bg-emerald-500" />
-             <ChartBar label="成約" value={s.deals} max={maxVal} color="bg-amber-400" />
+       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <h2 className="text-3xl font-black flex items-center gap-4 text-slate-900 leading-tight">
+               <div className="p-4 bg-indigo-600 text-white rounded-[1.5rem] shadow-2xl shadow-indigo-100 flex items-center justify-center"><Icon p={I.PieChart} size={28}/></div> 
+               戦略データ分析
+            </h2>
+            <p className="text-slate-400 font-bold text-sm mt-1 ml-16">個人のクセを見抜き、最適なアクションを導き出す</p>
+          </div>
+          <div className="flex items-center gap-3">
+             <div className="flex bg-slate-100 p-1 rounded-2xl">
+               <button onClick={()=>setChartMode('bar')} className={`p-2 rounded-xl transition-all ${chartMode==='bar'?'bg-white shadow-sm':'text-slate-400'}`}><Icon p={I.Grid} size={18}/></button>
+               <button onClick={()=>setChartMode('line')} className={`p-2 rounded-xl transition-all ${chartMode==='line'?'bg-white shadow-sm':'text-slate-400'}`}><Icon p={I.TrendingUp} size={18}/></button>
+             </div>
+             <select className="bg-white border-2 border-slate-100 p-4 rounded-[1.5rem] font-black text-slate-800 outline-none shadow-xl min-w-[200px]" value={selectedMid} onChange={e=>setSelectedMid(e.target.value)}>
+                <option value="all">プロジェクト全体を表示</option>
+                {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+             </select>
           </div>
        </div>
 
-       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="premium-card p-6 border-b-4 border-slate-200 bg-white"><div className="text-[9px] font-black text-slate-400 uppercase mb-1">架電数</div><div className="text-3xl font-black text-slate-800">{s.calls}</div></div>
-          <div className="premium-card p-6 border-b-4 border-emerald-500 bg-white"><div className="text-[9px] font-black text-slate-400 uppercase mb-1">アポ数</div><div className="text-3xl font-black text-emerald-600">{s.appts}</div></div>
-          <div className="premium-card p-6 border-b-4 border-indigo-500 bg-white"><div className="text-[9px] font-black text-slate-400 uppercase mb-1">アポ率</div><div className="text-3xl font-black text-indigo-600">{apptR.toFixed(1)}%</div></div>
-          <div className="premium-card p-6 border-b-4 border-amber-500 bg-white"><div className="text-[9px] font-black text-slate-400 uppercase mb-1">成約数</div><div className="text-3xl font-black text-amber-600">{s.deals}</div></div>
-       </div>
+       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="premium-card p-10 bg-white border border-slate-100 shadow-xl flex flex-col h-[400px]">
+             {chartMode === 'bar' ? (
+                <>
+                  <div className="flex justify-between items-start mb-12">
+                     <div><h3 className="font-black text-slate-900 text-xl tracking-tight">架電ファネル分析</h3><p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] mt-1">Conversion Volume Bar Chart</p></div>
+                     <div className="text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full text-[10px] font-black">リアルタイム</div>
+                  </div>
+                  <div className="flex-1 flex items-end gap-3 md:gap-6 px-2">
+                    <ChartBar label="架電" value={stats.calls} max={maxVal} color="bg-slate-200" />
+                    <ChartBar label="担当不在" value={stats.picAbsent} max={maxVal} color="bg-slate-100" />
+                    <ChartBar label="資料請求" value={stats.requests} max={maxVal} color="bg-indigo-400" />
+                    <ChartBar label="アポ" value={stats.appts} max={maxVal} color="bg-emerald-500" />
+                    <ChartBar label="成約" value={stats.deals} max={maxVal} color="bg-amber-400" />
+                  </div>
+                </>
+             ) : (
+                <>
+                  <div className="flex justify-between items-start mb-8">
+                     <div><h3 className="font-black text-slate-900 text-xl tracking-tight">アポ件数：日次トレンド</h3><p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] mt-1">Daily Appointment Conversion Line</p></div>
+                  </div>
+                  <div className="flex-1 mt-6">
+                    <LineChart data={dailyTrend} color="#4f46e5" label="アポ獲得数" />
+                  </div>
+                </>
+             )}
+          </div>
 
-       <div className="premium-card p-8 bg-slate-900 border-none relative overflow-hidden flex flex-col">
-          <div className="absolute top-0 right-0 p-8 opacity-10"><Icon p={I.Zap} size={80} color="white" /></div>
-          <div className="relative z-10 flex items-center gap-3 mb-6"><div className="p-2 bg-indigo-500 rounded-lg animate-pulse"><Icon p={I.Zap} size={20} color="white" /></div><h3 className="font-black text-xl text-white">AIアドバイザー分析</h3></div>
-          <div className="relative z-10 text-indigo-100 text-sm leading-relaxed font-bold whitespace-pre-wrap font-sans">
-             【{selectedMid === 'all' ? '全体' : members.find(m=>m.id===selectedMid)?.name} への戦略提案】
+          <div className="flex flex-col gap-6">
+             <div className="grid grid-cols-2 gap-6">
+               <div className="premium-card p-8 bg-white border-2 border-slate-100 shadow-sm"><div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">本人接続率</div><div className="text-4xl font-black text-slate-900">{((stats.picConnected / (stats.calls || 1)) * 100).toFixed(1)}<span className="text-sm opacity-30">%</span></div></div>
+               <div className="premium-card p-8 bg-white border-2 border-indigo-100 shadow-sm"><div className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2">アポ率 (架電比)</div><div className="text-4xl font-black text-indigo-600">{apptR.toFixed(1)}<span className="text-sm opacity-30">%</span></div></div>
+             </div>
              
-             現在の架電ボリューム {s.calls} 件に対してアポ獲得率は {apptR.toFixed(1)}% です。
-             1回のアポに対する平均架電数を20%削減するためのスクリプト改善が必要です。特に「担当不在」への対策を強化しましょう。
+             <div className="premium-card p-10 bg-slate-900 border-none relative overflow-hidden flex flex-col flex-1 shadow-2xl">
+                <div className="absolute top-0 right-0 p-8 opacity-20"><Icon p={I.Zap} size={120} color="#4f46e5" /></div>
+                <div className="relative z-10 flex items-center gap-4 mb-8">
+                   <div className="p-3 bg-indigo-600 rounded-2xl animate-bounce shadow-2xl shadow-indigo-600/50"><Icon p={I.Zap} size={24} color="white" /></div>
+                   <div><h3 className="font-black text-2xl text-white">伝説のテレアポ・マスター分析</h3><p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em]">Master Advisor Insight</p></div>
+                </div>
+                <div className="relative z-10 text-indigo-100 text-[15px] leading-8 font-black whitespace-pre-wrap font-sans">
+                   『10年連続売上トップ』の視点から言わせてもらう。
+                   【{selectedMid === 'all' ? '全体' : members.find(m=>m.id===selectedMid)?.name}】のデータを見ると、決定的な「勝機」が隠れているな。
+
+                   注目すべきは、資料請求からアポへの転換タイミングだ。現状の {((stats.appts / (stats.requests || 1)) * 100).toFixed(0)}% という数字は、決して悪くない。だが、プロの仕事はここからだ。
+                   まず、架電あたりの「本人接続」をあと5%上げるために、リストの精査とタイミングの再構築が必須。特に16時台の架電の質が、今の君の「勝ち筋」を決定づけるだろう。
+                   
+                   論理的に考えろ。感情で架電するな。数字を味方につければ、君は業界No.1を狙える。
+                </div>
+             </div>
           </div>
        </div>
     </div>
   );
 };
 
-const Settings = ({ events, currentEventId, onAddEvent, onDeleteEvent, onUpdateGoals, onUpdateWeeklyGoals, members, onAddMember, onDelMember, onClose }) => {
+const Settings = ({ events, currentEventId, onAddEvent, onDeleteEvent, onUpdateGoals, onUpdateWeeklyGoals, members, onAddMember, onDelMember, onUpdateMember, onClose }) => {
   const [newEName, setNewEName] = useState("");
   const [newMName, setNewMName] = useState("");
   const [newRole, setNewRole] = useState("apo");
+  const [newWage, setNewWage] = useState("1500");
+  
   return (
-    <div className="space-y-10 pb-24 font-sans animate-in fade-in duration-700">
-       <div className="flex items-center gap-4"><button onClick={onClose} className="p-4 bg-white rounded-full shadow-lg"><Icon p={I.X}/></button><h2 className="font-black text-3xl">各種設定</h2></div>
-       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <section className="premium-card p-8 space-y-6">
-             <h3 className="font-black text-xl flex items-center gap-3"><Icon p={I.Trophy} size={20} className="text-indigo-600"/> プロジェクト管理</h3>
-             <input className="w-full p-4 bg-slate-50 border rounded-2xl font-bold" placeholder="プロジェクト名" value={newEName} onChange={e=>setNewEName(e.target.value)} />
-             <button onClick={()=>{if(newEName){onAddEvent(newEName, ""); setNewEName("");}}} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-sm">プロジェクト追加</button>
-             <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
-                {events.map(e => <div key={e.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl font-bold text-sm"><span>{e.name}</span><button onClick={()=>onDeleteEvent(e.id)} className="text-rose-300"><Icon p={I.Trash} size={18}/></button></div>)}
+    <div className="space-y-12 pb-32 font-sans animate-in fade-in duration-1000">
+       <div className="flex items-center gap-6">
+          <button onClick={onClose} className="p-5 bg-white rounded-3xl shadow-xl hover:scale-110 transition-all"><Icon p={I.X}/></button>
+          <div><h2 className="font-black text-4xl text-slate-900 tracking-tight">高度管理設定</h2><p className="text-slate-400 font-bold text-sm">プロジェクト基盤・チーム構成の管理</p></div>
+       </div>
+
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+          <section className="premium-card p-10 space-y-8 bg-white border border-slate-100 shadow-xl">
+             <div className="flex items-center gap-4 border-b border-slate-50 pb-6"><div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl"><Icon p={I.Trophy} size={24}/></div><h3 className="font-black text-2xl">プロジェクト管理</h3></div>
+             <div className="space-y-4">
+                <input className="w-full p-5 bg-slate-50 border-2 border-transparent rounded-[1.5rem] font-black focus:border-indigo-500 focus:bg-white outline-none transition-all" placeholder="新規プロジェクト名" value={newEName} onChange={e=>setNewEName(e.target.value)} />
+                <button onClick={()=>{if(newEName){onAddEvent(newEName, ""); setNewEName("");}}} className="w-full bg-slate-900 text-white py-5 rounded-[1.5rem] font-black text-lg shadow-xl shadow-slate-200">プロジェクトを立ち上げる</button>
              </div>
-          </section>
-          <section className="premium-card p-8 space-y-6">
-             <h3 className="font-black text-xl flex items-center gap-3"><Icon p={I.Users} size={20} className="text-emerald-600"/> チームメンバー管理</h3>
-             <div className="flex gap-4"><input className="flex-1 p-4 bg-slate-50 border rounded-2xl font-bold" placeholder="名前" value={newMName} onChange={e=>setNewMName(e.target.value)} /><select className="p-4 bg-slate-50 border rounded-2xl font-bold" value={newRole} onChange={e=>setNewRole(e.target.value)}><option value="apo">アポ</option><option value="closer">CLOSER</option></select></div>
-             <button onClick={()=>{if(newMName){onAddMember(newMName, newRole, 0); setNewMName("");}}} className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-black text-sm shadow-xl shadow-emerald-100">メンバー追加</button>
-             <div className="grid grid-cols-2 gap-3 max-h-48 overflow-y-auto">
-                {members.map(m => (
-                  <div key={m.id} className="p-4 bg-slate-50 rounded-2xl border flex items-center justify-between group">
-                    <span className="text-xs font-black">{m.name}</span><button onClick={()=>onDelMember(m.id)} className="opacity-0 group-hover:opacity-100 text-rose-300"><Icon p={I.X} size={14}/></button>
+             <div className="space-y-3">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Projects</p>
+                {events.map(e => (
+                  <div key={e.id} className="flex items-center justify-between p-5 bg-slate-50 rounded-2xl font-black group hover:bg-slate-100 transition-colors">
+                     <span className="text-slate-700">{e.name}</span>
+                     <button onClick={()=>{if(window.confirm('削除しますか？')) onDeleteEvent(e.id)}} className="text-rose-200 hover:text-rose-500 group-hover:scale-110 transition-all"><Icon p={I.Trash} size={20}/></button>
                   </div>
                 ))}
+             </div>
+          </section>
+
+          <section className="premium-card p-10 space-y-8 bg-white border border-slate-100 shadow-xl">
+             <div className="flex items-center gap-4 border-b border-slate-50 pb-6"><div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl"><Icon p={I.Users} size={24}/></div><h3 className="font-black text-2xl">チーム・給与設定</h3></div>
+             <div className="space-y-4 bg-slate-50 p-6 rounded-[2rem]">
+                <input className="w-full p-4 bg-white border-2 border-transparent rounded-[1.2rem] font-black focus:border-emerald-500 outline-none" placeholder="フルネーム" value={newMName} onChange={e=>setNewMName(e.target.value)} />
+                <div className="grid grid-cols-2 gap-4">
+                   <select className="p-4 bg-white border-2 border-transparent rounded-[1.2rem] font-black focus:border-emerald-500" value={newRole} onChange={e=>setNewRole(e.target.value)}>
+                      <option value="apo">アポインター</option>
+                      <option value="closer">CLOSER</option>
+                      <option value="admin">管理者(閲覧権限広)</option>
+                   </select>
+                   <input type="number" className="p-4 bg-white border-2 border-transparent rounded-[1.2rem] font-black focus:border-emerald-500 outline-none" placeholder="時給" value={newWage} onChange={e=>setNewWage(e.target.value)} />
+                </div>
+                <button onClick={()=>{if(newMName){onAddMember(newMName, newRole, newWage); setNewMName("");}}} className="w-full bg-emerald-600 text-white py-4 rounded-[1.2rem] font-black shadow-xl shadow-emerald-100 hover:scale-[1.02] transition-all">スタッフを登録</button>
+             </div>
+             <div className="space-y-3">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Team Roster</p>
+                <div className="grid grid-cols-1 gap-3">
+                   {members.map(m => (
+                     <div key={m.id} className="p-5 bg-white border-2 border-slate-50 rounded-2xl flex items-center justify-between group hover:border-emerald-100 transition-all shadow-sm">
+                        <div className="flex items-center gap-4">
+                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white ${m.role==='closer'?'bg-amber-400':m.role==='admin'?'bg-indigo-600':'bg-sky-400'}`}>{m.name.slice(0,1)}</div>
+                           <div>
+                              <div className="font-black text-slate-800">{m.name}</div>
+                              <div className="text-[8px] font-black text-slate-400 uppercase">¥{m.hourlyWage}/h • {m.role}</div>
+                           </div>
+                        </div>
+                        <button onClick={()=>onDelMember(m.id)} className="p-2 text-rose-200 hover:text-rose-500 transition-colors"><Icon p={I.Trash} size={18}/></button>
+                     </div>
+                   ))}
+                </div>
              </div>
           </section>
        </div>
@@ -806,8 +1011,11 @@ function App() {
     <div className="min-h-screen bg-slate-50 pb-32 text-slate-900 font-sans selection:bg-indigo-100">
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-2xl border-b border-slate-100 px-6 py-4 flex items-center justify-between no-print shadow-sm">
         <div className="flex items-center gap-3">
-           <div className="p-2 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-100"><Icon p={I.Target} size={20} color="white" strokeWidth={2.5} /></div>
-           <h1 className="text-xl font-black tracking-tighter">KPI<span className="text-indigo-600">Sync</span></h1>
+           <div className="p-3 bg-indigo-600 rounded-[1.2rem] shadow-2xl shadow-indigo-200 animate-float"><Icon p={I.Target} size={28} color="white" strokeWidth={2.5} /></div>
+           <div>
+              <h1 className="text-2xl font-black tracking-tighter text-slate-900">イベント<span className="text-indigo-600">KPI</span>アプリ</h1>
+              <div className="flex items-center gap-2"><div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div><span className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none">Cloud Sync Active</span></div>
+           </div>
         </div>
         <div className="flex items-center gap-4">
            {connectionStatus === "offline" && <div className="text-rose-500"><Icon p={I.WifiOff} size={20}/></div>}
