@@ -52,7 +52,6 @@ try {
   isOffline = true;
 }
 
-const ADMIN_EMAIL = "sotaro50017@gmail.com";
 
 const getWeekRange = (baseDate) => {
   const d = new Date(baseDate);
@@ -415,31 +414,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
     </div>
   );
 };
-                       <div><h2 className="text-2xl font-black text-slate-900 leading-none">{drilldownMember.name} さんの分析</h2><p className="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-widest">{drilldownMember.role}</p></div>
-                    </div>
-                 </div>
-                 <div className="p-8 space-y-10 overflow-y-auto">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                       <div className="p-4 bg-slate-50 rounded-2xl"><div className="text-[8px] font-black text-slate-400 uppercase mb-1">本人接続数</div><div className="text-2xl font-black">{memberStats.find(s=>s.id===drilldownMember.id)?.picConnected || 0}</div></div>
-                       <div className="p-4 bg-slate-50 rounded-2xl"><div className="text-[8px] font-black text-slate-400 uppercase mb-1">現在のアポ数</div><div className="text-2xl font-black text-emerald-600">{memberStats.find(s=>s.id===drilldownMember.id)?.appts || 0}</div></div>
-                       <div className="p-4 bg-slate-50 rounded-2xl"><div className="text-[8px] font-black text-slate-400 uppercase mb-1">架電単価(CPH)</div><div className="text-2xl font-black text-indigo-600">{memberStats.find(s=>s.id===drilldownMember.id)?.cph || '0.0'}</div></div>
-                       <div className="p-4 bg-slate-50 rounded-2xl"><div className="text-[8px] font-black text-slate-400 uppercase mb-1">稼働時間</div><div className="text-2xl font-black">{memberStats.find(s=>s.id===drilldownMember.id)?.hours || 0}h</div></div>
-                    </div>
-                    <div className="bg-slate-900 rounded-[2rem] p-8 text-white relative overflow-hidden">
-                      <div className="absolute top-0 right-0 p-4 opacity-10"><Icon p={I.Zap} size={48} /></div>
-                      <h4 className="text-lg font-black mb-4">AI個別アドバイス</h4>
-                      <p className="text-sm text-indigo-100 font-bold leading-relaxed font-sans">
-                        {drilldownMember.name}さんは現在、アポ率がチーム平均を大きく上回っています。架電強度(CPH)を維持しながら、1回1回の通話時間を30秒短縮できれば、1日あたりのアポ獲得数をさらに0.5件上乗せできる余地があります。
-                      </p>
-                    </div>
-                 </div>
-              </div>
-           </div>
-        </div>
-      )}
-    </div>
-  );
-};
+
 
 const AttendanceView = ({ members, reports, onEdit }) => {
   const [selectedMonth, setSelectedMonth] = useState(toLocalMonthString(new Date()));
