@@ -174,15 +174,14 @@ const MetricBar = ({ label, val, tgt }) => {
   const isOk = val >= (tgt || 0);
   return (
     <div className="space-y-2 w-full">
-      <div className="flex justify-between items-center px-1">
-        <span className="text-[11px] font-black text-slate-900 uppercase tracking-widest">{label}</span>
-        <span className={`text-xs font-black ${isOk ? 'text-emerald-600' : 'text-rose-600'}`}>
-          {val.toLocaleString()} <span className="text-slate-400 mx-1">/</span> {tgt.toLocaleString()}
-          <span className="ml-2 px-1.5 py-0.5 bg-slate-100 rounded text-[9px]">{p.toFixed(0)}%</span>
+      <div className="flex justify-between items-end">
+        <span className="text-xs font-bold text-slate-500">{label}</span>
+        <span className={`text-sm font-black ${isOk ? 'text-emerald-600' : 'text-blue-600'}`}>
+          {val.toLocaleString()} <span className="text-slate-300 font-normal">/ {tgt.toLocaleString()}</span>
         </span>
       </div>
-      <div className="h-3 w-full bg-slate-100 rounded-none overflow-hidden border border-slate-200">
-        <div className={`h-full transition-all duration-1000 ${isOk ? 'bg-indigo-600' : 'bg-rose-500'}`} style={{ width: `${p}%` }}></div>
+      <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-50">
+        <div className={`h-full transition-all duration-1000 ${isOk ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${p}%` }}></div>
       </div>
     </div>
   );
@@ -192,45 +191,48 @@ const MainMetric = ({ label, icon, current, target }) => {
   const p = Math.min((current / (target || 1)) * 100, 100);
   const isOk = current >= (target || 0);
   return (
-    <div className="p-8 bg-white border-2 border-slate-900 shadow-[8px_8px_0px_0px_rgba(15,23,42,1)] flex flex-col gap-6 relative overflow-hidden">
+    <div className={`p-8 rounded-[2rem] border border-slate-100 bg-white flex flex-col gap-6 shadow-sm relative overflow-hidden group transition-all hover:shadow-xl`}>
        <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-             <div className="w-10 h-10 bg-slate-900 text-white flex items-center justify-center"><Icon p={icon} size={20}/></div>
-             <span className="text-sm font-black text-slate-900 uppercase tracking-tighter">{label}</span>
+             <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg"><Icon p={icon} size={20}/></div>
+             <span className="text-sm font-bold text-slate-900">{label}</span>
           </div>
-          <div className={`text-[10px] font-black px-3 py-1 ${isOk ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}>{isOk ? 'ACHIEVED' : 'IN PROGRESS'}</div>
+          <span className={`text-[10px] font-black px-3 py-1 rounded-full ${isOk ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>{isOk ? '達成済み' : '目標達成へ'}</span>
        </div>
-       <div className="flex items-baseline justify-between pt-2">
-          <div className="text-6xl font-black text-slate-950 tabular-nums leading-none tracking-tighter">
-            {current}
-            <span className="text-xl text-slate-300 ml-2">/ {target}</span>
+       <div className="flex items-end justify-between pt-2">
+          <div className="text-5xl font-black text-slate-900 tabular-nums tracking-tighter">
+            {current.toLocaleString()}
+            <span className="text-base font-normal text-slate-300 ml-2">/ {target.toLocaleString()}</span>
           </div>
-          <div className={`text-3xl font-black ${isOk ? 'text-emerald-600' : 'text-rose-600'} leading-none italic underline decoration-4 offset-4`}>{p.toFixed(0)}%</div>
+          <div className={`text-2xl font-black ${isOk ? 'text-emerald-500' : 'text-blue-500'} leading-none`}>{p.toFixed(0)}%</div>
+       </div>
+       <div className="absolute bottom-0 left-0 h-1.5 bg-slate-50 w-full">
+          <div className={`h-full transition-all duration-1000 ${isOk ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ width: `${p}%` }}></div>
        </div>
     </div>
   );
 };
 
 const AreaChart = ({ data, color }) => {
-  if (!data || data.length === 0) return <div className="h-32 flex items-center justify-center text-slate-300 font-bold text-xs uppercase tracking-widest">No Data Logged</div>;
+  if (!data || data.length === 0) return <div className="h-32 flex items-center justify-center text-slate-300 font-bold text-xs uppercase tracking-widest">データがありません</div>;
   const max = Math.max(...data.map(d => d.value), 10);
   const points = data.map((d, i) => `${(i / (data.length - 1)) * 100},${100 - (d.value / max) * 100}`).join(' ');
   const areaPoints = `${points} 100,100 0,100`;
 
   return (
     <div className="w-full h-full relative group">
-      <div className="absolute inset-0 grid grid-cols-6 border-b border-l border-slate-100">
+      <div className="absolute inset-x-0 bottom-0 top-0 grid grid-cols-6 border-b border-l border-slate-100/50">
         {[...Array(6)].map((_, i) => <div key={i} className="border-r border-slate-50 opacity-20" />)}
       </div>
       <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full overflow-visible relative z-10">
-        <polygon fill={`${color}15`} points={areaPoints} />
-        <polyline fill="none" stroke={color} strokeWidth="4" strokeLinejoin="round" points={points} />
+        <polygon fill={`${color}10`} points={areaPoints} />
+        <polyline fill="none" stroke={color} strokeWidth="3" strokeLinejoin="round" points={points} />
         {data.map((d, i) => (
-          <circle key={i} cx={(i / (data.length - 1)) * 100} cy={100 - (d.value / max) * 100} r="2.5" fill="white" stroke={color} strokeWidth="2" />
+          <circle key={i} cx={(i / (data.length - 1)) * 100} cy={100 - (d.value / max) * 100} r="2" fill="white" stroke={color} strokeWidth="2" />
         ))}
       </svg>
       <div className="flex justify-between mt-4 px-1">
-        {data.map((d, i) => <span key={i} className="text-[10px] font-black text-slate-400 uppercase">{d.day}</span>)}
+        {data.map((d, i) => <span key={i} className={`text-[9px] font-black uppercase ${i===data.length-1?'text-blue-600':'text-slate-400'}`}>{d.day}</span>)}
       </div>
     </div>
   );
@@ -256,79 +258,84 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
 
   return (
     <div className="space-y-12 pb-24 font-sans">
-       <div className="flex flex-col md:flex-row md:items-end justify-between gap-10 border-b-4 border-slate-900 pb-10">
-          <div className="space-y-4">
-             <h2 className="text-5xl font-black text-slate-950 uppercase tracking-tighter leading-none">{event.name}</h2>
-             <div className="flex items-center gap-4 text-xs font-black text-slate-400 uppercase tracking-widest">
-                <span>PROJECT PERFORMANCE CORE</span>
+       <div className="flex flex-col md:flex-row md:items-end justify-between gap-10 border-b border-slate-100 pb-10">
+          <div className="space-y-3">
+             <h2 className="text-4xl font-black text-slate-900 tracking-tighter">{event.name}</h2>
+             <div className="flex items-center gap-4 text-xs font-bold text-slate-400">
+                <span className="flex items-center gap-2"><div className="w-2 h-2 bg-emerald-500 rounded-full"></div> 正常稼働中</span>
+                <span className="w-px h-3 bg-slate-200"></span>
+                <span>運営期間内</span>
              </div>
           </div>
-          <div className="flex bg-slate-100 p-1.5 border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)]">
-             <button onClick={()=>setViewMode('personal')} className={`px-8 py-3 text-xs font-black transition-all ${viewMode==='personal'?'bg-slate-900 text-white':'text-slate-400 hover:text-slate-900'}`}>{currentUserEmail === ADMIN_EMAIL ? '管理個人' : 'マイ実績'}</button>
-             <button onClick={()=>setViewMode('team')} className={`px-8 py-3 text-xs font-black transition-all ${viewMode==='team'?'bg-slate-900 text-white':'text-slate-400 hover:text-slate-900'}`}>全体指標</button>
+          <div className="flex bg-slate-200 p-1 rounded-2xl">
+             <button onClick={()=>setViewMode('personal')} className={`px-8 py-3 text-xs font-bold transition-all rounded-xl ${viewMode==='personal'?'bg-white text-blue-600 shadow-sm':'text-slate-500 hover:text-slate-900'}`}>{currentUserEmail === ADMIN_EMAIL ? '個人統計' : 'マイ実績'}</button>
+             <button onClick={()=>setViewMode('team')} className={`px-8 py-3 text-xs font-bold transition-all rounded-xl ${viewMode==='team'?'bg-white text-blue-600 shadow-sm':'text-slate-500 hover:text-slate-900'}`}>全体指標</button>
           </div>
        </div>
 
        {viewMode === 'personal' ? (
                 <div className="space-y-10">
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       <div className="space-y-6">
-                         <h3 className="text-sm font-black text-slate-950 tracking-[.2em] uppercase border-l-8 border-indigo-600 pl-4">CORE GOAL</h3>
-                         <MainMetric label="週間獲得アポイント" icon={I.Target} current={myTotals.appts} target={activeIndivGoals.appts} />
-                         <button onClick={()=>setEditingGoal(activeIndivGoals)} className="w-full py-5 bg-slate-900 text-white text-[12px] font-black uppercase tracking-widest shadow-[6px_6px_0px_0px_rgba(79,70,229,1)] active:translate-x-1 active:translate-y-1 active:shadow-none transition-all">目標数値を編集する</button>
+                         <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                           <div className="w-1.5 h-4 bg-blue-600 rounded-full"></div> 主要目標
+                         </h3>
+                         <MainMetric label="週間アポイント数" icon={I.Target} current={myTotals.appts} target={activeIndivGoals.appts} />
+                         <button onClick={()=>setEditingGoal(activeIndivGoals)} className="w-full py-4 bg-white border border-slate-200 text-slate-500 rounded-2xl text-[11px] font-bold hover:bg-slate-50 transition-all">数値を調整する</button>
                       </div>
                       <div className="space-y-6">
-                         <h3 className="text-sm font-black text-slate-950 tracking-[.2em] uppercase border-l-8 border-slate-300 pl-4">EFFICIENCY</h3>
-                         <div className="flex flex-col gap-10 p-10 bg-white border-2 border-slate-100 shadow-xl">
-                            <MetricBar label="接続成功率 (有効架電)" val={myTotals.picConnected} tgt={myTotals.calls} />
-                            <MetricBar label="アポ獲得率 (接続比)" val={myTotals.appts} tgt={myTotals.picConnected} />
+                         <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                           <div className="w-1.5 h-4 bg-slate-300 rounded-full"></div> 効率解析
+                         </h3>
+                         <div className="flex flex-col gap-10 p-10 bg-white border border-slate-100 rounded-[2rem] shadow-sm">
+                            <MetricBar label="接続率 (架電比)" val={myTotals.picConnected} tgt={myTotals.calls} />
+                            <MetricBar label="アポ率 (接続比)" val={myTotals.appts} tgt={myTotals.picConnected} />
                          </div>
                       </div>
                    </div>
                 </div>
              ) : (
-                <div className="space-y-10">
+                <div className="space-y-12">
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                       <div className="space-y-6">
-                         <h3 className="text-sm font-black text-slate-950 tracking-[.2em] uppercase border-l-8 border-indigo-600 pl-4">TEAM GOAL</h3>
-                         <MainMetric label="チーム全体のアポ獲得" icon={I.Check} current={totals.weekly.appts} target={activeWeeklyGoals.appts} />
+                         <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                           <div className="w-1.5 h-4 bg-indigo-600 rounded-full"></div> チーム目標
+                         </h3>
+                         <MainMetric label="全社アポイント獲得数" icon={I.Check} current={totals.weekly.appts} target={activeWeeklyGoals.appts} />
                       </div>
                       <div className="space-y-6">
-                         <h3 className="text-sm font-black text-slate-950 tracking-[.2em] uppercase border-l-8 border-slate-300 pl-4">TEAM EFFICIENCY</h3>
-                         <div className="flex flex-col gap-10 p-10 bg-white border-2 border-slate-100 shadow-xl">
+                         <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                           <div className="w-1.5 h-4 bg-slate-300 rounded-full"></div> 全体効率
+                         </h3>
+                         <div className="flex flex-col gap-10 p-10 bg-white border border-slate-100 rounded-[3rem] shadow-sm">
                             <MetricBar label="全体接続率" val={totals.weekly.picConnected} tgt={totals.weekly.calls} />
-                            <MetricBar label="全体アポ獲得率" val={totals.weekly.appts} tgt={totals.weekly.picConnected} />
+                            <MetricBar label="全体アポ率" val={totals.weekly.appts} tgt={totals.weekly.picConnected} />
                          </div>
                       </div>
                    </div>
 
-                   <div className="bg-white border-4 border-slate-950 shadow-[12px_12px_0px_0px_rgba(15,23,42,1)] overflow-hidden transition-all hover:shadow-[16px_16px_0px_0px_rgba(15,23,42,1)]">
-                      <div className="p-5 bg-slate-950 text-white text-xs font-black uppercase tracking-[.3em] flex items-center justify-between">
-                         <span className="flex items-center gap-3"><Icon p={I.Users} size={16}/> MEMBER ANALYTICS</span>
-                         <span className="text-[10px] opacity-40 italic">Sorted by Performance</span>
+                   <div className="bg-white border border-slate-100 rounded-[2.5rem] shadow-sm overflow-hidden">
+                      <div className="p-6 bg-slate-50 border-b border-slate-100 text-xs font-black flex items-center justify-between text-slate-600 uppercase tracking-widest">
+                         <span className="flex items-center gap-3"><Icon p={I.Users} size={16}/> メンバー別パフォーマンス</span>
                       </div>
-                      <div className="divide-y-2 divide-slate-100">
+                      <div className="divide-y divide-slate-50">
                          {members.map(m => {
                             const stats = memberStats.find(s=>s.id===m.id);
                             return (
                               <button key={m.id} onClick={()=>setDrilldownMember(m)} className="w-full p-8 flex items-center justify-between hover:bg-slate-50 transition-all text-left group">
                                  <div className="flex items-center gap-6">
-                                    <div className={`w-14 h-14 ${m.role==='closer'?'bg-indigo-600':'bg-slate-900'} text-white flex items-center justify-center font-black text-lg`}>{m.name.slice(0,1)}</div>
+                                    <div className={`w-14 h-14 rounded-2xl ${m.role==='closer'?'bg-amber-400':'bg-blue-600'} text-white flex items-center justify-center font-black text-lg shadow-sm group-hover:scale-105 transition-transform`}>{m.name.slice(0,1)}</div>
                                     <div>
-                                       <div className="font-black text-2xl text-slate-950 leading-tight group-hover:underline">{m.name}</div>
-                                       <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{m.role}・¥{m.hourlyWage.toLocaleString()}/H</div>
+                                       <div className="font-bold text-xl text-slate-900 leading-tight">{m.name}</div>
+                                       <div className="text-[10px] font-bold text-slate-400 mt-1">¥{m.hourlyWage.toLocaleString()} / 時間</div>
                                     </div>
                                  </div>
-                                 <div className="flex items-center gap-12">
+                                 <div className="flex items-center gap-10">
                                     <div className="text-right">
-                                       <div className="text-[10px] font-black text-slate-300 uppercase">APPTS</div>
-                                       <div className="text-3xl font-black text-slate-950">{stats?.appts || 0}</div>
+                                       <div className="text-[10px] font-black text-slate-200 uppercase tracking-widest">獲得数</div>
+                                       <div className="text-4xl font-black text-slate-900 tabular-nums">{stats?.appts || 0}</div>
                                     </div>
-                                    <div className="text-right hidden sm:block">
-                                       <div className="text-[10px] font-black text-slate-300 uppercase">CPH</div>
-                                       <div className="text-3xl font-black text-indigo-600 italic">{stats?.cph || '0.0'}</div>
-                                    </div>
-                                    <div className="p-3 bg-slate-900 text-white active:bg-indigo-600"><Icon p={I.ChevronRight} size={20}/></div>
+                                    <div className="p-3 bg-slate-50 rounded-2xl text-slate-200 group-hover:bg-blue-600 group-hover:text-white transition-colors"><Icon p={I.ChevronRight} size={20}/></div>
                                  </div>
                               </button>
                             );
@@ -595,7 +602,7 @@ const AnalyticsView = ({ members, reports, event }) => {
   return (
     <div className="space-y-10 pb-28">
        <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4">
-          <h2 className="text-xl font-bold flex items-center gap-3"><Icon p={I.PieChart} size={20}/> 高度分析センター</h2>
+          <h2 className="text-xl font-black flex items-center gap-3"><Icon p={I.PieChart} size={20}/> プロジェクト分析</h2>
           <select className="bg-white border border-slate-300 p-2 font-bold text-xs outline-none rounded-xl" value={selectedMid} onChange={e=>setSelectedMid(e.target.value)}>
              <option value="all">チーム全体の状態を見る</option>
              {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
@@ -616,19 +623,20 @@ const AnalyticsView = ({ members, reports, event }) => {
           </div>
        </div>
 
-       <section className="p-10 bg-slate-900 text-white relative rounded-[2.5rem] shadow-2xl overflow-hidden min-h-[300px] flex flex-col justify-between">
+       <section className="p-10 bg-slate-900 text-white relative rounded-[2.5rem] shadow-xl overflow-hidden min-h-[340px] flex flex-col justify-between border border-slate-800">
           <div className="absolute top-0 right-0 p-10 opacity-10 pointer-events-none"><Icon p={I.Zap} size={140} /></div>
           <div className="relative z-10 space-y-8">
              <div className="flex items-center gap-3">
-                <div className="w-1.5 h-6 bg-indigo-500"></div>
-                <h3 className="text-xs font-black text-indigo-300 uppercase tracking-widest">AI戦略アドバイス</h3>
+                <div className="w-1.5 h-6 bg-blue-500 rounded-full"></div>
+                <h3 className="text-xs font-black text-blue-400 uppercase tracking-widest">AI戦略アドバイザー</h3>
              </div>
-             <p className="text-lg font-black leading-relaxed font-sans pr-10">
+             <p className="text-xl font-bold leading-relaxed pr-6">
                 {getAIAdvice(stats, selectedMid !== 'all')}
              </p>
           </div>
-          <div className="relative z-10 border-t border-white/10 pt-6 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-             Deep Analytical Engine Active
+          <div className="relative z-10 border-t border-white/10 pt-6 flex items-center justify-between text-[11px] font-black text-slate-500 uppercase tracking-widest">
+             <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div> システム稼働中</span>
+             <span className="opacity-40 italic">深層分析エンジン v5.0.2</span>
           </div>
        </section>
     </div>
@@ -648,7 +656,7 @@ const Settings = ({ events, members, onAddEvent, onDeleteEvent, onAddMember, onD
        <div className="flex items-center justify-between border-b-4 border-slate-900 pb-6">
           <div className="flex items-center gap-6">
              <button onClick={onClose} className="p-4 bg-slate-900 text-white rounded-2xl"><Icon p={I.X}/></button>
-             <div><h2 className="font-black text-3xl text-slate-900 leading-none">システム高度管理</h2><p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mt-1">Administrator Privileges Only</p></div>
+             <div><h2 className="font-black text-3xl text-slate-900 leading-none">システム高度管理</h2><p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mt-1">管理者権限のみ。一般スタッフは閲覧できません。</p></div>
           </div>
        </div>
 
@@ -712,7 +720,7 @@ const Settings = ({ events, members, onAddEvent, onDeleteEvent, onAddMember, onD
                   <div className="grid grid-cols-2 gap-4">
                      <select className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none rounded-xl" value={editingMember.role} onChange={e=>setEditingMember({...editingMember, role: e.target.value})}>
                         <option value="apo">アポインター</option>
-                        <option value="closer">CLOSER</option>
+                        <option value="closer">クローザー</option>
                         <option value="admin">管理者</option>
                      </select>
                      <input type="number" className="w-full p-4 bg-slate-50 border-2 border-slate-200 font-bold outline-none rounded-xl" value={editingMember.hourlyWage} onChange={e=>setEditingMember({...editingMember, hourlyWage: e.target.value})} />
@@ -852,46 +860,7 @@ function App() {
   const updateEventWeeklyGoals = async (id, wk, wg, ig) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', id), { [`weeklyGoals.${wk}`]: wg, [`individualWeeklyGoals.${wk}`]: ig });
   
   const addMember = async (n, r, w, e) => await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'members'), { name: n, role: r, hourlyWage: Number(w), email: e || "", createdAt: Timestamp.now() });
-  const updateMember = async (id, d) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', id), { ...d, updatedAt: Timestamp.now() });
-  const deleteMember = async (id) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', id));
-
-  const addReport = async (d) => {
-    const reportDate = d.date ? Timestamp.fromDate(new Date(d.date)) : Timestamp.now();
-    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reports'), { ...d, eventId: currentEventId, date: reportDate, createdAt: Timestamp.now() });
-  };
-  const updateReport = async (d) => {
-    const { id, ...u } = d;
-    u.date = d.date ? Timestamp.fromDate(new Date(d.date)) : Timestamp.now();
-    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reports', id), u);
-    setEditingReport(null);
-  };
-  const deleteReport = async (id) => { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reports', id)); setEditingReport(null); };
-
-  const currentEvent = useMemo(() => events.find(e => e.id === currentEventId) || { goals: defaultGoals }, [events, currentEventId]);
-  
-  const totals = useMemo(() => {
-    const wr = getWeekRange(currentBaseDate);
-    const wD = reports.filter(r => {
-      if (!r.date) return false;
-      const isEventMatch = !r.eventId || r.eventId === currentEventId;
-      if (!isEventMatch) return false;
-      const d = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
-      return d >= wr.start && d <= wr.end;
-    });
-    const tD = reports.filter(r => !r.eventId || r.eventId === currentEventId);
-    const sum = (arr) => arr.reduce((acc, r) => ({
-      appts: acc.appts + (Number(r.appts) || 0),
-      calls: acc.calls + (Number(r.calls) || 0),
-      requests: acc.requests + (Number(r.requests) || 0),
-      meetings: acc.meetings + (Number(r.meetings) || 0),
-      deals: acc.deals + (Number(r.deals) || 0),
-      lost: acc.lost + (Number(r.lost) || 0),
-      hours: acc.hours + (Number(r.hours) || 0),
-    }), { appts: 0, calls: 0, requests: 0, meetings: 0, deals: 0, lost: 0, hours: 0 });
-    return { weekly: sum(wD), total: sum(tD) };
-  }, [reports, currentEventId, currentBaseDate]);
-
-  const memberStats = useMemo(() => {
+  const updateMember = async (id, d) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'da  const memberStats = useMemo(() => {
     return members.map(m => {
       const myReps = reports.filter(r => r.memberId === m.id && r.eventId === currentEventId);
       const myTot = myReps.reduce((acc, r) => ({
@@ -912,17 +881,19 @@ function App() {
   if (connectionStatus === "unauthenticated" || !user) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-slate-900 font-sans">
-         <div className="w-full max-w-md bg-white border-4 border-slate-900 p-12 shadow-2xl space-y-10 text-center rounded-3xl">
-            <div className="space-y-4">
-               <div className="w-24 h-24 bg-slate-900 mx-auto flex items-center justify-center shadow-2xl mb-8 rounded-3xl">
+         <div className="w-full max-w-sm bg-white border border-slate-100 p-12 shadow-2xl space-y-12 text-center rounded-[3rem]">
+            <div className="space-y-6">
+               <div className="w-24 h-24 bg-blue-600 mx-auto flex items-center justify-center shadow-xl rounded-[2rem]">
                   <Icon p={I.Target} size={48} color="white" />
                </div>
-               <h1 className="text-3xl font-black tracking-tighter">KPI Sync</h1>
-               <p className="text-slate-400 text-sm font-bold">次世代KPI管理プラットフォーム</p>
+               <div className="space-y-2">
+                <h1 className="text-4xl font-black tracking-tighter">KPI SYNC</h1>
+                <p className="text-slate-400 text-sm font-bold">高精度な実績管理。チームの成果を最大化。</p>
+               </div>
             </div>
-            <button onClick={handleLogin} className="w-full bg-slate-900 text-white py-5 font-black text-lg shadow-2xl flex items-center justify-center gap-4 hover:bg-black transition-all rounded-2xl">
+            <button onClick={handleLogin} className="w-full bg-slate-900 text-white py-5 font-black text-lg shadow-xl flex items-center justify-center gap-4 hover:shadow-2xl transition-all rounded-[2rem]">
                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-               Googleでログイン
+               Google連携でログイン
             </button>
          </div>
       </div>
@@ -930,23 +901,24 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-32 text-slate-900 font-sans selection:bg-indigo-100">
+    <div className="min-h-screen bg-slate-50 pb-32 text-slate-900 font-sans selection:bg-blue-100 uppercase-none">
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-2xl border-b border-slate-100 px-6 py-4 flex items-center justify-between no-print shadow-sm">
-        <div className="flex items-center gap-2">
-           <div className="p-3 bg-slate-900 rounded-none shadow-xl"><Icon p={I.Target} size={24} color="white" strokeWidth={2.5} /></div>
+        <div className="flex items-center gap-4">
+           <div className="p-3 bg-blue-600 rounded-2xl shadow-xl"><Icon p={I.Target} size={24} color="white" strokeWidth={2.5} /></div>
            <div>
-              <h1 className="text-xl font-bold tracking-tight text-slate-900">イベントKPIアプリ</h1>
-              <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div><span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">正常稼働中</span></div>
+              <h1 className="text-xl font-black tracking-tight text-slate-900 leading-none">実績管理・KPI同期システム</h1>
            </div>
         </div>
         <div className="flex items-center gap-4">
            {connectionStatus === "offline" && <div className="text-rose-500"><Icon p={I.WifiOff} size={20}/></div>}
-           <div className="flex items-center gap-3">
+           <div className="flex items-center gap-4">
               <div className="text-right hidden md:block">
                  <div className="text-xs font-black">{user.displayName}</div>
-                 <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{userRole === 'admin' ? '管理者' : 'メンバー'}</div>
+                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{userRole === 'admin' ? 'システム管理者' : 'プロジェクトメンバー'}</div>
               </div>
-              <button onClick={handleLogout} className="p-2.5 bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-500 transition-all border border-slate-100 shadow-sm"><Icon p={I.LogOut} size={20} /></button>
+              <button onClick={handleLogout} className="p-3 bg-white hover:bg-slate-50 text-slate-400 hover:text-slate-900 transition-all border border-slate-100 shadow-sm rounded-2xl">
+                <Icon p={I.LogOut} size={20} />
+              </button>
            </div>
         </div>
       </header>
@@ -964,6 +936,42 @@ function App() {
         )}
         {activeTab === 'analytics' && <AnalyticsView members={members} reports={reports} event={currentEvent} userRole={userRole} />}
         {activeTab === 'attendance' && <AttendanceView members={members} reports={reports} onEdit={setEditingReport} />}
+        {activeTab === 'shifts' && (
+          <ShiftView 
+            members={members} shifts={shifts} 
+            onAddShift={(s) => addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shifts'), { ...s, createdAt: Timestamp.now() })} 
+            onDeleteShift={(id) => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shifts', id))} 
+          />
+        )}
+        {activeTab === 'settings' && (
+          <Settings 
+            events={events} currentEventId={currentEventId} 
+            onAddEvent={addEvent} onDeleteEvent={deleteEvent}
+            onUpdateGoals={updateEventGoals} onUpdateWeeklyGoals={updateEventWeeklyGoals}
+            members={members} onAddMember={addMember} onDelMember={deleteMember} onUpdateMember={updateMember}
+            onClose={() => setActiveTab('dashboard')}
+          />
+        )}
+      </main>
+
+      {(activeTab === 'dashboard' || activeTab === 'analytics' || activeTab === 'shifts' || activeTab === 'attendance' || activeTab === 'settings') && (
+        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t-2 border-slate-100 flex items-center justify-between no-print pt-2 pb-6 px-4">
+          <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={I.Grid} label="ホーム" />
+          <NavButton active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} icon={I.PieChart} label="分析" />
+          <NavButton active={activeTab === 'shifts'} onClick={() => setActiveTab('shifts')} icon={I.Calendar} label="シフト" />
+          <NavButton active={activeTab === 'attendance'} onClick={() => setActiveTab('attendance')} icon={I.Clock} label="履歴" />
+          <NavButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings'} icon={I.Settings} label="管理設定" />
+        </nav>
+      )}
+
+      {showInput && <InputModal members={members} onAdd={addReport} onClose={() => setShowInput(false)} />}
+      {editingReport && <InputModal members={members} initialData={editingReport} onUpdate={updateReport} onDelete={deleteReport} onClose={() => setEditingReport(null)} />}
+    </div>
+  );
+}
+
+export default App;
+orts} onEdit={setEditingReport} />}
         {activeTab === 'shifts' && (
           <ShiftView 
             members={members} shifts={shifts} 
