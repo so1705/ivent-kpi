@@ -13,6 +13,17 @@ import {
 // 1. 設定 & ヘルパー関数
 // ==========================================
 const appId = 'tele-apo-manager-v42-date-nav';
+const ADMIN_EMAIL = 'sotaro50017@gmail.com'; 
+
+// 進捗状況に応じた色判定
+const getStatusColor = (val, tgt) => {
+  if (!tgt || tgt === 0) return 'text-slate-900';
+  return val >= tgt ? 'text-emerald-700' : 'text-rose-600';
+};
+const getStatusBg = (val, tgt) => {
+  if (!tgt || tgt === 0) return 'bg-slate-50 border-slate-200';
+  return val >= tgt ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200';
+};
 
 const firebaseConfig = {
   apiKey: "AIzaSyBnvOnuKhldjHQGGpKSpI4TGo4a74_eaj0",
@@ -129,90 +140,75 @@ const BREAKDOWN_LABELS = {
 // 3. UI部品コンポーネント (Atomic Components)
 // ==========================================
 const Icon = ({ p, size=24, color="currentColor", className="", strokeWidth=1.5 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}>
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="square" strokeLinejoin="square" className={className}>
     {p}
   </svg>
 );
 
 const NavButton = ({ active, onClick, icon, label }) => (
-  <button onClick={onClick} className={`flex flex-col items-center justify-center w-full h-16 transition-all duration-500 relative group flex-1`}>
-    <div className={`transition-all duration-300 z-10 ${active ? 'transform -translate-y-0.5' : 'opacity-40 group-hover:opacity-70'}`}>
-      <Icon p={icon} size={22} strokeWidth={active ? 2.5 : 2} color={active ? '#4f46e5' : '#64748b'} />
-    </div>
-    <span className={`text-[11px] font-black mt-1 tracking-tighter transition-all duration-300 ${active ? 'text-indigo-600' : 'text-slate-400'}`}>{label}</span>
-    {active && <div className="absolute top-1 w-8 h-1 bg-indigo-500 rounded-full"></div>}
+  <button onClick={onClick} className={`flex flex-col items-center justify-center flex-1 py-1 transition-all ${active ? 'text-slate-900 border-t-4 border-slate-900' : 'text-slate-300'}`}>
+    <Icon p={icon} size={22} strokeWidth={active ? 3 : 2} />
+    <span className={`text-[9px] font-bold mt-1 ${active ? 'opacity-100' : 'opacity-60'}`}>{label}</span>
   </button>
 );
 
-const MetricBar = ({ label, val, tgt, color, small }) => {
-  const percent = tgt > 0 ? Math.min((val/tgt)*100, 100) : 0;
+const MetricBar = ({ label, val, tgt }) => {
+  const p = Math.min((val / (tgt || 1)) * 100, 100);
+  const isOk = val >= (tgt || 0);
   return (
-    <div className={`flex flex-col ${small ? 'gap-1' : 'gap-2'}`}>
+    <div className="space-y-1.5 w-full">
       <div className="flex justify-between items-end">
-        <span className={`font-black text-slate-500 uppercase tracking-tighter ${small ? 'text-[9px]' : 'text-[10px]'}`}>{label}</span>
-        <div className="font-black text-slate-900 leading-none">
-          <span className={small ? 'text-sm' : 'text-base'}>{val}</span>
-          {tgt > 0 && <span className="text-[10px] text-slate-300 ml-1">/ {tgt}</span>}
-        </div>
+        <span className="text-[10px] font-bold text-slate-500">{label}</span>
+        <span className={`text-[11px] font-bold ${isOk ? 'text-emerald-700' : 'text-rose-600'}`}>
+          {val} / {tgt || 0} ({p.toFixed(0)}%)
+        </span>
       </div>
-      <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
-        <div className={`h-full ${color} transition-all duration-1000`} style={{ width: `${percent}%` }} />
+      <div className="h-1.5 w-full bg-slate-100 rounded-none overflow-hidden border border-slate-200/50">
+        <div className={`h-full transition-all duration-1000 ${isOk ? 'bg-emerald-500' : 'bg-rose-500'}`} style={{ width: `${p}%` }}></div>
       </div>
     </div>
   );
 };
 
-const MainMetric = ({ label, icon, current, target, color, bg }) => {
-  const percent = target > 0 ? Math.min((current/target)*100, 100) : 0;
+const MainMetric = ({ label, icon, current, target, color }) => {
+  const p = Math.min((current / (target || 1)) * 100, 100);
+  const isOk = current >= (target || 0);
   return (
-    <div className="group">
-      <div className="flex justify-between items-end mb-4">
-        <div className={`flex items-center gap-3 font-black ${color}`}>
-          <div className={`p-2 rounded-xl bg-slate-50 group-hover:scale-110 transition-transform duration-500`}>
-            <Icon p={icon} size={24}/> 
+    <div className={`p-6 border-l-8 ${isOk ? 'border-emerald-500 bg-emerald-50/30' : 'border-rose-500 bg-rose-50/30'} flex flex-col gap-4 shadow-sm`}>
+       <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+             <div className="p-2 bg-slate-900 text-white"><Icon p={icon} size={18}/></div>
+             <span className="text-xs font-bold text-slate-900 uppercase tracking-widest">{label}</span>
           </div>
-          <span className="text-xl tracking-tight uppercase">{label}</span>
-        </div>
-        <div className="text-right">
-          <span className="text-5xl font-black text-slate-900 tracking-tighter">{current}</span>
-          <span className="text-sm font-black text-slate-200 ml-2">/ {target}</span>
-        </div>
-      </div>
-      <div className="h-5 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner border border-slate-50 p-1">
-        <div className={`h-full ${bg} rounded-full transition-all duration-1000 ease-out relative`} style={{ width: `${percent}%` }}>
-          <div className="absolute top-0 right-0 bottom-0 w-8 bg-white/20 skew-x-20"></div>
-        </div>
-      </div>
+          <span className={`text-[10px] font-bold px-2 py-0.5 border ${isOk ? 'border-emerald-200 text-emerald-600' : 'border-rose-200 text-rose-500'}`}>{isOk ? '達成' : '未達'}</span>
+       </div>
+       <div className="flex items-end justify-between">
+          <div className="text-4xl font-black text-slate-900 tabular-nums">{current}<span className="text-sm font-bold text-slate-300 ml-1">/ {target}</span></div>
+          <div className={`text-xl font-black ${isOk ? 'text-emerald-600' : 'text-rose-600'}`}>{p.toFixed(0)}%</div>
+       </div>
+       <div className="h-1 w-full bg-slate-100 rounded-none overflow-hidden">
+          <div className={`h-full transition-all duration-1000 ${isOk ? 'bg-emerald-500' : 'bg-rose-500'}`} style={{ width: `${p}%` }}></div>
+       </div>
     </div>
   );
 };
-
-const InputItem = ({ label, icon, val, set }) => (
-  <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm focus-within:ring-4 focus-within:ring-indigo-50/50 transition-all group">
-    <div className={`text-[9px] font-black uppercase mb-3 flex items-center justify-center gap-2 text-slate-400 group-focus-within:text-indigo-500 transition-colors tracking-[0.2em]`}>
-      <Icon p={icon} size={14}/> {label}
-    </div>
-    <input type="number" className="w-full bg-transparent text-4xl font-black text-slate-900 outline-none text-center placeholder-slate-100" placeholder="0" value={val} onChange={e=>set(e.target.value)} />
-  </div>
-);
 
 const ChartBar = ({ label, value, max, color }) => {
   const h = max > 0 ? (value / max) * 100 : 0;
   return (
-    <div className="flex-1 flex flex-col items-center gap-2 group">
-      <div className="relative w-full flex-1 flex flex-col justify-end bg-slate-50/50 rounded-t-2xl overflow-hidden shadow-inner">
-        <div className={`w-full rounded-t-2xl transition-all duration-1000 ${color} group-hover:brightness-110 relative`} style={{ height: `${h}%` }}>
-           <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[10px] font-black text-white drop-shadow-sm">{value}</div>
-           <div className="absolute top-0 left-0 right-0 h-4 bg-white/20 blur-sm"></div>
+    <div className="flex-1 flex flex-col items-center gap-1 group h-full">
+      <div className="relative w-full flex-1 flex flex-col justify-end bg-slate-50 border border-slate-100">
+        <div className={`w-full transition-all duration-1000 ${color} relative`} style={{ height: `${h}%` }}>
+           <div className="absolute top-1 left-1/2 -translate-x-1/2 text-[9px] font-bold text-white drop-shadow-md">{value}</div>
         </div>
       </div>
-      <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter text-center leading-tight h-8 flex items-center">{label}</span>
+      <span className="text-[8px] font-bold text-slate-400 text-center leading-tight h-6 flex items-center">{label}</span>
     </div>
   );
 };
 
 const LineChart = ({ data, color, label }) => {
-  if (!data || data.length === 0) return <div className="h-40 flex items-center justify-center text-slate-300 font-bold">データなし</div>;
+  if (!data || data.length === 0) return <div className="h-32 flex items-center justify-center text-slate-300 font-bold text-xs">データ無し</div>;
   const max = Math.max(...data.map(d => d.value), 10);
   const points = data.map((d, i) => {
     const x = (i / (data.length - 1)) * 100;
@@ -221,207 +217,204 @@ const LineChart = ({ data, color, label }) => {
   }).join(' ');
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-end px-2">
-         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label} - 時系列推移</span>
-         <span className="text-sm font-black text-slate-800">MAX: {max}</span>
-      </div>
-      <div className="h-40 w-full relative">
+    <div className="space-y-4 w-full h-full flex flex-col">
+      <div className="flex-1 relative min-h-[120px]">
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full overflow-visible">
-          <defs>
-            <linearGradient id={`grad-${color}`} x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" style={{ stopColor: color, stopOpacity: 0.3 }} />
-              <stop offset="100%" style={{ stopColor: color, stopOpacity: 0 }} />
-            </linearGradient>
-          </defs>
-          <path d={`M0,100 L${points} L100,100 Z`} fill={`url(#grad-${color})`} />
-          <polyline fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" points={points} />
+          <polyline fill="none" stroke={color} strokeWidth="3" strokeLinecap="square" points={points} />
           {data.map((d, i) => (
-            <circle key={i} cx={(i / (data.length - 1)) * 100} cy={100 - (d.value / max) * 100} r="1.5" fill="white" stroke={color} strokeWidth="1" />
+            <rect key={i} x={(i / (data.length - 1)) * 100 - 1.5} y={100 - (d.value / max) * 100 - 1.5} width="3" height="3" fill="white" stroke={color} strokeWidth="1.5" />
           ))}
         </svg>
-        <div className="flex justify-between mt-4">
-          {data.map((d, i) => (
-            <span key={i} className="text-[8px] font-black text-slate-300 transform -rotate-45">{d.day}</span>
-          ))}
-        </div>
+      </div>
+      <div className="flex justify-between border-t border-slate-100 pt-2">
+        {data.map((d, i) => <span key={i} className="text-[8px] font-bold text-slate-300">{d.day}</span>)}
       </div>
     </div>
   );
 };
 
-// ==========================================
-// 4. 各画面コンポーネント (Screens)
-// ==========================================
-
-const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBaseDate, eventReports, members, userRole, currentUserEmail }) => {
-  const [activeSubTab, setActiveSubTab] = useState('summary');
+const Dashboard = ({ event, totals, memberStats, eventReports, members, currentBaseDate, setCurrentBaseDate, userRole, currentUserEmail, onUpdateGoal }) => {
   const [drilldownMember, setDrilldownMember] = useState(null);
-  const wr = getWeekRange(currentBaseDate);
-  const weekRangeString = `${wr.start.getMonth()+1}/${wr.start.getDate()} - ${wr.end.getMonth()+1}/${wr.end.getDate()}`;
-  const mondayKey = getMondayKey(currentBaseDate);
-  const activeWeeklyGoals = event.weeklyGoals?.[mondayKey] || event.goals?.weekly || {};
+  const [viewMode, setViewMode] = useState('personal'); // 'personal' or 'team'
+  const [editingGoal, setEditingGoal] = useState(null);
 
-  const currentMember = useMemo(() => members.find(m => m.email === currentUserEmail) || members[0], [members, currentUserEmail]);
+  const currentMember = useMemo(() => members.find(m => m.email === currentUserEmail), [members, currentUserEmail]);
+  const myReports = useMemo(() => reports.filter(r => r.memberId === currentMember?.id && r.eventId === event.id), [reports, currentMember, event]);
+  const myTotals = useMemo(() => {
+     return myReports.reduce((acc, r) => ({
+        appts: acc.appts + (Number(r.appts) || 0),
+        calls: acc.calls + (Number(r.calls) || 0),
+        picConnected: acc.picConnected + (Number(r.picConnected) || 0),
+     }), { appts: 0, calls: 0, picConnected: 0 });
+  }, [myReports]);
 
-  const myStats = useMemo(() => {
-    if (!currentMember) return null;
-    const mid = currentMember.id;
-    const now = new Date();
-    const todayStr = toLocalDateString(now);
-
-    const todayReps = eventReports.filter(r => r.memberId === mid && r.date && toLocalDateString(r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000)) === todayStr);
-    const weekReps = eventReports.filter(r => {
-      if (!r.date || r.memberId !== mid) return false;
-      const d = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
-      return d >= wr.start && d <= wr.end;
-    });
-
-    return {
-      today: {
-        appts: todayReps.reduce((s, r) => s + (Number(r.appts)||0), 0),
-        requests: todayReps.reduce((s, r) => s + (Number(r.requests)||0), 0),
-        calls: todayReps.reduce((s, r) => s + (Number(r.calls)||0), 0),
-      },
-      weekly: {
-        appts: weekReps.reduce((s, r) => s + (Number(r.appts)||0), 0),
-        requests: weekReps.reduce((s, r) => s + (Number(r.requests)||0), 0),
-      }
-    };
-  }, [currentMember, eventReports, wr]);
-
-  const funnelData = useMemo(() => {
-    const list = eventReports.filter(r => {
-       if (!r.date) return false;
-       const d = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
-       return d >= wr.start && d <= wr.end;
-    });
-    const sum = (k) => list.reduce((s, r) => s + (Number(r[k])||0), 0);
-    return {
-      noAnswer: sum('noAnswer'),
-      receptionRefusal: sum('receptionRefusal'),
-      picAbsent: sum('picAbsent'),
-      picConnected: sum('picConnected'),
-      requests: sum('requests'),
-      appts: sum('appts'),
-      outOfTarget: sum('outOfTarget')
-    };
-  }, [eventReports, wr]);
+  const activeWeeklyGoals = event.weeklyGoals?.[getMondayKey(currentBaseDate)] || event.goals?.weekly || {};
+  const activeIndivGoals = event.individualWeeklyGoals?.[getMondayKey(currentBaseDate)]?.[currentMember?.id] || activeWeeklyGoals;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-700">
-      <div className="flex md:hidden bg-slate-100 p-1 rounded-2xl mb-4">
-        <button onClick={() => setActiveSubTab('my')} className={`flex-1 py-3 rounded-xl text-[10px] font-black transition-all ${activeSubTab === 'my' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>自分</button>
-        <button onClick={() => setActiveSubTab('summary')} className={`flex-1 py-3 rounded-xl text-[10px] font-black transition-all ${activeSubTab === 'summary' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>全体</button>
-        <button onClick={() => setActiveSubTab('charts')} className={`flex-1 py-3 rounded-xl text-[10px] font-black transition-all ${activeSubTab === 'charts' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}>分析</button>
-      </div>
+    <div className="space-y-12 animate-in fade-in pb-24 font-sans">
+       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b-2 border-slate-900 pb-8">
+          <div className="space-y-2">
+             <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tighter">実績状況ダッシュボード</h2>
+             <p className="font-bold text-slate-400 text-sm flex items-center gap-2 underline decoration-indigo-500 decoration-2">
+                運用対象：{event.name}
+             </p>
+          </div>
+          <div className="flex bg-slate-200 p-1 border border-slate-300">
+             <button onClick={()=>setViewMode('personal')} className={`px-6 py-2 text-xs font-bold transition-all ${viewMode==='personal'?'bg-slate-900 text-white shadow-lg':'text-slate-500'}`}>個人実績</button>
+             <button onClick={()=>setViewMode('team')} className={`px-6 py-2 text-xs font-bold transition-all ${viewMode==='team'?'bg-slate-900 text-white shadow-lg':'text-slate-500'}`}>プロジェクト全体</button>
+          </div>
+       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <div className={`lg:col-span-8 space-y-8 ${(activeSubTab !== 'my' && activeSubTab !== 'summary') ? 'hidden md:block' : ''}`}>
-          {(activeSubTab === 'my' || activeSubTab === 'summary') && (
-            <div className="space-y-6">
-              <h3 className="text-xl font-black text-slate-800 flex items-center gap-2 px-2">
-                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Icon p={I.User} size={18}/></div> 自分モード
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="premium-card p-10 bg-gradient-to-br from-slate-900 to-indigo-900 text-white relative overflow-hidden shadow-2xl">
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-[80px] -mr-32 -mt-32"></div>
-                  <div className="relative z-10">
-                    <p className="text-indigo-300 text-[10px] font-black uppercase tracking-[0.3em] mb-4">Daily Performance Pulse</p>
-                    <h4 className="text-xl font-black mb-8 flex items-center gap-3"><Icon p={I.Zap} size={20} className="text-amber-400"/> 本日の速報結果</h4>
-                    <div className="grid grid-cols-3 gap-6">
-                      <div className="bg-white/5 backdrop-blur-md p-4 rounded-3xl border border-white/10 text-center"><div className="text-5xl font-black text-white">{myStats?.today.appts || 0}</div><div className="text-[10px] font-black uppercase text-indigo-300 mt-2">アポ</div></div>
-                      <div className="bg-white/5 backdrop-blur-md p-4 rounded-3xl border border-white/10 text-center"><div className="text-5xl font-black text-white">{myStats?.today.requests || 0}</div><div className="text-[10px] font-black uppercase text-indigo-300 mt-2">資料</div></div>
-                      <div className="bg-white/5 backdrop-blur-md p-4 rounded-3xl border border-white/10 text-center opacity-40"><div className="text-5xl font-black text-white">{myStats?.today.calls || 0}</div><div className="text-[10px] font-black uppercase text-indigo-300 mt-2">架電</div></div>
-                    </div>
+       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+          <div className="lg:col-span-8 space-y-10">
+             {viewMode === 'personal' ? (
+                <div className="space-y-8 animate-in slide-in-from-left-4">
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-slate-200 border border-slate-200">
+                      <div className="bg-white p-8 space-y-6">
+                         <h3 className="text-[10px] font-bold text-slate-400 mb-4 tracking-widest uppercase">My 個人目標・進捗</h3>
+                         <MainMetric label="今週のアポ獲得" icon={I.Target} current={myTotals.appts} target={activeIndivGoals.appts} />
+                         <button onClick={()=>setEditingGoal(activeIndivGoals)} className="w-full py-2 bg-slate-50 text-[10px] font-bold text-slate-400 border border-slate-200 hover:bg-slate-900 hover:text-white transition-all uppercase tracking-widest">個人目標を修正</button>
+                      </div>
+                      <div className="bg-white p-8">
+                         <h3 className="text-[10px] font-bold text-slate-400 mb-6 tracking-widest uppercase">My 効率指標</h3>
+                         <div className="space-y-8">
+                            <MetricBar label="接続率 (架電比)" val={myTotals.picConnected} tgt={myTotals.calls} />
+                            <MetricBar label="アポ率 (接続比)" val={myTotals.appts} tgt={myTotals.picConnected} />
+                         </div>
+                      </div>
+                   </div>
+                </div>
+             ) : (
+                <div className="space-y-10 animate-in slide-in-from-right-4">
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-slate-200 border border-slate-200">
+                      <div className="bg-white p-8 space-y-6">
+                         <h3 className="text-[10px] font-bold text-slate-400 mb-4 tracking-widest uppercase">プロジェクト目標進捗</h3>
+                         <MainMetric label="今週のチームアポ" icon={I.Check} current={totals.weekly.appts} target={activeWeeklyGoals.appts} />
+                      </div>
+                      <div className="bg-white p-8">
+                         <h3 className="text-[10px] font-bold text-slate-400 mb-6 tracking-widest uppercase">チーム効率指標</h3>
+                         <div className="space-y-8">
+                            <MetricBar label="チーム接続率" val={totals.weekly.picConnected} tgt={totals.weekly.calls} />
+                            <MetricBar label="チームアポ率" val={totals.weekly.appts} tgt={totals.weekly.picConnected} />
+                         </div>
+                      </div>
+                   </div>
+
+                   <div className="bg-white border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="p-4 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
+                         <Icon p={I.Users} size={14}/> メンバー別パフォーマンス
+                      </div>
+                      <div className="flex flex-col gap-px bg-slate-200">
+                         {members.map(m => (
+                           <button key={m.id} onClick={()=>setDrilldownMember(m)} className="p-6 bg-white flex items-center justify-between hover:bg-slate-50 transition-all text-left">
+                              <div className="flex items-center gap-4">
+                                 <div className={`w-10 h-10 ${m.role==='closer'?'bg-amber-400':'bg-sky-500'} text-white flex items-center justify-center font-bold text-xs shadow-sm`}>{m.name.slice(0,1)}</div>
+                                 <div>
+                                    <div className="font-bold text-slate-900">{m.name}</div>
+                                    <div className="text-[9px] font-bold text-slate-400 uppercase">{m.role}</div>
+                                 </div>
+                              </div>
+                              <div className="flex items-center gap-8">
+                                 <div className="text-right">
+                                    <div className="text-[8px] font-bold text-slate-300">アポ</div>
+                                    <div className="text-lg font-black text-slate-800">{memberStats.find(s=>s.id===m.id)?.appts || 0}</div>
+                                 </div>
+                                 <Icon p={I.ChevronRight} size={16} className="text-slate-200"/>
+                              </div>
+                           </button>
+                         ))}
+                      </div>
+                   </div>
+                </div>
+             )}
+          </div>
+
+          <div className="lg:col-span-4 space-y-10">
+             <section className="bg-slate-900 p-8 text-white relative flex flex-col justify-between min-h-[300px] shadow-2xl">
+                <div className="absolute top-0 right-0 p-8 opacity-20"><Icon p={I.Zap} size={80}/></div>
+                <div className="relative z-10 space-y-6">
+                   <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-white/10 pb-4">管理者・AI戦略掲示板</h3>
+                   <div className="text-sm leading-relaxed font-bold font-sans">
+                      <p className="border-l-4 border-indigo-500 pl-4 bg-white/5 py-3">
+                         {viewMode === 'personal' ? '君の現在の接続率は高い水準だ。14時台の架電強度を維持せよ。' : '15時以降の接続率が低下傾向にある。リストの再分配を検討されたし。'}
+                      </p>
+                   </div>
+                </div>
+                <div className="relative z-10 border-t border-white/10 pt-4 flex items-center justify-between text-[10px] font-bold text-slate-500 italic">
+                   <span>THE PROFESSIONAL ADVISOR</span>
+                   <span>VER 2.0</span>
+                </div>
+             </section>
+
+             <section className="p-8 bg-white border border-slate-200 shadow-sm space-y-6">
+                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">プロジェクト基本統計</h3>
+                <div className="space-y-6">
+                   <div className="flex justify-between items-end border-b border-slate-50 pb-4">
+                      <span className="text-xs font-bold text-slate-500 italic">人件費想定額</span>
+                      <span className="text-2xl font-black text-slate-900 tracking-tighter">¥{(totals.total.hours * 1500).toLocaleString()}</span>
+                   </div>
+                   <div className="flex justify-between items-end">
+                      <span className="text-xs font-bold text-slate-500 italic">総アポイント獲得</span>
+                      <span className="text-2xl font-black text-indigo-600 tracking-tighter">{totals.total.appts}件</span>
+                   </div>
+                </div>
+             </section>
+          </div>
+       </div>
+
+       {drilldownMember && (
+         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/95 p-4 backdrop-blur-xl animate-in fade-in duration-300">
+            <div className="bg-white w-full max-w-sm p-10 space-y-10 border-4 border-slate-900 shadow-2xl overflow-y-auto max-h-[90vh]">
+               <div className="flex justify-between items-center border-b-2 border-slate-900 pb-6">
+                  <div>
+                    <h3 className="text-2xl font-black text-slate-900">{drilldownMember.name} 氏</h3>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{drilldownMember.role}</p>
                   </div>
-                </div>
-                <div className="premium-card p-10 bg-white border border-slate-100 shadow-xl relative overflow-hidden">
-                  <div className="relative z-10 font-sans">
-                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] mb-4">Conversion funnel status</p>
-                    <h4 className="text-xl font-black text-slate-800 mb-8 border-b border-slate-50 pb-4">今週の成果達成度</h4>
-                    <div className="space-y-8">
-                      <MetricBar label="アポ件数 (目標比)" val={myStats?.weekly.appts || 0} tgt={event.individualWeeklyGoals?.[mondayKey]?.[currentMember?.id]?.appts || 0} color="bg-indigo-600" />
-                      <MetricBar label="資料送付件数" val={myStats?.weekly.requests || 0} tgt={event.individualWeeklyGoals?.[mondayKey]?.[currentMember?.id]?.requests || 0} color="bg-emerald-500" />
-                    </div>
+                  <button onClick={()=>setDrilldownMember(null)} className="p-2 border border-slate-200"><Icon p={I.X}/></button>
+               </div>
+               <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-slate-50 border border-slate-100">
+                     <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">架電数</div>
+                     <div className="text-xl font-black">{memberStats.find(s=>s.id===drilldownMember.id)?.calls || 0}</div>
                   </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {(activeSubTab === 'summary' || activeSubTab === 'my') && (
-            <div className="premium-card p-8 bg-white border border-slate-100 shadow-sm">
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
-                  <div className="p-2 bg-slate-900 text-white rounded-xl shadow-lg"><Icon p={I.TrendingUp} size={20}/></div> 全体ファネル分析
-                </h3>
-                <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
-                   <button onClick={() => setCurrentBaseDate(new Date(currentBaseDate.setDate(currentBaseDate.getDate()-7)))} className="p-2 hover:bg-white rounded-lg text-slate-400 transition-all"><Icon p={I.ChevronLeft} size={16}/></button>
-                   <span className="text-[10px] font-black text-slate-600 px-2">{weekRangeString}</span>
-                   <button onClick={() => setCurrentBaseDate(new Date(currentBaseDate.setDate(currentBaseDate.getDate()+14)))} className="p-2 hover:bg-white rounded-lg text-slate-400 transition-all"><Icon p={I.ChevronRight} size={16}/></button>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-                {Object.entries(BREAKDOWN_LABELS).map(([k, label]) => (
-                  <div key={k} className="p-5 rounded-3xl bg-slate-50/50 border border-transparent hover:border-indigo-100 transition-all group">
-                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">{label}</div>
-                    <div className="text-2xl font-black text-slate-800 group-hover:text-indigo-600">{funnelData[k] || 0}</div>
+                  <div className="p-4 bg-slate-50 border border-slate-100">
+                     <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">アポ</div>
+                     <div className="text-xl font-black text-indigo-600">{memberStats.find(s=>s.id===drilldownMember.id)?.appts || 0}</div>
                   </div>
-                ))}
-              </div>
+               </div>
+               <div className="bg-slate-900 p-8 text-white relative">
+                  <Icon p={I.Zap} className="absolute top-2 right-2 opacity-10" />
+                  <h4 className="text-[10px] font-bold text-slate-500 uppercase mb-4">個別AI分析</h4>
+                  <p className="text-xs leading-relaxed font-bold">
+                     切り返しのタイミングに迷いが見られる。冒頭の5秒をプロとして支配せよ。数字は嘘をつかない。
+                  </p>
+               </div>
+               <button onClick={()=>setDrilldownMember(null)} className="w-full bg-slate-900 text-white py-4 font-bold">閉じる</button>
             </div>
-          )}
+         </div>
+       )}
 
-          {activeSubTab === 'summary' && (
-            <div className="space-y-6">
-              <h3 className="text-xl font-black text-slate-800 flex items-center gap-2 px-2">
-                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><Icon p={I.Users} size={18}/></div> メンバー別状況
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {members.map(m => (
-                  <button key={m.id} onClick={() => setDrilldownMember(m)} className="premium-card p-6 flex items-center justify-between hover:scale-[1.02] active:scale-95 transition-all text-left bg-white border border-slate-100 shadow-sm">
-                     <div className="flex items-center gap-4">
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-sm font-black ${m.role==='closer' ? 'bg-amber-100 text-amber-600' : 'bg-indigo-100 text-indigo-600'}`}> {m.name.slice(0, 2)} </div>
-                        <div><div className="font-black text-slate-800">{m.name}</div><div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{m.role === 'closer' ? 'クローザー' : 'アポインター'}</div></div>
-                     </div>
-                     <Icon p={I.ChevronRight} size={20} className="text-slate-200" />
-                  </button>
-                ))}
-              </div>
+       {editingGoal && (
+         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/90 p-4">
+            <div className="bg-white w-full max-w-sm p-10 space-y-8 border-4 border-slate-900 shadow-2xl">
+               <h3 className="text-xl font-bold">個人目標設定の修正</h3>
+               <div className="space-y-4">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase">週間アポ目標件数</label>
+                  <input type="number" className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-black text-2xl outline-none" defaultValue={editingGoal.appts} id="new-indiv-goal" />
+               </div>
+               <button onClick={()=>{
+                  const val = Number(document.getElementById('new-indiv-goal').value);
+                  onUpdateGoal(getMondayKey(currentBaseDate), currentMember.id, { ...activeIndivGoals, appts: val });
+                  setEditingGoal(null);
+               }} className="w-full bg-slate-900 text-white py-4 font-bold shadow-lg">設定を保存</button>
+               <button onClick={()=>setEditingGoal(null)} className="w-full text-slate-400 text-sm font-bold pt-4">キャンセル</button>
             </div>
-          )}
-        </div>
-
-        <div className={`lg:col-span-4 space-y-8 ${(activeSubTab !== 'charts') ? 'hidden md:block' : ''}`}>
-           {userRole === 'admin' && (
-             <div className="premium-card p-8 bg-slate-900 text-white shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-400/10 rounded-full blur-2xl -mr-16 -mt-16"></div>
-                <h3 className="text-xs font-black text-emerald-400 uppercase tracking-widest mb-6">管理者専用パネル</h3>
-                <div className="space-y-8 font-sans">
-                   <div><p className="text-[10px] font-black opacity-50 uppercase mb-1">予測成約収益 (単価30万円時)</p><div className="text-3xl font-black text-white">¥{(totals.total.deals * 300000).toLocaleString()}</div></div>
-                   <div><p className="text-[10px] font-black opacity-50 uppercase mb-1">想定コスト (時給1500円換算)</p><p className="text-xl font-black text-slate-400">¥{(totals.total.hours * 1500).toLocaleString()}</p></div>
-                </div>
-             </div>
-           )}
-           <div className="premium-card p-8 bg-white border border-slate-100 shadow-sm">
-              <h3 className="font-black text-lg text-slate-800 mb-8 border-b border-slate-50 pb-4">全体目標</h3>
-              <div className="space-y-8">
-                 <MainMetric label="通算アポ" icon={I.Check} current={totals.total.appts} target={event.goals?.total?.appts} color="text-emerald-500" bg="bg-emerald-500" />
-                 <MainMetric label="今週アポ" icon={I.Calendar} current={totals.weekly.appts} target={activeWeeklyGoals.appts} color="text-indigo-500" bg="bg-indigo-500" />
-                 <MainMetric label="通算成約" icon={I.Trophy} current={totals.total.deals} target={event.goals?.total?.deals} color="text-amber-500" bg="bg-amber-500" />
-              </div>
-           </div>
-        </div>
-      </div>
-
-      {drilldownMember && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-slate-900/40 backdrop-blur-md p-4 animate-in fade-in duration-300">
-           <div className="flex-1 overflow-y-auto w-full max-w-4xl mx-auto md:py-10">
-              <div className="bg-white rounded-[2.5rem] shadow-2xl relative overflow-hidden flex flex-col">
-                 <div className="p-8 border-b border-slate-50 flex justify-between items-center sticky top-0 bg-white/90 backdrop-blur-xl z-20">
-                    <div className="flex items-center gap-4">
-                       <button onClick={() => setDrilldownMember(null)} className="p-2 bg-slate-100 rounded-full text-slate-500"><Icon p={I.X}/></button>
+         </div>
+       )}
+    </div>
+  );
+};
                        <div><h2 className="text-2xl font-black text-slate-900 leading-none">{drilldownMember.name} さんの分析</h2><p className="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-widest">{drilldownMember.role}</p></div>
                     </div>
                  </div>
@@ -459,42 +452,43 @@ const AttendanceView = ({ members, reports, onEdit }) => {
 
   return (
     <div className="space-y-8 animate-in fade-in pb-24 font-sans">
-       <div className="flex items-center justify-between"><h2 className="text-2xl font-black flex items-center gap-3"><div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Icon p={I.Clock} size={20}/></div> 稼働・コスト統計</h2><input type="month" className="bg-white border-2 border-slate-100 p-3 rounded-2xl font-bold shadow-sm" value={selectedMonth} onChange={e=>setSelectedMonth(e.target.value)} /></div>
+       <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4">
+          <h2 className="text-xl font-bold flex items-center gap-3">稼働・人件費統計</h2>
+          <input type="month" className="bg-white border border-slate-300 p-2 font-bold text-sm outline-none" value={selectedMonth} onChange={e=>setSelectedMonth(e.target.value)} />
+       </div>
        
-       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white flex justify-between items-center shadow-2xl relative overflow-hidden">
-             <div className="absolute top-0 right-0 p-8 opacity-5"><Icon p={I.Clock} size={120} /></div>
-             <div className="relative z-10"><span className="font-black opacity-60 uppercase tracking-widest text-[10px] block mb-2">Total Project Hours</span><span className="text-5xl font-black">{totalH}<span className="text-xl opacity-30 ml-2">h</span></span></div>
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-slate-200 border border-slate-200 shadow-lg">
+          <div className="bg-slate-900 p-8 text-white relative">
+             <div className="relative z-10"><span className="font-bold opacity-60 text-[10px] block mb-2">総稼働時間</span><span className="text-4xl font-black">{totalH}<span className="text-sm opacity-30 ml-2">H</span></span></div>
           </div>
-          <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 p-8 rounded-[2.5rem] text-white flex justify-between items-center shadow-2xl relative overflow-hidden">
-             <div className="absolute top-0 right-0 p-8 opacity-10"><Icon p={I.Trophy} size={120} /></div>
-             <div className="relative z-10"><span className="font-black opacity-60 uppercase tracking-widest text-[10px] block mb-2">Estimated Personnel Cost</span><span className="text-4xl font-black">¥{totalCost.toLocaleString()}</span></div>
+          <div className="bg-white p-8 text-slate-900 relative">
+             <div className="relative z-10"><span className="font-bold text-slate-400 text-[10px] block mb-2">概算人件費合計</span><span className="text-4xl font-black">¥{totalCost.toLocaleString()}</span></div>
           </div>
        </div>
 
-       <div className="space-y-4">
-          <h3 className="font-black text-slate-400 text-xs uppercase tracking-widest px-2">個別稼働詳細</h3>
-          {fReports.map(r => (
-            <button key={r.id} onClick={()=>onEdit(r)} className="w-full bg-white p-6 rounded-3xl border border-slate-100 flex items-center justify-between text-left hover:border-indigo-200 transition-all shadow-sm group">
-               <div className="flex items-center gap-6">
-                  <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center font-black text-indigo-600 group-hover:scale-110 transition-transform"> {members.find(m=>m.id===r.memberId)?.name?.slice(0,1)} </div>
-                  <div className="flex flex-col">
-                     <span className="text-[10px] font-black text-slate-400 mb-1 tracking-widest uppercase">{toLocalDateString(r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000))}</span>
-                     <span className="font-black text-lg text-slate-800">{members.find(m=>m.id===r.memberId)?.name || 'Unknown'}</span>
-                  </div>
-               </div>
-               <div className="flex items-center gap-10">
-                  <div className="hidden md:flex flex-col items-end">
-                     <span className="text-[10px] font-black text-slate-300 uppercase">Cost</span>
-                     <span className="font-bold text-slate-400">¥{((Number(r.hours)||0) * (Number(members.find(m=>m.id===r.memberId)?.hourlyWage)||1500)).toLocaleString()}</span>
-                  </div>
-                  <div className="flex items-center gap-6">
-                     {r.startTime && <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-3 py-1.5 rounded-xl">{r.startTime} - {r.endTime}</span>}
-                     <span className="text-3xl font-black text-slate-900">{r.hours}<span className="text-sm opacity-30 ml-1">h</span></span>
-                  </div>
-               </div>
-            </button>
-          ))}
+       <div className="space-y-px bg-slate-200 border border-slate-200 shadow-md">
+          {fReports.map(r => {
+            const m = members.find(mem=>mem.id===r.memberId);
+            return (
+              <button key={r.id} onClick={()=>onEdit(r)} className="w-full bg-white p-5 flex items-center justify-between text-left hover:bg-slate-50 transition-all group">
+                <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-slate-900 text-white flex items-center justify-center font-bold text-xs"> {m?.name?.slice(0,1)} </div>
+                    <div className="flex flex-col">
+                        <span className="text-[9px] font-bold text-slate-400 mb-0.5">{toLocalDateString(r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000))}</span>
+                        <span className="font-bold text-slate-800">{m?.name || '不明'}</span>
+                    </div>
+                </div>
+                <div className="flex items-center gap-6">
+                    <div className="flex flex-col items-end mr-4">
+                        <span className="text-[8px] font-bold text-slate-300">給与算出</span>
+                        <span className="font-bold text-xs text-slate-400">¥{((Number(r.hours)||0) * (Number(m?.hourlyWage)||1500)).toLocaleString()}</span>
+                    </div>
+                    <div className="bg-slate-100 px-3 py-1 text-[10px] font-bold border border-slate-200">{r.startTime || '--:--'} - {r.endTime || '--:--'}</div>
+                    <span className="text-2xl font-black text-slate-900">{r.hours}<span className="text-xs opacity-20 ml-1">H</span></span>
+                </div>
+              </button>
+            );
+          })}
        </div>
     </div>
   );
@@ -502,150 +496,115 @@ const AttendanceView = ({ members, reports, onEdit }) => {
 
 const ShiftView = ({ members, shifts, onAddShift, onDeleteShift }) => {
   const [showModal, setShowModal] = useState(false);
-  const [viewMode, setViewMode] = useState('day'); // 'day', 'week', 'month'
+  const [viewMode, setViewMode] = useState('day'); 
   const [selectedDate, setSelectedDate] = useState(toLocalDateString(new Date()));
 
   const wr = getWeekRange(selectedDate);
   const currentMonthArr = useMemo(() => {
     const d = new Date(selectedDate);
-    const y = d.getFullYear();
-    const m = d.getMonth();
-    const first = new Date(y, m, 1);
-    const last = new Date(y, m + 1, 0);
+    const y = d.getFullYear(); const m = d.getMonth();
+    const first = new Date(y, m, 1); const last = new Date(y, m + 1, 0);
     const days = [];
-    for (let i = 1; i <= last.getDate(); i++) {
-       days.push(toLocalDateString(new Date(y, m, i)));
-    }
+    for (let i = 1; i <= last.getDate(); i++) days.push(toLocalDateString(new Date(y, m, i)));
     return days;
   }, [selectedDate]);
   
   const displayShifts = useMemo(() => {
-    if (viewMode === 'day') {
-      return shifts.filter(s => s.date === selectedDate).sort((a,b)=>a.startTime.localeCompare(b.startTime));
-    } else if (viewMode === 'week') {
-      return shifts.filter(s => {
-        const d = new Date(s.date);
-        return d >= wr.start && d <= wr.end;
-      }).sort((a,b)=>a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
-    } else {
-      const monthPrefix = toLocalMonthString(selectedDate);
-      return shifts.filter(s => s.date.startsWith(monthPrefix)).sort((a,b)=>a.date.localeCompare(b.date));
-    }
+    if (viewMode === 'day') return shifts.filter(s => s.date === selectedDate).sort((a,b)=>a.startTime.localeCompare(b.startTime));
+    if (viewMode === 'week') return shifts.filter(s => { const d = new Date(s.date); return d >= wr.start && d <= wr.end; }).sort((a,b)=>a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+    const monthPrefix = toLocalMonthString(selectedDate);
+    return shifts.filter(s => s.date.startsWith(monthPrefix)).sort((a,b)=>a.date.localeCompare(b.date));
   }, [shifts, selectedDate, viewMode, wr]);
 
   return (
     <div className="space-y-8 animate-in fade-in pb-24 font-sans">
-       <div className="flex flex-col gap-6">
+       <div className="flex flex-col gap-4 border-b-2 border-slate-900 pb-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-black flex items-center gap-3"><div className="p-3 bg-pink-500 text-white rounded-2xl shadow-xl shadow-pink-100"><Icon p={I.Calendar} size={24}/></div> シフト高度管理</h2>
-            <div className="flex bg-slate-100 p-1.5 rounded-2xl shadow-inner">
-               <button onClick={()=>setViewMode('day')} className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${viewMode==='day'?'bg-white text-pink-500 shadow-sm':'text-slate-400'}`}>日別</button>
-               <button onClick={()=>setViewMode('week')} className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${viewMode==='week'?'bg-white text-pink-500 shadow-sm':'text-slate-400'}`}>週別</button>
-               <button onClick={()=>setViewMode('month')} className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${viewMode==='month'?'bg-white text-pink-500 shadow-sm':'text-slate-400'}`}>月間</button>
+            <h2 className="text-xl font-bold">シフト管理・人員配置</h2>
+            <div className="flex bg-slate-200 p-1 border border-slate-300">
+               <button onClick={()=>setViewMode('day')} className={`px-4 py-1 text-[10px] font-bold ${viewMode==='day'?'bg-slate-900 text-white shadow-md':'text-slate-500'}`}>日別</button>
+               <button onClick={()=>setViewMode('week')} className={`px-4 py-1 text-[10px] font-bold ${viewMode==='week'?'bg-slate-900 text-white shadow-md':'text-slate-500'}`}>週別</button>
+               <button onClick={()=>setViewMode('month')} className={`px-4 py-1 text-[10px] font-bold ${viewMode==='month'?'bg-slate-900 text-white shadow-md':'text-slate-500'}`}>月間</button>
             </div>
           </div>
-          <div className="flex items-center gap-4 bg-white p-4 rounded-3xl border border-slate-100 shadow-sm">
-             <Icon p={I.Search} size={20} className="text-slate-300" />
-             <input type="date" className="flex-1 bg-transparent font-black text-slate-800 outline-none" value={selectedDate} onChange={e=>setSelectedDate(e.target.value)} />
-          </div>
+          <input type="date" className="w-full bg-white border border-slate-300 p-3 font-bold text-sm outline-none" value={selectedDate} onChange={e=>setSelectedDate(e.target.value)} />
        </div>
 
        {viewMode === 'month' ? (
-         <div className="premium-card p-8 bg-white border border-slate-100 shadow-xl">
-           <h3 className="font-black text-slate-800 mb-8 flex justify-between items-center">
-             <span>{selectedDate.split('-')[0]}年 {selectedDate.split('-')[1]}月のシフト布陣</span>
-             <span className="text-xs font-black text-slate-400 uppercase tracking-widest">{displayShifts.length} 勤務予定</span>
-           </h3>
-           <div className="grid grid-cols-7 gap-3 mb-4">
-              {['日','月','火','水','木','金','土'].map(d => <div key={d} className="text-center text-[10px] font-black text-slate-300">{d}</div>)}
-              {currentMonthArr.map(d => {
-                const dayShifts = displayShifts.filter(s => s.date === d);
-                return (
-                  <div key={d} className={`aspect-square rounded-2xl flex flex-col items-center justify-center gap-1 border-2 transition-all ${d === selectedDate ? 'border-pink-200 bg-pink-50' : 'border-transparent bg-slate-50'}`}>
-                    <span className={`text-[10px] font-black ${d===selectedDate?'text-pink-600':'text-slate-400'}`}>{d.split('-')[2]}</span>
-                    {dayShifts.length > 0 && <div className="flex gap-0.5"><div className="w-1.5 h-1.5 rounded-full bg-pink-500"></div>{dayShifts.length > 1 && <div className="w-1.5 h-1.5 rounded-full bg-pink-300"></div>}</div>}
-                  </div>
-                );
-              })}
-           </div>
-           <div className="mt-8 space-y-3">
-              {displayShifts.map(s => {
-                const m = members.find(mem=>mem.id===s.memberId);
-                return (
-                  <div key={s.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl">
-                    <span className="text-[10px] font-black text-slate-400">{s.date}</span>
-                    <span className="font-black text-xs text-slate-800">{m?.name}</span>
-                    <span className="text-[10px] font-black text-pink-500 bg-white px-2 py-1 rounded-lg border">{s.startTime}-{s.endTime}</span>
-                  </div>
-                );
-              })}
-           </div>
+         <div className="p-6 bg-white border border-slate-200 shadow-sm">
+            <div className="grid grid-cols-7 gap-1 mb-4 border-b border-slate-100 pb-4">
+               {['日','月','火','水','木','金','土'].map(d => <div key={d} className="text-center text-[9px] font-bold text-slate-400">{d}</div>)}
+               {currentMonthArr.map(d => {
+                 const dayShifts = displayShifts.filter(s => s.date === d);
+                 return (
+                   <div key={d} className={`aspect-square flex flex-col items-center justify-center border ${d === selectedDate ? 'bg-slate-900 border-slate-900' : 'bg-slate-50 border-slate-100'}`}>
+                     <span className={`text-[8px] font-bold ${d===selectedDate?'text-white':'text-slate-400'}`}>{d.split('-')[2]}</span>
+                     {dayShifts.length > 0 && <div className="w-1 h-1 bg-emerald-500"></div>}
+                   </div>
+                 );
+               })}
+            </div>
+            <div className="space-y-px bg-slate-100 border border-slate-100">
+               {displayShifts.map(s => {
+                 const m = members.find(mem=>mem.id===s.memberId);
+                 return (
+                   <div key={s.id} className="flex items-center justify-between p-3 bg-white text-[10px] font-bold">
+                     <span className="text-slate-400">{s.date.split('-')[2]}日</span>
+                     <span className="text-slate-900">{m?.name}</span>
+                     <span className="text-indigo-600 border px-2 py-0.5">{s.startTime}-{s.endTime}</span>
+                   </div>
+                 );
+               })}
+            </div>
          </div>
        ) : (
-         <div className="space-y-4">
-            {displayShifts.length === 0 ? (
-              <div className="p-20 text-center text-slate-300 font-bold bg-white rounded-[2.5rem] border-2 border-dashed border-slate-100">
-                 登録されたシフトはありません
-              </div>
-            ) : (
-              displayShifts.map(s => {
-                const m = members.find(mem=>mem.id===s.memberId);
-                return (
-                  <div key={s.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 flex items-center justify-between hover:scale-[1.02] transition-all shadow-sm">
-                     <div className="flex items-center gap-5">
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-white text-lg shadow-lg ${m?.role==='closer'?'bg-amber-400 shadow-amber-100':'bg-sky-500 shadow-sky-100'}`}>
-                          {m?.name?.slice(0,1)}
-                        </div>
-                        <div>
-                          <div className="font-black text-slate-900 text-lg">{m?.name}</div>
-                          <div className="text-[10px] font-black text-slate-400 flex gap-4 uppercase tracking-widest mt-1">
+         <div className="space-y-px bg-slate-200 border border-slate-200">
+            {displayShifts.map(s => {
+               const m = members.find(mem=>mem.id===s.memberId);
+               return (
+                 <div key={s.id} className="bg-white p-5 flex items-center justify-between hover:bg-slate-50 transition-all border-l-4 border-transparent hover:border-slate-900">
+                    <div className="flex items-center gap-4">
+                       <div className="w-10 h-10 bg-slate-100 flex items-center justify-center font-bold text-slate-900">{m?.name?.slice(0,1)}</div>
+                       <div>
+                          <div className="font-bold text-slate-900">{m?.name}</div>
+                          <div className="text-[9px] font-bold text-slate-400 flex gap-3 mt-0.5">
                              {viewMode === 'week' && <span className="flex items-center gap-1"><Icon p={I.Calendar} size={10}/>{s.date}</span>}
-                             <span className="flex items-center gap-1 font-sans text-[11px]"><Icon p={I.Clock} size={10}/>{s.startTime}-{s.endTime}</span>
+                             <span className="flex items-center gap-1"><Icon p={I.Clock} size={10}/>{s.startTime}-{s.endTime}</span>
                           </div>
-                        </div>
-                     </div>
-                     <button onClick={()=>{if(window.confirm('このシフトを削除しますか？')) onDeleteShift(s.id)}} className="p-3 text-rose-200 hover:text-rose-500 hover:bg-rose-50 rounded-2xl transition-all"><Icon p={I.Trash} size={20}/></button>
-                  </div>
-                );
-              })
-            )}
+                       </div>
+                    </div>
+                    <button onClick={()=>{if(window.confirm('削除しますか？')) onDeleteShift(s.id)}} className="p-2 text-slate-200 hover:text-rose-600 transition-colors"><Icon p={I.Trash} size={18}/></button>
+                 </div>
+               );
+            })}
          </div>
        )}
        
-       <button onClick={()=>setShowModal(true)} className="fixed bottom-32 right-8 w-20 h-20 bg-pink-500 text-white rounded-[2.5rem] shadow-2xl flex flex-col items-center justify-center border-4 border-white transition-all active:scale-90 hover:scale-105 hover:rotate-3 z-40">
-         <Icon p={I.Plus} size={28} strokeWidth={3}/>
-         <span className="text-[8px] font-black uppercase mt-1">Add Shift</span>
+       <button onClick={()=>setShowModal(true)} className="fixed bottom-24 right-6 w-16 h-16 bg-slate-900 text-white flex flex-col items-center justify-center border-4 border-white shadow-2xl z-40">
+         <Icon p={I.Plus} size={24} />
+         <span className="text-[7px] font-bold uppercase mt-0.5">登録</span>
        </button>
 
        {showModal && (
-         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-sm rounded-[3rem] p-10 space-y-8 shadow-2xl relative">
-               <button onClick={()=>setShowModal(false)} className="absolute top-6 right-6 p-2 text-slate-300 hover:text-slate-900 transition-colors"><Icon p={I.X} /></button>
-               <div>
-                  <h3 className="text-2xl font-black text-slate-900 mb-2">シフト新規登録</h3>
-                  <p className="text-xs text-slate-400 font-bold">メンバーを選択して勤務時間を入力してください</p>
+         <div className="fixed inset-0 bg-slate-900/95 z-[200] flex items-center justify-center p-4">
+            <div className="bg-white w-full max-w-sm p-10 space-y-8 border-2 border-slate-900">
+               <div className="flex justify-between items-center border-b-2 border-slate-900 pb-4">
+                  <h3 className="text-xl font-bold">シフト新規登録</h3>
+                  <button onClick={()=>setShowModal(false)}><Icon p={I.X} /></button>
                </div>
                <div className="space-y-6">
-                 <div>
-                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">担当スタッフ</label>
-                   <div className="flex flex-wrap gap-2">
-                     {members.map(m => (
-                       <button key={m.id} className="px-4 py-2 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-xs hover:border-pink-500 hover:text-pink-500 transition-all"> {m.name} </button>
-                     ))}
-                   </div>
-                 </div>
-                 <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">開始</label>
-                      <input type="time" className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-black focus:border-pink-500 outline-none" defaultValue="10:00" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">終了</label>
-                      <input type="time" className="w-full p-4 bg-slate-50 border-2 border-transparent rounded-2xl font-black focus:border-pink-500 outline-none" defaultValue="19:00" />
-                    </div>
-                 </div>
+                  <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-3 block">担当スタッフ</label>
+                  <div className="flex flex-wrap gap-2">{members.map(m => (
+                    <button key={m.id} className="px-3 py-1.5 border border-slate-200 font-bold text-xs hover:bg-slate-900 hover:text-white transition-all">{m.name}</button>
+                  ))}</div></div>
+                  <div className="grid grid-cols-2 gap-4">
+                     <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">開始</label>
+                     <input type="time" className="w-full p-4 border-2 border-slate-100 font-bold outline-none focus:border-slate-900" defaultValue="10:00" /></div>
+                     <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">終了</label>
+                     <input type="time" className="w-full p-4 border-2 border-slate-100 font-bold outline-none focus:border-slate-900" defaultValue="19:00" /></div>
+                  </div>
                </div>
-               <button onClick={()=>setShowModal(false)} className="w-full bg-slate-900 text-white py-5 rounded-[2rem] font-black text-lg hover:bg-black shadow-xl transition-all">この内容で登録</button>
+               <button onClick={()=>setShowModal(false)} className="w-full bg-slate-900 text-white py-4 font-bold">内容を保存</button>
             </div>
          </div>
        )}
@@ -655,30 +614,18 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift }) => {
 
 const AnalyticsView = ({ members, reports, event, userRole }) => {
   const [selectedMid, setSelectedMid] = useState('all');
-  const [chartMode, setChartMode] = useState('bar'); // 'bar', 'line'
-  
   const fReports = selectedMid === 'all' ? reports : reports.filter(r => r.memberId === selectedMid);
   
   const stats = useMemo(() => {
-    const s = fReports.reduce((acc, r)=>({ 
+    return fReports.reduce((acc, r)=>({ 
       calls: acc.calls+(Number(r.calls)||0), 
       appts: acc.appts+(Number(r.appts)||0), 
       requests: acc.requests+(Number(r.requests)||0), 
-      deals: acc.deals+(Number(r.deals)||0),
-      noAnswer: acc.noAnswer+(Number(r.noAnswer)||0),
-      picAbsent: acc.picAbsent+(Number(r.picAbsent)||0),
       picConnected: acc.picConnected+(Number(r.picConnected)||0),
-    }), { calls: 0, appts: 0, requests: 0, deals: 0, noAnswer: 0, picAbsent: 0, picConnected: 0 });
-    return s;
+    }), { calls: 0, appts: 0, requests: 0, picConnected: 0 });
   }, [fReports]);
 
   const dailyTrend = useMemo(() => {
-    const sorted = [...fReports].sort((a,b) => a.date.seconds - b.date.seconds);
-    const last7 = sorted.slice(-7);
-    return last7.map(r => ({
-      day: toLocalDateString(r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000)).split('-')[2] + '日',
-      value: Number(r.appts) || 0
-    }));
   }, [fReports]);
 
   const apptR = (stats.appts / (stats.calls || 1)) * 100;
@@ -698,156 +645,189 @@ const AnalyticsView = ({ members, reports, event, userRole }) => {
              <div className="flex bg-slate-100 p-1 rounded-2xl">
                <button onClick={()=>setChartMode('bar')} className={`p-2 rounded-xl transition-all ${chartMode==='bar'?'bg-white shadow-sm':'text-slate-400'}`}><Icon p={I.Grid} size={18}/></button>
                <button onClick={()=>setChartMode('line')} className={`p-2 rounded-xl transition-all ${chartMode==='line'?'bg-white shadow-sm':'text-slate-400'}`}><Icon p={I.TrendingUp} size={18}/></button>
+const AnalyticsView = ({ members, reports }) => {
+  const [selectedMid, setSelectedMid] = useState('all');
+  const fReports = selectedMid === 'all' ? reports : reports.filter(r => r.memberId === selectedMid);
+  
+  const stats = useMemo(() => {
+    return fReports.reduce((acc, r)=>({ 
+      calls: acc.calls+(Number(r.calls)||0), 
+      appts: acc.appts+(Number(r.appts)||0), 
+      requests: acc.requests+(Number(r.requests)||0), 
+      picConnected: acc.picConnected+(Number(r.picConnected)||0),
+    }), { calls: 0, appts: 0, requests: 0, picConnected: 0 });
+  }, [fReports]);
+
+  const dailyTrend = useMemo(() => {
+    const map = {};
+    fReports.forEach(r => {
+      const d = toLocalDateString(r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000)).slice(-5);
+      map[d] = (map[d] || 0) + (Number(r.appts) || 0);
+    });
+    return Object.entries(map).map(([day, value]) => ({ day, value })).sort((a,b)=>a.day.localeCompare(b.day)).slice(-7);
+  }, [fReports]);
+
+  return (
+    <div className="space-y-10 pb-28">
+       <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4">
+          <h2 className="text-xl font-bold">高度分析センター</h2>
+          <select className="bg-white border border-slate-300 p-2 font-bold text-xs outline-none" value={selectedMid} onChange={e=>setSelectedMid(e.target.value)}>
+             <option value="all">チーム全体の状態を見る</option>
+             {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+          </select>
+       </div>
+
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-slate-200 border border-slate-200 shadow-lg">
+          <div className="p-8 bg-white space-y-6">
+             <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">週間アポイント実績の推移</h3>
+             <LineChart data={dailyTrend} color="#0f172a" label="アポ数" />
+          </div>
+          <div className="p-8 bg-white space-y-8">
+             <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">転換率（コンバージョン）</h3>
+             <div className="space-y-8">
+                <MetricBar label="接続率 (架電比)" val={stats.picConnected} tgt={stats.calls} />
+                <MetricBar label="アポ率 (接続比)" val={stats.appts} tgt={stats.picConnected} />
              </div>
-             <select className="bg-white border-2 border-slate-100 p-4 rounded-[1.5rem] font-black text-slate-800 outline-none shadow-xl min-w-[200px]" value={selectedMid} onChange={e=>setSelectedMid(e.target.value)}>
-                <option value="all">プロジェクト全体を表示</option>
-                {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-             </select>
           </div>
        </div>
 
-       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="premium-card p-10 bg-white border border-slate-100 shadow-xl flex flex-col h-[400px]">
-             {chartMode === 'bar' ? (
-                <>
-                  <div className="flex justify-between items-start mb-12">
-                     <div><h3 className="font-black text-slate-900 text-xl tracking-tight">架電ファネル分析</h3><p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] mt-1">Conversion Volume Bar Chart</p></div>
-                     <div className="text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full text-[10px] font-black">リアルタイム</div>
-                  </div>
-                  <div className="flex-1 flex items-end gap-3 md:gap-6 px-2">
-                    <ChartBar label="架電" value={stats.calls} max={maxVal} color="bg-slate-200" />
-                    <ChartBar label="担当不在" value={stats.picAbsent} max={maxVal} color="bg-slate-100" />
-                    <ChartBar label="資料請求" value={stats.requests} max={maxVal} color="bg-indigo-400" />
-                    <ChartBar label="アポ" value={stats.appts} max={maxVal} color="bg-emerald-500" />
-                    <ChartBar label="成約" value={stats.deals} max={maxVal} color="bg-amber-400" />
-                  </div>
-                </>
-             ) : (
-                <>
-                  <div className="flex justify-between items-start mb-8">
-                     <div><h3 className="font-black text-slate-900 text-xl tracking-tight">アポ件数：日次トレンド</h3><p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] mt-1">Daily Appointment Conversion Line</p></div>
-                  </div>
-                  <div className="flex-1 mt-6">
-                    <LineChart data={dailyTrend} color="#4f46e5" label="アポ獲得数" />
-                  </div>
-                </>
-             )}
+       <section className="p-8 bg-slate-900 text-white relative">
+          <div className="flex items-center gap-4 mb-8">
+             <div className="p-2 bg-slate-800"><Icon p={I.Zap} size={20} className="text-slate-400" /></div>
+             <h3 className="text-lg font-bold">【伝説のマスターAI】戦略提言</h3>
           </div>
-
-          <div className="flex flex-col gap-6">
-             <div className="grid grid-cols-2 gap-6">
-               <div className="premium-card p-8 bg-white border-2 border-slate-100 shadow-sm"><div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">本人接続率</div><div className="text-4xl font-black text-slate-900">{((stats.picConnected / (stats.calls || 1)) * 100).toFixed(1)}<span className="text-sm opacity-30">%</span></div></div>
-               <div className="premium-card p-8 bg-white border-2 border-indigo-100 shadow-sm"><div className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-2">アポ率 (架電比)</div><div className="text-4xl font-black text-indigo-600">{apptR.toFixed(1)}<span className="text-sm opacity-30">%</span></div></div>
-             </div>
-             
-             <div className="premium-card p-10 bg-slate-900 border-none relative overflow-hidden flex flex-col flex-1 shadow-2xl">
-                <div className="absolute top-0 right-0 p-8 opacity-20"><Icon p={I.Zap} size={120} color="#4f46e5" /></div>
-                <div className="relative z-10 flex items-center gap-4 mb-8">
-                   <div className="p-3 bg-indigo-600 rounded-2xl animate-bounce shadow-2xl shadow-indigo-600/50"><Icon p={I.Zap} size={24} color="white" /></div>
-                   <div><h3 className="font-black text-2xl text-white">伝説のテレアポ・マスター分析</h3><p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em]">Master Advisor Insight</p></div>
-                </div>
-                <div className="relative z-10 text-indigo-100 text-[15px] leading-8 font-black whitespace-pre-wrap font-sans">
-                   『10年連続売上トップ』の視点から言わせてもらう。
-                   【{selectedMid === 'all' ? '全体' : members.find(m=>m.id===selectedMid)?.name}】のデータを見ると、決定的な「勝機」が隠れているな。
-
-                   注目すべきは、資料請求からアポへの転換タイミングだ。現状の {((stats.appts / (stats.requests || 1)) * 100).toFixed(0)}% という数字は、決して悪くない。だが、プロの仕事はここからだ。
-                   まず、架電あたりの「本人接続」をあと5%上げるために、リストの精査とタイミングの再構築が必須。特に16時台の架電の質が、今の君の「勝ち筋」を決定づけるだろう。
-                   
-                   論理的に考えろ。感情で架電するな。数字を味方につければ、君は業界No.1を狙える。
-                </div>
-             </div>
+          <div className="space-y-6 text-sm leading-relaxed font-bold border-l border-slate-700 pl-6">
+             <p>「現在の接続率は悪くないが、アポへの転換に迷いが見える。断られた直後の『次の一手』を型化せよ。感情を捨て、ロジックを磨くのが最速の達成への道だ。」</p>
+             <p className="text-slate-400 font-normal">「管理者は各員のリスト回転率を注視せよ。停滞は腐敗の始まりだ。動きを止めず、数字の波に乗り続けろ。」</p>
           </div>
-       </div>
+       </section>
     </div>
   );
 };
 
-const Settings = ({ events, currentEventId, onAddEvent, onDeleteEvent, onUpdateGoals, onUpdateWeeklyGoals, members, onAddMember, onDelMember, onUpdateMember, onClose }) => {
+const Settings = ({ events, members, onAddEvent, onDeleteEvent, onAddMember, onDelMember, onUpdateMember, onClose }) => {
   const [newEName, setNewEName] = useState("");
   const [newMName, setNewMName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState("apo");
   const [newWage, setNewWage] = useState("1500");
+  const [editingMember, setEditingMember] = useState(null);
   
   return (
-    <div className="space-y-12 pb-32 font-sans animate-in fade-in duration-1000">
-       <div className="flex items-center gap-6">
-          <button onClick={onClose} className="p-5 bg-white rounded-3xl shadow-xl hover:scale-110 transition-all"><Icon p={I.X}/></button>
-          <div><h2 className="font-black text-4xl text-slate-900 tracking-tight">高度管理設定</h2><p className="text-slate-400 font-bold text-sm">プロジェクト基盤・チーム構成の管理</p></div>
+    <div className="space-y-12 pb-40 font-sans">
+       <div className="flex items-center justify-between border-b-4 border-slate-900 pb-6">
+          <div className="flex items-center gap-6">
+             <button onClick={onClose} className="p-4 bg-slate-900 text-white"><Icon p={I.X}/></button>
+             <div><h2 className="font-black text-3xl text-slate-900 leading-none">システム高度管理</h2><p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mt-1">Administrator Privileges Only</p></div>
+          </div>
        </div>
 
-       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-          <section className="premium-card p-10 space-y-8 bg-white border border-slate-100 shadow-xl">
-             <div className="flex items-center gap-4 border-b border-slate-50 pb-6"><div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl"><Icon p={I.Trophy} size={24}/></div><h3 className="font-black text-2xl">プロジェクト管理</h3></div>
-             <div className="space-y-4">
-                <input className="w-full p-5 bg-slate-50 border-2 border-transparent rounded-[1.5rem] font-black focus:border-indigo-500 focus:bg-white outline-none transition-all" placeholder="新規プロジェクト名" value={newEName} onChange={e=>setNewEName(e.target.value)} />
-                <button onClick={()=>{if(newEName){onAddEvent(newEName, ""); setNewEName("");}}} className="w-full bg-slate-900 text-white py-5 rounded-[1.5rem] font-black text-lg shadow-xl shadow-slate-200">プロジェクトを立ち上げる</button>
+       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+          <section className="space-y-6">
+             <h3 className="text-sm font-bold text-slate-800 border-l-4 border-slate-900 pl-3">案件・プロジェクト</h3>
+             <div className="p-8 bg-white border border-slate-200 space-y-4 shadow-sm">
+                <input className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold focus:border-slate-900 outline-none" placeholder="新規案件名" value={newEName} onChange={e=>setNewEName(e.target.value)} />
+                <button onClick={()=>{if(newEName){onAddEvent(newEName, ""); setNewEName("");}}} className="w-full bg-slate-900 text-white py-4 font-bold">案件をデータベースに登録</button>
              </div>
-             <div className="space-y-3">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Projects</p>
+             <div className="flex flex-col gap-px bg-slate-200 border border-slate-200">
                 {events.map(e => (
-                  <div key={e.id} className="flex items-center justify-between p-5 bg-slate-50 rounded-2xl font-black group hover:bg-slate-100 transition-colors">
-                     <span className="text-slate-700">{e.name}</span>
-                     <button onClick={()=>{if(window.confirm('削除しますか？')) onDeleteEvent(e.id)}} className="text-rose-200 hover:text-rose-500 group-hover:scale-110 transition-all"><Icon p={I.Trash} size={20}/></button>
+                  <div key={e.id} className="flex items-center justify-between p-4 bg-white text-sm font-bold">
+                     <span>{e.name}</span>
+                     <button onClick={()=>{if(window.confirm('この案件を完全に削除しますか？')) onDeleteEvent(e.id)}} className="text-slate-300 hover:text-rose-600"><Icon p={I.Trash} size={18}/></button>
                   </div>
                 ))}
              </div>
           </section>
 
-          <section className="premium-card p-10 space-y-8 bg-white border border-slate-100 shadow-xl">
-             <div className="flex items-center gap-4 border-b border-slate-50 pb-6"><div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl"><Icon p={I.Users} size={24}/></div><h3 className="font-black text-2xl">チーム・給与設定</h3></div>
-             <div className="space-y-4 bg-slate-50 p-6 rounded-[2rem]">
-                <input className="w-full p-4 bg-white border-2 border-transparent rounded-[1.2rem] font-black focus:border-emerald-500 outline-none" placeholder="フルネーム" value={newMName} onChange={e=>setNewMName(e.target.value)} />
+          <section className="space-y-6">
+             <h3 className="text-sm font-bold text-slate-800 border-l-4 border-emerald-600 pl-3">チーム・給与構成</h3>
+             <div className="p-8 bg-white border border-slate-200 space-y-4 shadow-sm">
                 <div className="grid grid-cols-2 gap-4">
-                   <select className="p-4 bg-white border-2 border-transparent rounded-[1.2rem] font-black focus:border-emerald-500" value={newRole} onChange={e=>setNewRole(e.target.value)}>
+                   <input className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold" placeholder="氏名" value={newMName} onChange={e=>setNewMName(e.target.value)} />
+                   <input className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold" placeholder="Gmail" value={newEmail} onChange={e=>setNewEmail(e.target.value)} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                   <select className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none" value={newRole} onChange={e=>setNewRole(e.target.value)}>
                       <option value="apo">アポインター</option>
                       <option value="closer">CLOSER</option>
-                      <option value="admin">管理者(閲覧権限広)</option>
+                      <option value="admin">管理者</option>
                    </select>
-                   <input type="number" className="p-4 bg-white border-2 border-transparent rounded-[1.2rem] font-black focus:border-emerald-500 outline-none" placeholder="時給" value={newWage} onChange={e=>setNewWage(e.target.value)} />
+                   <input type="number" className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none" placeholder="時給" value={newWage} onChange={e=>setNewWage(e.target.value)} />
                 </div>
-                <button onClick={()=>{if(newMName){onAddMember(newMName, newRole, newWage); setNewMName("");}}} className="w-full bg-emerald-600 text-white py-4 rounded-[1.2rem] font-black shadow-xl shadow-emerald-100 hover:scale-[1.02] transition-all">スタッフを登録</button>
+                <button onClick={()=>{if(newMName){onAddMember(newMName, newRole, newWage, newEmail); setNewMName(""); setNewEmail("");}}} className="w-full bg-emerald-600 text-white py-4 font-bold">スタッフを新規登録</button>
              </div>
-             <div className="space-y-3">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Team Roster</p>
-                <div className="grid grid-cols-1 gap-3">
-                   {members.map(m => (
-                     <div key={m.id} className="p-5 bg-white border-2 border-slate-50 rounded-2xl flex items-center justify-between group hover:border-emerald-100 transition-all shadow-sm">
-                        <div className="flex items-center gap-4">
-                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white ${m.role==='closer'?'bg-amber-400':m.role==='admin'?'bg-indigo-600':'bg-sky-400'}`}>{m.name.slice(0,1)}</div>
-                           <div>
-                              <div className="font-black text-slate-800">{m.name}</div>
-                              <div className="text-[8px] font-black text-slate-400 uppercase">¥{m.hourlyWage}/h • {m.role}</div>
-                           </div>
+             <div className="flex flex-col gap-px bg-slate-200 border border-slate-200">
+                {members.map(m => (
+                  <button key={m.id} onClick={() => setEditingMember(m)} className="p-4 bg-white flex items-center justify-between text-left hover:bg-slate-50 group">
+                     <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 flex items-center justify-center font-bold text-white ${m.role==='admin'?'bg-slate-900':'bg-slate-400'}`}>{m.name.slice(0,1)}</div>
+                        <div>
+                           <div className="font-bold text-slate-900">{m.name}</div>
+                           <div className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">¥{m.hourlyWage}/H • {m.role}</div>
                         </div>
-                        <button onClick={()=>onDelMember(m.id)} className="p-2 text-rose-200 hover:text-rose-500 transition-colors"><Icon p={I.Trash} size={18}/></button>
                      </div>
-                   ))}
-                </div>
+                     <Icon p={I.Settings} size={16} className="text-slate-200 group-hover:text-slate-900" />
+                  </button>
+                ))}
              </div>
           </section>
        </div>
+
+       {editingMember && (
+         <div className="fixed inset-0 bg-slate-900/95 z-[300] flex items-center justify-center p-6 backdrop-blur-md">
+            <div className="bg-white w-full max-w-sm p-10 space-y-8 border-4 border-slate-900 shadow-2xl">
+               <h3 className="text-xl font-bold border-b-2 border-slate-100 pb-4">スタッフ情報の修正</h3>
+               <div className="space-y-4">
+                  <input className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold" value={editingMember.name} onChange={e=>setEditingMember({...editingMember, name: e.target.value})} />
+                  <div className="grid grid-cols-2 gap-4">
+                     <select className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none" value={editingMember.role} onChange={e=>setEditingMember({...editingMember, role: e.target.value})}>
+                        <option value="apo">アポインター</option>
+                        <option value="closer">CLOSER</option>
+                        <option value="admin">管理者</option>
+                     </select>
+                     <input type="number" className="w-full p-4 bg-slate-50 border-2 border-slate-200 font-bold outline-none" value={editingMember.hourlyWage} onChange={e=>setEditingMember({...editingMember, hourlyWage: e.target.value})} />
+                  </div>
+               </div>
+               <div className="grid grid-cols-2 gap-4">
+                  <button onClick={()=>{onDelMember(editingMember.id); setEditingMember(null);}} className="bg-rose-50 text-rose-500 py-4 font-bold border border-rose-100 transition-all active:bg-rose-100">削除</button>
+                  <button onClick={()=>{onUpdateMember(editingMember.id, editingMember); setEditingMember(null);}} className="bg-slate-900 text-white py-4 font-bold transition-all active:bg-black">更新を確定</button>
+               </div>
+               <button onClick={()=>setEditingMember(null)} className="w-full text-slate-400 text-sm font-bold pt-4">キャンセル</button>
+            </div>
+         </div>
+       )}
     </div>
   );
 };
 
 function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData = null }) {
-  const [val, setVal] = useState({ memberId: '', date: toLocalDateString(new Date()), calls: '', appts: '', requests: '', prospects: '', lost: '', deals: '', hours: '', startTime: '10:00', endTime: '19:00', noAnswer: '', receptionRefusal: '', picAbsent: '', picConnected: '', outOfTarget: '' });
+  const [val, setVal] = useState({ memberId: '', date: toLocalDateString(new Date()), calls: '', appts: '', requests: '', lost: '', deals: '', hours: '', startTime: '10:00', endTime: '19:00', picConnected: '' });
   useEffect(() => { if (initialData) { const d = initialData.date?.toDate ? initialData.date.toDate() : new Date(initialData.date); setVal({ ...initialData, date: toLocalDateString(d) }); } }, [initialData]);
-  const submit = (e) => { e.preventDefault(); if (!val.memberId) return alert("Select member"); const d = { ...val, calls: Number(val.calls), appts: Number(val.appts), requests: Number(val.requests), prospects: Number(val.prospects), lost: Number(val.lost), deals: Number(val.deals), hours: Number(val.hours) }; if (initialData) onUpdate(d); else onAdd(d); onClose(); };
+  const submit = (e) => { e.preventDefault(); if (!val.memberId) return alert("スタッフを選択してください"); const d = { ...val, calls: Number(val.calls), appts: Number(val.appts), requests: Number(val.requests), lost: Number(val.lost), deals: Number(val.deals), hours: Number(val.hours), picConnected: Number(val.picConnected) }; if (initialData) onUpdate(d); else onAdd(d); onClose(); };
+
   return (
-    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex flex-col md:items-center md:justify-center p-4">
-       <div className="w-full h-full md:max-w-2xl md:h-auto bg-white rounded-[2.5rem] flex flex-col overflow-hidden shadow-2xl">
-          <div className="p-6 border-b flex justify-between items-center"><button onClick={onClose} className="p-2.5 bg-slate-100 rounded-full text-slate-500"><Icon p={I.X}/></button><h2 className="font-black text-xl">稼働報告</h2><div className="w-10"/></div>
-          <form onSubmit={submit} className="flex-1 overflow-y-auto p-8 space-y-8 font-sans">
-             <div className="grid grid-cols-2 gap-4"><input type="date" className="p-4 bg-slate-50 border rounded-2xl font-bold" value={val.date} onChange={e=>setVal({...val, date: e.target.value})} /><div className="flex flex-wrap gap-2">{members.map(m => ( <label key={m.id} className={`px-4 py-2 rounded-xl border cursor-pointer font-bold transition-all text-xs ${val.memberId===m.id ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-500'}`}> <input type="radio" value={m.id} className="hidden" onChange={e=>setVal({...val, memberId: e.target.value})} /> {m.name} </label> ))}</div></div>
-             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <InputItem label="全体架電" icon={I.Phone} val={val.calls} set={v=>setVal({...val, calls: v})} />
-                <InputItem label="アポ" icon={I.Check} val={val.appts} set={v=>setVal({...val, appts: v})} />
-                <InputItem label="資料請求" icon={I.FileText} val={val.requests} set={v=>setVal({...val, requests: v})} />
-                <InputItem label="本人接続" icon={I.Zap} val={val.picConnected} set={v=>setVal({...val, picConnected: v})} />
-                <InputItem label="稼働時間" icon={I.Clock} val={val.hours} set={v=>setVal({...val, hours: v})} />
+    <div className="fixed inset-0 bg-slate-900/60 z-[100] flex flex-col md:items-center md:justify-center p-4">
+       <div className="w-full h-full md:max-w-2xl md:h-auto bg-white border-2 border-slate-900 flex flex-col overflow-hidden shadow-2xl">
+          <div className="p-6 border-b-2 border-slate-100 flex justify-between items-center bg-slate-50">
+             <button onClick={onClose} className="p-2 border border-slate-200 bg-white"><Icon p={I.X}/></button>
+             <h2 className="font-bold text-xl uppercase tracking-widest">実績報告入力</h2>
+             <div className="w-10"/>
+          </div>
+          <form onSubmit={submit} className="flex-1 overflow-y-auto p-8 space-y-10">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <input type="date" className="p-4 bg-slate-50 border-2 border-slate-100 font-bold focus:border-slate-900 outline-none" value={val.date} onChange={e=>setVal({...val, date: e.target.value})} />
+                <div className="flex flex-wrap gap-2">
+                   {members.map(m => ( <label key={m.id} className={`px-4 py-2 border-2 cursor-pointer font-bold transition-all text-xs ${val.memberId===m.id ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-100 text-slate-400'}`}> <input type="radio" value={m.id} className="hidden" onChange={e=>setVal({...val, memberId: e.target.value})} /> {m.name} </label> ))}
+                </div>
              </div>
-             <button className="w-full bg-slate-900 text-white py-5 rounded-3xl font-black text-lg shadow-2xl transition-all active:scale-[0.98]">報告する</button>
+             <div className="grid grid-cols-2 md:grid-cols-3 gap-px bg-slate-200 border border-slate-200 shadow-sm">
+                <div className="bg-white"><InputItem label="全体架電数" icon={I.Phone} val={val.calls} set={v=>setVal({...val, calls: v})} /></div>
+                <div className="bg-white"><InputItem label="本人接続数" icon={I.Zap} val={val.picConnected} set={v=>setVal({...val, picConnected: v})} /></div>
+                <div className="bg-white"><InputItem label="アポイント獲得" icon={I.Check} val={val.appts} set={v=>setVal({...val, appts: v})} /></div>
+                <div className="bg-white"><InputItem label="資料請求" icon={I.FileText} val={val.requests} set={v=>setVal({...val, requests: v})} /></div>
+                <div className="bg-white"><InputItem label="稼働時間" icon={I.Clock} val={val.hours} set={v=>setVal({...val, hours: v})} /></div>
+             </div>
+             <button className="w-full bg-slate-900 text-white py-6 font-bold text-lg hover:bg-black transition-all">実績を確定し送信</button>
           </form>
        </div>
     </div>
@@ -932,7 +912,8 @@ function App() {
   const updateEventGoals = async (id, g) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', id), { goals: g });
   const updateEventWeeklyGoals = async (id, wk, wg, ig) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', id), { [`weeklyGoals.${wk}`]: wg, [`individualWeeklyGoals.${wk}`]: ig });
   
-  const addMember = async (n, r, w) => await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'members'), { name: n, role: r, hourlyWage: Number(w), createdAt: Timestamp.now() });
+  const addMember = async (n, r, w, e) => await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'members'), { name: n, role: r, hourlyWage: Number(w), email: e || "", createdAt: Timestamp.now() });
+  const updateMember = async (id, d) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', id), { ...d, updatedAt: Timestamp.now() });
   const deleteMember = async (id) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', id));
 
   const addReport = async (d) => {
@@ -980,7 +961,7 @@ function App() {
         calls: acc.calls + (Number(r.calls)||0),
         requests: acc.requests + (Number(r.requests)||0),
         hours: acc.hours + (Number(r.hours)||0),
-        picConnected: acc.picConnected + (Number(r.picConnected)||0) + (Number(r.appts)||0),
+        picConnected: acc.picConnected + (Number(r.picConnected)||0),
       }), { deals: 0, prospects: 0, lost: 0, appts: 0, calls: 0, requests: 0, hours: 0, picConnected: 0 });
       const meetings = myTot.deals + (m.role==='closer' ? myTot.prospects : 0) + myTot.lost;
       return { ...m, ...myTot, meetings, cph: myTot.hours > 0 ? (myTot.calls / myTot.hours).toFixed(1) : "0.0" };
@@ -990,15 +971,15 @@ function App() {
   if (connectionStatus === "unauthenticated" || !user) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-slate-900 font-sans">
-         <div className="w-full max-w-md bg-white rounded-[3rem] p-12 shadow-2xl space-y-10 text-center animate-in zoom-in-95 duration-700">
+         <div className="w-full max-w-md bg-white border-4 border-slate-900 p-12 shadow-2xl space-y-10 text-center animate-in zoom-in-95 duration-700">
             <div className="space-y-4">
-               <div className="w-24 h-24 bg-indigo-600 rounded-[2rem] mx-auto flex items-center justify-center shadow-xl shadow-indigo-100 mb-8">
+               <div className="w-24 h-24 bg-slate-900 mx-auto flex items-center justify-center shadow-2xl mb-8">
                   <Icon p={I.Target} size={48} color="white" />
                </div>
                <h1 className="text-3xl font-black tracking-tighter">KPI Sync</h1>
                <p className="text-slate-400 text-sm font-bold">次世代KPI管理プラットフォーム</p>
             </div>
-            <button onClick={handleLogin} className="w-full bg-slate-900 text-white py-5 rounded-[2rem] font-black text-lg shadow-2xl flex items-center justify-center gap-4 hover:bg-black transition-all">
+            <button onClick={handleLogin} className="w-full bg-slate-900 text-white py-5 font-black text-lg shadow-2xl flex items-center justify-center gap-4 hover:bg-black transition-all">
                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
                Googleでログイン
             </button>
@@ -1010,11 +991,11 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-50 pb-32 text-slate-900 font-sans selection:bg-indigo-100">
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-2xl border-b border-slate-100 px-6 py-4 flex items-center justify-between no-print shadow-sm">
-        <div className="flex items-center gap-3">
-           <div className="p-3 bg-indigo-600 rounded-[1.2rem] shadow-2xl shadow-indigo-200 animate-float"><Icon p={I.Target} size={28} color="white" strokeWidth={2.5} /></div>
+        <div className="flex items-center gap-2">
+           <div className="p-3 bg-slate-900 rounded-none shadow-xl"><Icon p={I.Target} size={24} color="white" strokeWidth={2.5} /></div>
            <div>
-              <h1 className="text-2xl font-black tracking-tighter text-slate-900">イベント<span className="text-indigo-600">KPI</span>アプリ</h1>
-              <div className="flex items-center gap-2"><div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div><span className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none">Cloud Sync Active</span></div>
+              <h1 className="text-xl font-bold tracking-tight text-slate-900">イベントKPIアプリ</h1>
+              <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div><span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">正常稼働中</span></div>
            </div>
         </div>
         <div className="flex items-center gap-4">
@@ -1024,7 +1005,7 @@ function App() {
                  <div className="text-xs font-black">{user.displayName}</div>
                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{userRole === 'admin' ? '管理者' : 'メンバー'}</div>
               </div>
-              <button onClick={handleLogout} className="p-2.5 bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-500 rounded-xl transition-all"><Icon p={I.LogOut} size={20} /></button>
+              <button onClick={handleLogout} className="p-2.5 bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-500 transition-all border border-slate-100 shadow-sm"><Icon p={I.LogOut} size={20} /></button>
            </div>
         </div>
       </header>
@@ -1037,6 +1018,7 @@ function App() {
             currentBaseDate={currentBaseDate} setCurrentBaseDate={setCurrentBaseDate}
             userRole={userRole}
             currentUserEmail={user.email}
+            onUpdateGoal={updateEventWeeklyGoals}
           />
         )}
         {activeTab === 'analytics' && <AnalyticsView members={members} reports={reports} event={currentEvent} userRole={userRole} />}
@@ -1053,21 +1035,21 @@ function App() {
             events={events} currentEventId={currentEventId} 
             onAddEvent={addEvent} onDeleteEvent={deleteEvent}
             onUpdateGoals={updateEventGoals} onUpdateWeeklyGoals={updateEventWeeklyGoals}
-            members={members} onAddMember={addMember} onDelMember={deleteMember}
+            members={members} onAddMember={addMember} onDelMember={deleteMember} onUpdateMember={updateMember}
             onClose={() => setActiveTab('dashboard')}
           />
         )}
       </main>
 
-      <nav className="fixed bottom-6 left-6 right-6 z-50 bg-white/80 backdrop-blur-2xl border border-slate-200/50 rounded-[2.5rem] shadow-xl p-2 flex items-center justify-between no-print">
-        <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={I.Grid} label="ホーム" />
-        <NavButton active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} icon={I.PieChart} label="分析" />
-        <div className="relative -mt-12">
-           <button onClick={() => setShowInput(true)} className="w-16 h-16 bg-slate-900 text-white rounded-full flex items-center justify-center shadow-xl border-4 border-white transition-all active:scale-90 hover:scale-105"><Icon p={I.Plus} size={32} strokeWidth={3} /></button>
-        </div>
-        <NavButton active={activeTab === 'shifts'} onClick={() => setActiveTab('shifts')} icon={I.Calendar} label="シフト" />
-        <NavButton active={activeTab === 'settings' || activeTab === 'attendance'} onClick={() => setActiveTab(userRole === 'admin' ? 'settings' : 'attendance')} icon={userRole === 'admin' ? I.Settings : I.Clock} label={userRole === 'admin' ? '管理者' : '稼働履歴'} />
-      </nav>
+      {(activeTab === 'dashboard' || activeTab === 'analytics' || activeTab === 'shifts' || activeTab === 'attendance' || activeTab === 'settings') && (
+        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t-2 border-slate-100 flex items-center justify-between no-print pt-2 pb-6 px-4">
+          <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={I.Grid} label="ホーム" />
+          <NavButton active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} icon={I.PieChart} label="分析" />
+          <NavButton active={activeTab === 'shifts'} onClick={() => setActiveTab('shifts')} icon={I.Calendar} label="シフト" />
+          <NavButton active={activeTab === 'attendance'} onClick={() => setActiveTab('attendance')} icon={I.Clock} label="履歴/成果" />
+          <NavButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={I.Settings} label="設定" />
+        </nav>
+      )}
 
       {showInput && <InputModal members={members} onAdd={addReport} onClose={() => setShowInput(false)} />}
       {editingReport && <InputModal members={members} initialData={editingReport} onUpdate={updateReport} onDelete={deleteReport} onClose={() => setEditingReport(null)} />}
