@@ -145,7 +145,7 @@ const Icon = ({ p, size=24, color="currentColor", className="", strokeWidth=1.5 
 );
 
 const NavButton = ({ active, onClick, icon, label }) => (
-  <button onClick={onClick} className={`flex flex-col items-center justify-center flex-1 py-1 transition-all ${active ? 'text-indigo-600 border-t-2 border-indigo-600' : 'text-slate-300'}`}>
+  <button onClick={onClick} className={`flex flex-col items-center justify-center flex-1 py-1 transition-all ${active ? 'text-blue-600 border-t-2 border-blue-600' : 'text-slate-300'}`}>
     <Icon p={icon} size={20} />
     <span className={`text-[9px] font-bold mt-1 ${active ? 'opacity-100' : 'opacity-60'}`}>{label}</span>
   </button>
@@ -299,7 +299,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                       <div className="space-y-6">
                          <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
-                           <div className="w-1.5 h-4 bg-indigo-600 rounded-full"></div> チーム目標
+                           <div className="w-1.5 h-4 bg-blue-600 rounded-full"></div> チーム目標
                          </h3>
                          <MainMetric label="全社アポイント獲得数" icon={I.Check} current={totals.weekly.appts} target={activeWeeklyGoals.appts} />
                       </div>
@@ -362,7 +362,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                   </div>
                   <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
                      <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">アポ</div>
-                     <div className="text-xl font-black text-indigo-600">{memberStats.find(s=>s.id===drilldownMember.id)?.appts || 0}</div>
+                     <div className="text-xl font-black text-blue-600">{memberStats.find(s=>s.id===drilldownMember.id)?.appts || 0}</div>
                   </div>
                </div>
                <div className="bg-slate-900 p-8 text-white relative rounded-3xl">
@@ -509,7 +509,7 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift }) => {
                    <div key={s.id} className="flex items-center justify-between p-3 bg-white text-[10px] font-bold">
                      <span className="text-slate-400">{s.date.split('-')[2]}日</span>
                      <span className="text-slate-900">{m?.name}</span>
-                     <span className="text-indigo-600 border px-2 py-0.5 rounded-full">{s.startTime}-{s.endTime}</span>
+                     <span className="text-blue-600 border px-2 py-0.5 rounded-full">{s.startTime}-{s.endTime}</span>
                    </div>
                  );
                })}
@@ -687,7 +687,7 @@ const Settings = ({ events, members, onAddEvent, onDeleteEvent, onAddMember, onD
                 <div className="grid grid-cols-2 gap-4">
                    <select className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none rounded-xl" value={newRole} onChange={e=>setNewRole(e.target.value)}>
                       <option value="apo">アポインター</option>
-                      <option value="closer">CLOSER</option>
+                      <option value="closer">クローザー</option>
                       <option value="admin">管理者</option>
                    </select>
                    <input type="number" className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none rounded-xl" placeholder="時給" value={newWage} onChange={e=>setNewWage(e.target.value)} />
@@ -860,7 +860,47 @@ function App() {
   const updateEventWeeklyGoals = async (id, wk, wg, ig) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', id), { [`weeklyGoals.${wk}`]: wg, [`individualWeeklyGoals.${wk}`]: ig });
   
   const addMember = async (n, r, w, e) => await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'members'), { name: n, role: r, hourlyWage: Number(w), email: e || "", createdAt: Timestamp.now() });
-  const updateMember = async (id, d) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'da  const memberStats = useMemo(() => {
+  const updateMember = async (id, d) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', id), { ...d, updatedAt: Timestamp.now() });
+  const deleteMember = async (id) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', id));
+
+  const addReport = async (d) => {
+    const reportDate = d.date ? Timestamp.fromDate(new Date(d.date)) : Timestamp.now();
+    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reports'), { ...d, eventId: currentEventId, date: reportDate, createdAt: Timestamp.now() });
+  };
+  const updateReport = async (d) => {
+    const { id, ...u } = d;
+    u.date = d.date ? Timestamp.fromDate(new Date(d.date)) : Timestamp.now();
+    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reports', id), u);
+    setEditingReport(null);
+  };
+  const deleteReport = async (id) => { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reports', id)); setEditingReport(null); };
+
+  const currentEvent = useMemo(() => events.find(e => e.id === currentEventId) || { goals: defaultGoals }, [events, currentEventId]);
+  
+  const totals = useMemo(() => {
+    const wr = getWeekRange(currentBaseDate);
+    const wD = reports.filter(r => {
+      if (!r.date) return false;
+      const isEventMatch = !r.eventId || r.eventId === currentEventId;
+      if (!isEventMatch) return false;
+      const d = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
+      return d >= wr.start && d <= wr.end;
+    });
+    const tD = reports.filter(r => !r.eventId || r.eventId === currentEventId);
+    const sum = (arr) => arr.reduce((acc, r) => ({
+      appts: acc.appts + (Number(r.appts) || 0),
+      calls: acc.calls + (Number(r.calls) || 0),
+      requests: acc.requests + (Number(r.requests) || 0),
+      meetings: acc.meetings + (Number(r.meetings) || 0),
+      deals: acc.deals + (Number(r.deals) || 0),
+      lost: acc.lost + (Number(r.lost) || 0),
+      hours: acc.hours + (Number(r.hours) || 0),
+      picConnected: acc.picConnected + (Number(r.picConnected) || 0),
+    }), { appts: 0, calls: 0, requests: 0, meetings: 0, deals: 0, lost: 0, hours: 0, picConnected: 0 });
+    return { weekly: sum(wD), total: sum(tD) };
+  }, [reports, currentEventId, currentBaseDate]);
+
+  const memberStats = useMemo(() => {
     return members.map(m => {
       const myReps = reports.filter(r => r.memberId === m.id && r.eventId === currentEventId);
       const myTot = myReps.reduce((acc, r) => ({
@@ -881,7 +921,7 @@ function App() {
   if (connectionStatus === "unauthenticated" || !user) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-slate-900 font-sans">
-         <div className="w-full max-w-sm bg-white border border-slate-100 p-12 shadow-2xl space-y-12 text-center rounded-[3rem]">
+         <div className="w-full max-sm bg-white border border-slate-100 p-12 shadow-2xl space-y-12 text-center rounded-[3rem]">
             <div className="space-y-6">
                <div className="w-24 h-24 bg-blue-600 mx-auto flex items-center justify-center shadow-xl rounded-[2rem]">
                   <Icon p={I.Target} size={48} color="white" />
@@ -936,42 +976,6 @@ function App() {
         )}
         {activeTab === 'analytics' && <AnalyticsView members={members} reports={reports} event={currentEvent} userRole={userRole} />}
         {activeTab === 'attendance' && <AttendanceView members={members} reports={reports} onEdit={setEditingReport} />}
-        {activeTab === 'shifts' && (
-          <ShiftView 
-            members={members} shifts={shifts} 
-            onAddShift={(s) => addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shifts'), { ...s, createdAt: Timestamp.now() })} 
-            onDeleteShift={(id) => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shifts', id))} 
-          />
-        )}
-        {activeTab === 'settings' && (
-          <Settings 
-            events={events} currentEventId={currentEventId} 
-            onAddEvent={addEvent} onDeleteEvent={deleteEvent}
-            onUpdateGoals={updateEventGoals} onUpdateWeeklyGoals={updateEventWeeklyGoals}
-            members={members} onAddMember={addMember} onDelMember={deleteMember} onUpdateMember={updateMember}
-            onClose={() => setActiveTab('dashboard')}
-          />
-        )}
-      </main>
-
-      {(activeTab === 'dashboard' || activeTab === 'analytics' || activeTab === 'shifts' || activeTab === 'attendance' || activeTab === 'settings') && (
-        <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t-2 border-slate-100 flex items-center justify-between no-print pt-2 pb-6 px-4">
-          <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={I.Grid} label="ホーム" />
-          <NavButton active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} icon={I.PieChart} label="分析" />
-          <NavButton active={activeTab === 'shifts'} onClick={() => setActiveTab('shifts')} icon={I.Calendar} label="シフト" />
-          <NavButton active={activeTab === 'attendance'} onClick={() => setActiveTab('attendance')} icon={I.Clock} label="履歴" />
-          <NavButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings'} icon={I.Settings} label="管理設定" />
-        </nav>
-      )}
-
-      {showInput && <InputModal members={members} onAdd={addReport} onClose={() => setShowInput(false)} />}
-      {editingReport && <InputModal members={members} initialData={editingReport} onUpdate={updateReport} onDelete={deleteReport} onClose={() => setEditingReport(null)} />}
-    </div>
-  );
-}
-
-export default App;
-orts} onEdit={setEditingReport} />}
         {activeTab === 'shifts' && (
           <ShiftView 
             members={members} shifts={shifts} 
