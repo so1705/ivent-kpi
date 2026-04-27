@@ -238,7 +238,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
   const [editingGoal, setEditingGoal] = useState(null);
 
   const currentMember = useMemo(() => members.find(m => m.email === currentUserEmail), [members, currentUserEmail]);
-  const myReports = useMemo(() => reports.filter(r => r.memberId === currentMember?.id && r.eventId === event.id), [reports, currentMember, event]);
+  const myReports = useMemo(() => eventReports.filter(r => r.memberId === currentMember?.id && r.eventId === event.id), [eventReports, currentMember, event]);
   const myTotals = useMemo(() => {
      return myReports.reduce((acc, r) => ({
         appts: acc.appts + (Number(r.appts) || 0),
