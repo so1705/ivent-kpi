@@ -1042,22 +1042,26 @@ const AnalyticsView = ({ members, reports, event }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="premium-card p-8">
-          <h3 className="font-black text-lg text-slate-800 mb-6">生産性指標</h3>
+          <h3 className="font-black text-lg text-slate-800 mb-6 flex items-center gap-2">
+            <Icon p={I.TrendingUp} size={18} className="text-indigo-600" /> 
+            生産性指標分析
+          </h3>
           <div className="space-y-6">
-            <div className="flex justify-between items-center">
-               <span className="text-sm font-bold text-slate-500">アポ率 (架電比)</span>
+            <div className="flex justify-between items-center group">
+               <span className="text-sm font-bold text-slate-500 group-hover:text-indigo-600 transition-colors">アポ獲得率 (架電比)</span>
                <span className="text-xl font-black text-slate-900">{stats.calls > 0 ? ((stats.appts / stats.calls)*100).toFixed(1) : 0}%</span>
             </div>
-            <div className="flex justify-between items-center">
-               <span className="text-sm font-bold text-slate-500">資料送付率 (架電比)</span>
+            <div className="flex justify-between items-center group">
+               <span className="text-sm font-bold text-slate-500 group-hover:text-blue-600 transition-colors">資料送付率 (架電比)</span>
                <span className="text-xl font-black text-slate-900">{stats.calls > 0 ? ((stats.requests / stats.calls)*100).toFixed(1) : 0}%</span>
             </div>
-            <div className="flex justify-between items-center">
-               <span className="text-sm font-bold text-slate-500">成約率 (アポ比)</span>
+            <div className="flex justify-between items-center group">
+               <span className="text-sm font-bold text-slate-500 group-hover:text-amber-600 transition-colors">商談成約率 (アポ比)</span>
                <span className="text-xl font-black text-slate-900">{stats.appts > 0 ? ((stats.deals / stats.appts)*100).toFixed(1) : 0}%</span>
             </div>
           </div>
         </div>
+
         <div className="premium-card p-8 bg-indigo-600 text-white relative overflow-hidden">
           <div className="absolute bottom-0 right-0 w-32 h-32 bg-white/10 rounded-full -mb-10 -mr-10"></div>
           <div className="absolute top-4 right-4 animate-bounce">
@@ -1071,6 +1075,63 @@ const AnalyticsView = ({ members, reports, event }) => {
           </p>
         </div>
       </div>
+
+      {selectedMemberId === "all" && (
+        <div className="premium-card p-8 animate-in slide-in-from-bottom-6">
+          <h3 className="font-black text-lg text-slate-800 mb-8 border-b border-slate-100 pb-4">メンバー間パフォーマンス比較</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  <th className="pb-4 pl-2">メンバー</th>
+                  <th className="pb-4">架電数</th>
+                  <th className="pb-4">アポ率</th>
+                  <th className="pb-4">資料送付率</th>
+                  <th className="pb-4">受付突破率</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {members.map(m => {
+                  const mReports = reports.filter(r => r.memberId === m.id);
+                  const mStats = mReports.reduce((acc, r) => ({
+                    calls: acc.calls + (Number(r.calls)||0),
+                    appts: acc.appts + (Number(r.appts)||0),
+                    requests: acc.requests + (Number(r.requests)||0),
+                    connected: acc.connected + (Number(r.picConnected)||0) + (Number(r.appts)||0),
+                  }), { calls: 0, appts: 0, requests: 0, connected: 0 });
+                  
+                  return (
+                    <tr key={m.id} className="group hover:bg-slate-50 transition-colors">
+                      <td className="py-4 pl-2">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-[10px] font-black">{m.name.slice(0,2)}</div>
+                          <span className="font-black text-slate-700">{m.name}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 font-bold text-slate-600">{mStats.calls}</td>
+                      <td className="py-4">
+                        <span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded-md text-[10px] font-black">
+                          {mStats.calls > 0 ? ((mStats.appts / mStats.calls)*100).toFixed(1) : 0}%
+                        </span>
+                      </td>
+                      <td className="py-4">
+                        <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded-md text-[10px] font-black">
+                          {mStats.calls > 0 ? ((mStats.requests / mStats.calls)*100).toFixed(1) : 0}%
+                        </span>
+                      </td>
+                      <td className="py-4">
+                        <span className="bg-amber-50 text-amber-600 px-2 py-1 rounded-md text-[10px] font-black">
+                          {mStats.calls > 0 ? ((mStats.connected / mStats.calls)*100).toFixed(1) : 0}%
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
