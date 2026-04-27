@@ -252,7 +252,7 @@ const GoalSection = ({ title, subTitle, data, goals, variant, headerAction }) =>
             <Icon p={isGold ? I.Trophy : I.Calendar} size={24} strokeWidth={2}/>
           </div>
           <div>
-            <h3 className="text-xl font-black text-slate-800 leading-none mb-1">{title} Goal</h3>
+            <h3 className="text-xl font-black text-slate-800 leading-none mb-1">{title}達成目標</h3>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{subTitle}</p>
           </div>
         </div>
@@ -270,30 +270,31 @@ const GoalSection = ({ title, subTitle, data, goals, variant, headerAction }) =>
         />
       </div>
       
-      <div className="grid grid-cols-2 gap-10 relative z-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-10 relative z-10">
         <div className="space-y-6">
           <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
             <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Apointer</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">アポインター実績</span>
           </div>
           <MetricBar label="アポ数" val={data.appts} tgt={safeGoals.appts} color="bg-emerald-500" />
           <MetricBar label="架電数" val={data.calls} tgt={safeGoals.calls} color="bg-slate-700" />
-          <MetricBar label="アポ見込み" val={data.apoProspects} tgt={safeGoals.apoProspects} color="bg-cyan-500" />
+          <MetricBar label="アポ見込み数" val={data.apoProspects} tgt={safeGoals.apoProspects} color="bg-cyan-500" />
         </div>
         
         <div className="space-y-6">
           <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
             <div className="w-2 h-2 rounded-full bg-purple-400"></div>
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Closer</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">クローザー実績</span>
           </div>
-          <MetricBar label="商談数 (実施)" val={data.meetings} tgt={safeGoals.meetings} color="bg-purple-600" />
-          <MetricBar label="商談見込み" val={data.dealProspects} tgt={safeGoals.prospects} color="bg-amber-500" />
+          <MetricBar label="実施商談数" val={data.meetings} tgt={safeGoals.meetings} color="bg-purple-600" />
+          <MetricBar label="商談見込み数" val={data.dealProspects} tgt={safeGoals.prospects} color="bg-amber-500" />
           <MetricBar label="失注数" val={data.lost} tgt={safeGoals.lost} color="bg-rose-400" />
         </div>
       </div>
     </div>
   );
 };
+
 
 
 const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBaseDate, activeWeeklyGoals, eventReports, members }) => {
@@ -322,21 +323,14 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
   
   const dateString = toLocalDateString(currentBaseDate);
 
-  // --- Logic for Predictions ---
   const predictionStats = useMemo(() => {
     const activeMembers = members.filter(m => m.role === 'apo');
     const memberCount = activeMembers.length || 1;
-    
-    // Remaining needed for event
     const remainingNeeded = Math.max(0, (g.total.appts || 0) - (totals.total.appts || 0));
     const individualTarget = (remainingNeeded / memberCount).toFixed(1);
 
-    // Calculate individual expectations
     const memberStatsWithPredictions = memberStats.map(m => {
-      // Historical Avg (All time in this event)
       const avgApptPerHour = m.hours > 0 ? (m.appts / m.hours) : 0;
-      
-      // Target for this person (simple average for now)
       const target = individualTarget;
       const hoursNeeded = avgApptPerHour > 0 ? (target / avgApptPerHour).toFixed(1) : "??";
       
@@ -369,34 +363,36 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
 
   return (
     <div className="space-y-10 animate-in fade-in duration-1000">
-      {/* Top Banner: Individual Goal Focus */}
+      {/* 達成目標・分析バナー */}
       <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl">
         <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl -mr-20 -mt-20"></div>
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="bg-indigo-500 text-[10px] font-black px-2 py-1 rounded-md uppercase tracking-widest text-indigo-100">Target Analytics</span>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="bg-indigo-500 text-[10px] font-black px-2 py-1 rounded-md uppercase tracking-widest text-indigo-100">目標分析データ</span>
               <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
             </div>
-            <h2 className="text-3xl font-black tracking-tight mb-1">現在の個人目標</h2>
-            <p className="text-slate-400 text-sm font-medium">残り {Math.max(0, (g.total.appts||0) - (totals.total.appts||0))} アポ ÷ {members.filter(m=>m.role==='apo').length} 人</p>
+            <h2 className="text-3xl font-black tracking-tight mb-2">現在の個人目標アポ数</h2>
+            <p className="text-slate-400 text-sm font-medium">
+              全体残り {Math.max(0, (g.total.appts||0) - (totals.total.appts||0))}件 を {members.filter(m=>m.role==='apo').length}名で分割
+            </p>
           </div>
-          <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/10 flex items-center gap-6">
+          <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/10 flex items-center gap-8">
             <div className="text-center">
-              <div className="text-4xl font-black">{predictionStats.individualTarget}</div>
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Needed / Person</div>
+              <div className="text-4xl font-black text-white">{predictionStats.individualTarget}</div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">1名あたりの目標</div>
             </div>
             <div className="w-px h-10 bg-white/10"></div>
             <div className="text-center">
               <div className="text-4xl font-black text-emerald-400">{(totals.total.appts / (g.total.appts || 1) * 100).toFixed(0)}%</div>
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Overall Progress</div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">全体の進捗率</div>
             </div>
           </div>
         </div>
       </div>
 
       <div className="dashboard-grid no-print">
-        <GoalSection title="週間" subTitle={weekRangeString} data={totals.weekly} goals={g.weekly} variant="indigo" 
+        <GoalSection title="今週の" subTitle={`${weekRangeString} の稼働`} data={totals.weekly} goals={g.weekly} variant="indigo" 
           headerAction={
             <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-100">
                <button onClick={() => shiftDate(-7, 'week')} className="p-2 hover:bg-white rounded-lg text-slate-400"><Icon p={I.ChevronLeft} size={16}/></button>
@@ -405,51 +401,51 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
             </div>
           }
         />
-        <GoalSection title="全体" subTitle={`Target: ${event.date}`} data={totals.total} goals={g.total} variant="gold" />
+        <GoalSection title="全体の" subTitle={`終了予定日: ${event.date}`} data={totals.total} goals={g.total} variant="gold" />
       </div>
 
-      {/* Funnel & Results Breakdown */}
+      {/* 架電状況・詳細分析 */}
       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
-        <h3 className="text-xl font-bold mb-8 flex items-center gap-3">
+        <h3 className="text-xl font-bold mb-8 flex items-center gap-3 text-slate-800">
           <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Icon p={I.TrendingUp} size={20}/></div>
-          Funnel Analysis
+          架電結果の状況（ファネル分析）
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
           {Object.entries(BREAKDOWN_LABELS).map(([key, label]) => (
-            <div key={key} className="p-4 rounded-3xl bg-slate-50 border border-slate-100 group hover:bg-indigo-50 hover:border-indigo-100 transition-all">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{label}</div>
+            <div key={key} className="p-5 rounded-3xl bg-slate-50 border border-slate-100 group hover:bg-white hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/10 transition-all duration-300">
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{label}</div>
               <div className="text-2xl font-black text-slate-800 group-hover:text-indigo-600">{funnelData[key] || 0}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Prediction Table */}
+      {/* 個人別の達成予測 */}
       <section className="space-y-6">
         <div className="flex justify-between items-end px-2">
-           <h2 className="text-2xl font-black flex items-center gap-3">
+           <h2 className="text-2xl font-black flex items-center gap-3 text-slate-900">
              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><Icon p={I.Zap} size={20}/></div>
-             Predictions
+             個人別の達成状況・予測
            </h2>
            <div className="flex bg-slate-100 p-1 rounded-xl">
-              <button onClick={() => setFilterType('all')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${filterType==='all' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'}`}>ALL</button>
-              <button onClick={() => setFilterType('apo')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${filterType==='apo' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'}`}>APO</button>
+              <button onClick={() => setFilterType('all')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${filterType==='all' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'}`}>全員</button>
+              <button onClick={() => setFilterType('apo')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${filterType==='apo' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'}`}>アポインターのみ</button>
            </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {filteredMembers.map((m, i) => (
-            <div key={m.id} className="premium-card p-6 relative overflow-hidden group">
-              <div className="flex justify-between items-start mb-6">
-                <div className="flex items-center gap-4">
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-black ${m.role === 'closer' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
+            <div key={m.id} className="premium-card p-8 group">
+              <div className="flex justify-between items-start mb-8">
+                <div className="flex items-center gap-5">
+                  <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-xl font-black shadow-inner shadow-black/5 ${m.role === 'closer' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
                     {m.name.slice(0, 2)}
                   </div>
                   <div>
-                    <h4 className="text-xl font-bold text-slate-800">{m.name}</h4>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${m.role==='closer'?'bg-amber-50 text-amber-600':'bg-indigo-50 text-indigo-600'}`}>{m.role}</span>
-                      <span className="text-[10px] text-slate-400 font-bold">AVG: {m.avgApptPerHour.toFixed(2)}/h</span>
+                    <h4 className="text-xl font-black text-slate-900 mb-1">{m.name}</h4>
+                    <div className="flex items-center gap-3">
+                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${m.role==='closer'?'bg-amber-50 text-amber-600 font-sans':'bg-indigo-50 text-indigo-600 font-sans'}`}>{m.role==='closer'?'クローザー':'アポインター'}</span>
+                      <span className="text-[10px] text-slate-400 font-black tracking-wider uppercase">実績平均: {m.avgApptPerHour.toFixed(2)} 件/時</span>
                     </div>
                   </div>
                 </div>
@@ -457,22 +453,22 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
                   <div className={`text-2xl font-black ${Number(m.gap) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                     {Number(m.gap) > 0 ? `+${m.gap}` : m.gap}
                   </div>
-                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Goal Gap</div>
+                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">目標との差分</div>
                 </div>
               </div>
               
-              <div className="grid grid-cols-3 gap-2 py-4 border-t border-slate-50">
-                <div className="text-center">
-                  <div className="text-sm font-black text-slate-800">{m.appts}</div>
-                  <div className="text-[8px] font-bold text-slate-400 uppercase">Actual</div>
+              <div className="grid grid-cols-3 gap-4 pt-6 border-t border-slate-50">
+                <div className="text-center p-3 bg-slate-50/50 rounded-2xl">
+                  <div className="text-lg font-black text-slate-900 leading-none mb-2">{m.appts}</div>
+                  <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">現在の実績</div>
                 </div>
-                <div className="text-center">
-                  <div className="text-sm font-black text-slate-800">{m.target}</div>
-                  <div className="text-[8px] font-bold text-slate-400 uppercase">Target</div>
+                <div className="text-center p-3 bg-slate-50/50 rounded-2xl">
+                  <div className="text-lg font-black text-slate-900 leading-none mb-2">{m.target}</div>
+                  <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">個人目標</div>
                 </div>
-                <div className="text-center">
-                  <div className="text-sm font-black text-indigo-600">{m.hoursNeeded}h</div>
-                  <div className="text-[8px] font-bold text-slate-400 uppercase">Extra Time</div>
+                <div className="text-center p-3 bg-indigo-50/30 rounded-2xl border border-indigo-50">
+                  <div className="text-lg font-black text-indigo-600 leading-none mb-2">{m.hoursNeeded}h</div>
+                  <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">達成に必要な時間</div>
                 </div>
               </div>
             </div>
@@ -482,6 +478,7 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
     </div>
   );
 };
+
 
 const AttendanceView = ({ members, reports, onEdit }) => {
 
@@ -539,12 +536,12 @@ const AttendanceView = ({ members, reports, onEdit }) => {
         </div>
         <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-6">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Month</label><input type="month" className="w-full bg-gray-50 p-3 rounded-xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} /></div>
-            <div className="space-y-1"><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Member</label><select className="w-full bg-gray-50 p-3 rounded-xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all" value={selectedMemberId} onChange={e => setSelectedMemberId(e.target.value)}><option value="">All Members</option>{apoMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></div>
+            <div className="space-y-1"><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">対象月</label><input type="month" className="w-full bg-gray-50 p-3 rounded-xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} /></div>
+            <div className="space-y-1"><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">メンバー個別表示</label><select className="w-full bg-gray-50 p-3 rounded-xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all" value={selectedMemberId} onChange={e => setSelectedMemberId(e.target.value)}><option value="">全員表示</option>{apoMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</select></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="flex items-center justify-between bg-gradient-to-r from-gray-900 to-gray-800 p-5 rounded-2xl text-white shadow-lg shadow-gray-200"><span className="text-sm font-bold opacity-80">合計時間</span><span className="text-3xl font-black">{totalHours}<span className="text-sm font-medium ml-1 opacity-60">h</span></span></div>
-            {selectedMemberId && (<div className="flex items-center justify-between bg-gradient-to-r from-emerald-600 to-emerald-500 p-5 rounded-2xl text-white shadow-lg shadow-emerald-200"><span className="text-sm font-bold opacity-80">想定給与</span><span className="text-3xl font-black">¥{totalSalary.toLocaleString()}</span></div>)}
+            <div className="flex items-center justify-between bg-gradient-to-r from-gray-900 to-gray-800 p-5 rounded-2xl text-white shadow-lg shadow-gray-200"><span className="text-sm font-bold opacity-80">稼働時間の合計</span><span className="text-3xl font-black">{totalHours}<span className="text-sm font-medium ml-1 opacity-60">h</span></span></div>
+            {selectedMemberId && (<div className="flex items-center justify-between bg-gradient-to-r from-emerald-600 to-emerald-500 p-5 rounded-2xl text-white shadow-lg shadow-emerald-200"><span className="text-sm font-bold opacity-80">支払予定額</span><span className="text-3xl font-black">¥{totalSalary.toLocaleString()}</span></div>)}
           </div>
         </div>
         <div className="space-y-3 pb-20">
@@ -635,12 +632,12 @@ const ShiftView = ({ members, shifts, onDeleteShift, onAddShift }) => {
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-gray-800 flex items-center gap-3">
               <div className="p-2 bg-pink-50 text-pink-500 rounded-xl"><Icon p={I.Calendar} size={20}/></div>
-              Shift
+              シフト管理
             </h2>
             <div className="flex bg-gray-100 p-1 rounded-xl">
-              <button onClick={()=>setViewMode('month')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='month' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-400'}`}>Month</button>
-              <button onClick={()=>setViewMode('week')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='week' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-400'}`}>Week</button>
-              <button onClick={()=>setViewMode('day')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='day' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-400'}`}>Day</button>
+              <button onClick={()=>setViewMode('month')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='month' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-400'}`}>月間</button>
+              <button onClick={()=>setViewMode('week')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='week' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-400'}`}>週間</button>
+              <button onClick={()=>setViewMode('day')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode==='day' ? 'bg-white shadow-sm text-pink-500' : 'text-gray-400'}`}>日間</button>
             </div>
           </div>
           
@@ -699,7 +696,7 @@ const ShiftView = ({ members, shifts, onDeleteShift, onAddShift }) => {
                         <span className={`text-xl font-black ${isToday?'text-pink-500':'text-gray-800'}`}>{d.getDate()}</span>
                       </div>
                       <div className="flex-1 space-y-2">
-                        {dayShifts.length === 0 ? <div className="text-xs font-bold text-gray-200 py-1">No Shifts</div> : 
+                        {dayShifts.length === 0 ? <div className="text-xs font-bold text-gray-200 py-1">シフトなし</div> : 
                           <div className="grid grid-cols-1 gap-2">
                             {dayShifts.map(s => {
                               const mem = members.find(m => m.id === s.memberId);
@@ -732,11 +729,11 @@ const ShiftView = ({ members, shifts, onDeleteShift, onAddShift }) => {
           {viewMode === 'day' && (
             <div className="bg-white rounded-3xl p-6 border border-gray-100 min-h-[50vh]">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-bold text-gray-800">Schedule</h3>
-                <button onClick={() => { setTargetDateForInput(toLocalDateString(currentDate)); setShowShiftInput(true); }} className="bg-black text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg">Add Shift</button>
+                <h3 className="text-lg font-bold text-gray-800">本日の予定</h3>
+                <button onClick={() => { setTargetDateForInput(toLocalDateString(currentDate)); setShowShiftInput(true); }} className="bg-black text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg">シフトを追加</button>
               </div>
               <div className="space-y-4">
-                {getShiftsForDay(currentDate).length === 0 ? <div className="text-center py-10 text-gray-300 font-bold">No shifts scheduled</div> : 
+                {getShiftsForDay(currentDate).length === 0 ? <div className="text-center py-10 text-gray-300 font-bold">予定されているシフトはありません</div> : 
                   getShiftsForDay(currentDate).map(s => {
                     const mem = members.find(m => m.id === s.memberId);
                     if (!mem) return null;
@@ -969,14 +966,13 @@ function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData =
                 </>
               ) : (
                 <section className="space-y-6">
-                  <div className="flex items-center gap-2 text-xs font-black text-amber-600 bg-amber-50 px-4 py-2 rounded-xl w-fit">Closer Stats</div>
                   <div className="bg-amber-50 p-8 rounded-[2.5rem] border border-amber-100 flex flex-col items-center">
-                    <div className="text-[10px] font-black text-amber-800 uppercase tracking-widest mb-4">Deals Won</div>
+                    <div className="text-[10px] font-black text-amber-800 uppercase tracking-widest mb-4">商談成約数</div>
                     <input type="number" className="w-48 bg-white p-6 rounded-[2rem] text-5xl font-black text-center shadow-xl shadow-amber-200/50 outline-none" value={val.deals} onChange={e=>setVal({...val, deals: e.target.value})} />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <InputItem label="見込み" icon={I.Help} val={val.prospects} set={v=>setVal({...val, prospects: v})} color="text-amber-500" />
-                    <InputItem label="失注" icon={I.Ban} val={val.lost} set={v=>setVal({...val, lost: v})} color="text-rose-500" />
+                    <InputItem label="商談見込み" icon={I.Help} val={val.prospects} set={v=>setVal({...val, prospects: v})} color="text-amber-500" />
+                    <InputItem label="失注数" icon={I.Ban} val={val.lost} set={v=>setVal({...val, lost: v})} color="text-rose-500" />
                   </div>
                 </section>
               )}
@@ -993,17 +989,14 @@ function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData =
 }
 
 function Settings({ events, currentEventId, onAddEvent, onDeleteEvent, onUpdateGoals, onUpdateWeeklyGoals, members, onAddMember, onDelMember, onClose }) {
-
   const cur = events.find(e => e.id === currentEventId) || {};
   const [targetDate, setTargetDate] = useState(new Date()); 
   const [goals, setGoals] = useState({ total: {}, weekly: {} });
-  
   const [newEventName, setNewEventName] = useState("");
   const [newEventDate, setNewEventDate] = useState("");
   const [newMem, setNewMem] = useState("");
   const [newRole, setNewRole] = useState("apo");
   const [newHourlyWage, setNewHourlyWage] = useState("");
-
   const targetWeekKey = useMemo(() => getMondayKey(targetDate), [targetDate]);
 
   useEffect(() => {
@@ -1020,10 +1013,9 @@ function Settings({ events, currentEventId, onAddEvent, onDeleteEvent, onUpdateG
     if (currentEventId) { 
       onUpdateGoals(currentEventId, { ...cur.goals, total: goals.total });
       onUpdateWeeklyGoals(currentEventId, targetWeekKey, goals.weekly);
-      alert(`Saved goals for week of ${getWeekRange(targetDate).start.toLocaleDateString()}`); 
+      alert(`${getWeekRange(targetDate).start.toLocaleDateString()} の週の目標を保存しました。`); 
     } 
   };
-  
   const updateGoalVal = (type, key, val) => { setGoals(prev => ({ ...prev, [type]: { ...prev[type], [key]: Number(val) } })); };
   const shiftWeek = (days) => { const newDate = new Date(targetDate); newDate.setDate(newDate.getDate() + days); setTargetDate(newDate); };
   const wr = getWeekRange(targetDate);
@@ -1034,20 +1026,21 @@ function Settings({ events, currentEventId, onAddEvent, onDeleteEvent, onUpdateG
       <div className="md:col-span-2 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button onClick={onClose} className="p-4 bg-white rounded-full shadow-lg shadow-slate-200/50 hover:bg-slate-50 transition-all active:scale-90"><Icon p={I.X}/></button>
-          <h2 className="font-black text-3xl text-slate-900 tracking-tight">Settings</h2>
+          <h2 className="font-black text-3xl text-slate-900 tracking-tight">各種設定</h2>
         </div>
       </div>
 
       <div className="space-y-10">
+        {/* プロジェクト・イベント管理 */}
         <section className="premium-card p-8 space-y-8">
           <h3 className="font-black text-xl text-slate-800 flex items-center gap-3">
             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Icon p={I.Trophy} size={20}/></div>
-            Projects
+            プロジェクト管理
           </h3>
           <div className="space-y-4">
-            <input className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-700 outline-none" placeholder="Project Name" value={newEventName} onChange={e=>setNewEventName(e.target.value)} />
-            <input className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-700 outline-none" placeholder="Target Date (YYYY-MM-DD)" value={newEventDate} onChange={e=>setNewEventDate(e.target.value)} />
-            <button onClick={() => { if(newEventName){ onAddEvent(newEventName, newEventDate); setNewEventName(""); setNewEventDate(""); }}} className="w-full bg-slate-900 text-white py-5 rounded-3xl font-black text-sm hover:bg-black transition-all">Add Project</button>
+            <input className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-700 outline-none" placeholder="プロジェクト名（例: 26卒イベント）" value={newEventName} onChange={e=>setNewEventName(e.target.value)} />
+            <input className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-700 outline-none" placeholder="終了予定日 (YYYY-MM-DD)" value={newEventDate} onChange={e=>setNewEventDate(e.target.value)} />
+            <button onClick={() => { if(newEventName){ onAddEvent(newEventName, newEventDate); setNewEventName(""); setNewEventDate(""); }}} className="w-full bg-slate-900 text-white py-5 rounded-3xl font-black text-sm hover:bg-black transition-all">プロジェクトを追加</button>
           </div>
           <div className="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
             {events.map(e => (
@@ -1059,21 +1052,22 @@ function Settings({ events, currentEventId, onAddEvent, onDeleteEvent, onUpdateG
           </div>
         </section>
 
+        {/* メンバー登録 */}
         <section className="premium-card p-8 space-y-8">
           <h3 className="font-black text-xl text-slate-800 flex items-center gap-3">
             <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><Icon p={I.Users} size={20}/></div>
-            Team
+            チームメンバー管理
           </h3>
           <div className="flex flex-col gap-4">
-             <input className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-700 outline-none" placeholder="Full Name" value={newMem} onChange={e=>setNewMem(e.target.value)} />
+             <input className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-700 outline-none" placeholder="名前" value={newMem} onChange={e=>setNewMem(e.target.value)} />
              <div className="grid grid-cols-2 gap-4">
                 <select className="p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-700 outline-none cursor-pointer" value={newRole} onChange={e=>setNewRole(e.target.value)}>
-                    <option value="apo">Apo-inter</option>
-                    <option value="closer">Closer</option>
+                    <option value="apo">アポインター</option>
+                    <option value="closer">クローザー</option>
                 </select>
-                <input className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-700 outline-none" placeholder="Wage (JPY)" type="number" value={newHourlyWage} onChange={e=>setNewHourlyWage(e.target.value)} />
+                <input className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-700 outline-none" placeholder="時給 (円)" type="number" value={newHourlyWage} onChange={e=>setNewHourlyWage(e.target.value)} />
              </div>
-             <button onClick={()=>{if(newMem){onAddMember(newMem, newRole, newHourlyWage); setNewMem(""); setNewHourlyWage("");}}} className="w-full bg-emerald-600 text-white py-5 rounded-3xl font-black text-sm shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all">Add Member</button>
+             <button onClick={()=>{if(newMem){onAddMember(newMem, newRole, newHourlyWage); setNewMem(""); setNewHourlyWage("");}}} className="w-full bg-emerald-600 text-white py-5 rounded-3xl font-black text-sm shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all text-center">メンバーを追加</button>
           </div>
           <div className="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
             {members.map(m => (
@@ -1087,9 +1081,10 @@ function Settings({ events, currentEventId, onAddEvent, onDeleteEvent, onUpdateG
       </div>
 
       <div className="space-y-10 h-fit">
+        {/* 目標数値設定 */}
         <section className="premium-card p-10 space-y-10 border-indigo-200/30">
           <div className="flex items-center justify-between border-b border-slate-50 pb-6">
-             <h3 className="font-black text-2xl text-slate-800 tracking-tight">Finance Targets</h3>
+             <h3 className="font-black text-2xl text-slate-800 tracking-tight">目標値の設定</h3>
              <div className="flex bg-slate-100 p-1 rounded-xl">
                 <button onClick={() => shiftWeek(-7)} className="p-2 hover:bg-white rounded-lg text-slate-500 transition-all"><Icon p={I.ChevronLeft} size={16}/></button>
                 <div className="px-4 flex items-center text-[10px] font-black text-slate-700 uppercase tracking-widest">{weekRangeLabel}</div>
@@ -1097,28 +1092,28 @@ function Settings({ events, currentEventId, onAddEvent, onDeleteEvent, onUpdateG
              </div>
           </div>
 
-          <div className="space-y-10">
-            <div className="p-8 bg-amber-50/50 rounded-[2.5rem] border border-amber-100 space-y-6">
-              <div className="text-[10px] font-black text-amber-800 uppercase tracking-[0.2em] flex items-center gap-2"><Icon p={I.Trophy} size={14}/> Total KPI</div>
-              <div className="grid grid-cols-2 gap-6">
-                <GoalRow label="成約 (Deals)" val={goals.total?.deals} set={v=>updateGoalVal('total','deals',v)} />
-                <GoalRow label="アポ (Appts)" val={goals.total?.appts} set={v=>updateGoalVal('total','appts',v)} />
+          <div className="space-y-8">
+            <div className="space-y-4">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">プロジェクト全体の目標</label>
+              <div className="grid grid-cols-2 gap-4">
+                <GoalRow label="アポ数" val={goals.total?.appts} set={v=>updateGoalVal('total','appts',v)} />
+                <GoalRow label="成約数" val={goals.total?.deals} set={v=>updateGoalVal('total','deals',v)} />
               </div>
             </div>
-
-            <div className="p-8 bg-indigo-50/50 rounded-[2.5rem] border border-indigo-100 space-y-6">
-              <div className="text-[10px] font-black text-indigo-800 uppercase tracking-[0.2em] flex items-center gap-2"><Icon p={I.Calendar} size={14}/> Weekly KPI</div>
-              <div className="grid grid-cols-2 gap-6">
-                <GoalRow label="成約 (Deals)" val={goals.weekly?.deals} set={v=>updateGoalVal('weekly','deals',v)} />
-                <GoalRow label="アポ (Appts)" val={goals.weekly?.appts} set={v=>updateGoalVal('weekly','appts',v)} />
-                <GoalRow label="架電 (Calls)" val={goals.weekly?.calls} set={v=>updateGoalVal('weekly','calls',v)} />
-                <GoalRow label="実施 (MTG)" val={goals.weekly?.meetings} set={v=>updateGoalVal('weekly','meetings',v)} />
+            
+            <div className="space-y-4">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">選択した週の週間目標</label>
+              <div className="grid grid-cols-2 gap-4">
+                <GoalRow label="アポ数" val={goals.weekly?.appts} set={v=>updateGoalVal('weekly','appts',v)} />
+                <GoalRow label="成約数" val={goals.weekly?.deals} set={v=>updateGoalVal('weekly','deals',v)} />
+                <GoalRow label="架電数" val={goals.weekly?.calls} set={v=>updateGoalVal('weekly','calls',v)} />
+                <GoalRow label="商談数" val={goals.weekly?.meetings} set={v=>updateGoalVal('weekly','meetings',v)} />
               </div>
             </div>
           </div>
           
-          <button onClick={saveGoals} className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black text-xl shadow-2xl shadow-indigo-100 flex items-center justify-center gap-3 active:scale-95 transition-all hover:bg-black">
-            <Icon p={I.Check} size={24} strokeWidth={3}/> Save Config
+          <button onClick={saveGoals} className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black text-xl shadow-2xl shadow-indigo-100 flex items-center justify-center gap-4 active:scale-95 transition-all hover:bg-black">
+            <Icon p={I.Check} size={28} strokeWidth={3}/> 目標を保存する
           </button>
         </section>
       </div>
@@ -1340,7 +1335,7 @@ function App() {
       <style>{`@media print { body > * { display: none !important; } .print-wrapper, .print-wrapper * { display: block !important; } .print-wrapper { position: absolute; left: 0; top: 0; width: 100vw; min-height: 100vh; background: white; z-index: 99999; padding: 40px; } @page { size: A4; margin: 10mm; } }`}</style>
       <div className="max-w-md md:max-w-4xl lg:max-w-6xl mx-auto flex flex-col min-h-screen pb-24 shadow-2xl bg-white md:bg-slate-50 relative">
         <header className="bg-white/90 backdrop-blur sticky top-0 z-20 px-4 py-3 border-b border-slate-100 flex justify-between items-center md:rounded-b-2xl md:mx-4 md:mt-2 md:shadow-sm no-print">
-          <div className="flex flex-col"><div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Current Event</div><div className="relative group"><select className="appearance-none bg-transparent font-black text-lg text-indigo-900 pr-6 outline-none cursor-pointer" value={currentEventId || ""} onChange={e => setCurrentEventId(e.target.value)}>{events.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select><div className="absolute right-0 top-1.5 pointer-events-none text-indigo-900"><Icon p={I.ChevronDown} size={16} /></div></div></div>
+          <div className="flex flex-col"><div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider pl-1">プロジェクトの選択</div><div className="relative group"><select className="appearance-none bg-transparent font-black text-lg text-indigo-900 pr-10 outline-none cursor-pointer" value={currentEventId || ""} onChange={e => setCurrentEventId(e.target.value)}>{events.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}</select><div className="absolute right-0 top-1.5 pointer-events-none text-indigo-900 opacity-50"><Icon p={I.ChevronDown} size={16} /></div></div></div>
           <div className="flex gap-2">{connectionStatus === "offline" && <span className="text-red-400 bg-red-50 p-2 rounded-full"><Icon p={I.WifiOff} size={16}/></span>}<button onClick={() => setActiveTab('settings')} className="p-2 bg-slate-100 rounded-full text-slate-500 active:bg-slate-200"><Icon p={I.Settings} size={20} /></button></div>
         </header>
         <div className="flex-1 p-4 overflow-y-auto space-y-6">
