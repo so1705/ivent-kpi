@@ -138,7 +138,7 @@ const NavButton = ({ active, onClick, icon, label }) => (
     <div className={`transition-all duration-300 z-10 ${active ? 'transform -translate-y-0.5' : 'opacity-40 group-hover:opacity-70'}`}>
       <Icon p={icon} size={22} strokeWidth={active ? 2.5 : 2} color={active ? '#4f46e5' : '#64748b'} />
     </div>
-    <span className={`text-[10px] font-black mt-1 tracking-tighter transition-all duration-300 ${active ? 'text-indigo-600' : 'text-slate-400'}`}>{label}</span>
+    <span className={`text-[11px] font-black mt-1 tracking-tighter transition-all duration-300 ${active ? 'text-indigo-600' : 'text-slate-400'}`}>{label}</span>
     {active && <div className="absolute top-1 w-8 h-1 bg-indigo-500 rounded-full"></div>}
   </button>
 );
@@ -285,7 +285,7 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="premium-card p-8 bg-gradient-to-br from-indigo-600 to-indigo-800 text-white relative overflow-hidden shadow-2xl">
                   <div className="relative z-10">
-                    <p className="text-indigo-200 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Today's Results</p>
+                    <p className="text-indigo-200 text-[10px] font-black uppercase tracking-[0.2em] mb-2">本日の速報</p>
                     <h4 className="text-sm font-bold opacity-80 mb-6 font-sans">今日の結果</h4>
                     <div className="grid grid-cols-3 gap-4 font-sans">
                       <div className="text-center"><div className="text-4xl font-black">{myStats?.today.appts || 0}</div><div className="text-[9px] font-black uppercase opacity-60 mt-1">アポ</div></div>
@@ -296,11 +296,11 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
                 </div>
                 <div className="premium-card p-8 bg-white border border-slate-100 shadow-sm relative overflow-hidden">
                   <div className="relative z-10 font-sans">
-                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Weekly Performance</p>
-                    <h4 className="text-sm font-bold text-slate-800 mb-6">今週の成果</h4>
+                    <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2">今週の成果推移</p>
+                    <h4 className="text-sm font-bold text-slate-800 mb-6">週間目標の達成度</h4>
                     <div className="space-y-4">
                       <MetricBar label="アポ数" val={myStats?.weekly.appts || 0} tgt={event.individualWeeklyGoals?.[mondayKey]?.[currentMember?.id]?.appts || 0} color="bg-emerald-500" />
-                      <MetricBar label="資料送付" val={myStats?.weekly.requests || 0} tgt={event.individualWeeklyGoals?.[mondayKey]?.[currentMember?.id]?.requests || 0} color="bg-blue-500" />
+                      <MetricBar label="資料送送付" val={myStats?.weekly.requests || 0} tgt={event.individualWeeklyGoals?.[mondayKey]?.[currentMember?.id]?.requests || 0} color="bg-blue-500" />
                     </div>
                   </div>
                 </div>
@@ -357,8 +357,8 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
                 <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-400/10 rounded-full blur-2xl -mr-16 -mt-16"></div>
                 <h3 className="text-xs font-black text-emerald-400 uppercase tracking-widest mb-6">管理者専用パネル</h3>
                 <div className="space-y-8 font-sans">
-                   <div><p className="text-[10px] font-black opacity-50 uppercase mb-1">予測成約収益 (30万単価時)</p><div className="text-3xl font-black text-white">¥{(totals.total.deals * 300000).toLocaleString()}</div></div>
-                   <div><p className="text-[10px] font-black opacity-50 uppercase mb-1">コスト概算 (時給1500円換算)</p><p className="text-xl font-black text-slate-400">¥{(totals.total.hours * 1500).toLocaleString()}</p></div>
+                   <div><p className="text-[10px] font-black opacity-50 uppercase mb-1">予測成約収益 (単価30万円時)</p><div className="text-3xl font-black text-white">¥{(totals.total.deals * 300000).toLocaleString()}</div></div>
+                   <div><p className="text-[10px] font-black opacity-50 uppercase mb-1">想定コスト (時給1500円換算)</p><p className="text-xl font-black text-slate-400">¥{(totals.total.hours * 1500).toLocaleString()}</p></div>
                 </div>
              </div>
            )}
@@ -413,7 +413,7 @@ const AttendanceView = ({ members, reports, onEdit }) => {
   return (
     <div className="space-y-6 animate-in fade-in pb-24 font-sans">
        <div className="flex items-center justify-between"><h2 className="text-xl font-black flex items-center gap-3"><div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Icon p={I.Clock} size={20}/></div> 稼働履歴</h2><input type="month" className="bg-white border p-3 rounded-2xl font-bold" value={selectedMonth} onChange={e=>setSelectedMonth(e.target.value)} /></div>
-       <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white flex justify-between items-center"><span className="font-bold opacity-60 uppercase tracking-widest text-xs">Total Working Hours</span><span className="text-4xl font-black">{totalH}<span className="text-lg opacity-40 ml-1">h</span></span></div>
+       <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white flex justify-between items-center"><span className="font-bold opacity-60 uppercase tracking-widest text-xs">合計稼働時間</span><span className="text-4xl font-black">{totalH}<span className="text-lg opacity-40 ml-1">h</span></span></div>
        <div className="space-y-3">
           {fReports.map(r => (
             <button key={r.id} onClick={()=>onEdit(r)} className="w-full bg-white p-5 rounded-2xl border border-slate-100 flex items-center justify-between text-left hover:border-indigo-200 transition-all">
@@ -724,7 +724,7 @@ function App() {
            <div className="flex items-center gap-3">
               <div className="text-right hidden md:block">
                  <div className="text-xs font-black">{user.displayName}</div>
-                 <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{userRole === 'admin' ? 'Admin' : 'Member'}</div>
+                 <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{userRole === 'admin' ? '管理者' : 'メンバー'}</div>
               </div>
               <button onClick={handleLogout} className="p-2.5 bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-500 rounded-xl transition-all"><Icon p={I.LogOut} size={20} /></button>
            </div>
@@ -762,13 +762,10 @@ function App() {
       </main>
 
       <nav className="fixed bottom-6 left-6 right-6 z-50 bg-white/80 backdrop-blur-2xl border border-slate-200/50 rounded-[2.5rem] shadow-xl p-2 flex items-center justify-between no-print">
-        <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={I.Grid} label="HOME" />
-        <NavButton active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} icon={I.PieChart} label="ANALYSIS" />
-        <div className="relative -mt-12">
-           <button onClick={() => setShowInput(true)} className="w-16 h-16 bg-slate-900 text-white rounded-full flex items-center justify-center shadow-xl border-4 border-white"><Icon p={I.Plus} size={32} strokeWidth={3} /></button>
-        </div>
-        <NavButton active={activeTab === 'shifts'} onClick={() => setActiveTab('shifts')} icon={I.Calendar} label="SHIFTS" />
-        <NavButton active={activeTab === 'settings' || activeTab === 'attendance'} onClick={() => setActiveTab(userRole === 'admin' ? 'settings' : 'attendance')} icon={userRole === 'admin' ? I.Settings : I.Clock} label={userRole === 'admin' ? 'ADMIN' : 'WORK'} />
+        <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={I.Grid} label="ホーム" />
+        <NavButton active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} icon={I.PieChart} label="分析" />
+        <NavButton active={activeTab === 'shifts'} onClick={() => setActiveTab('shifts')} icon={I.Calendar} label="シフト" />
+        <NavButton active={activeTab === 'settings' || activeTab === 'attendance'} onClick={() => setActiveTab(userRole === 'admin' ? 'settings' : 'attendance')} icon={userRole === 'admin' ? I.Settings : I.Clock} label={userRole === 'admin' ? '管理者' : '稼働履歴'} />
       </nav>
 
       {showInput && <InputModal members={members} onAdd={addReport} onClose={() => setShowInput(false)} />}
