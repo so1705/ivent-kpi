@@ -1,128 +1,94 @@
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&family=Noto+Sans+JP:wght@400;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;900&family=Noto+Sans+JP:wght@400;700;900&display=swap');
 
 :root {
   --primary: #4f46e5;
-  --primary-light: #818cf8;
-  --indigo-glow: rgba(79, 70, 229, 0.15);
-  --background: #f8fafc;
-  --surface: #ffffff;
-  --text-main: #0f172a;
-  --text-muted: #64748b;
-  --radius-xl: 1.5rem;
-  --radius-2xl: 2.5rem;
+  --primary-glow: rgba(79, 70, 229, 0.4);
+  --accent: #10b981;
+  --bg: #f8fafc;
+  --card: #ffffff;
+  --text: #0f172a;
 }
 
 body {
-  background-color: var(--background);
-  color: var(--text-main);
+  margin: 0;
   font-family: 'Noto Sans JP', 'Montserrat', sans-serif;
-  overflow-x: hidden;
+  background-color: var(--bg);
+  color: var(--text);
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
-/* --- Premium Components --- */
+.font-sans {
+  font-family: 'Noto Sans JP', sans-serif;
+}
 
 .premium-card {
-  background: white;
-  border-radius: var(--radius-2xl);
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.04);
-  border: 1px solid rgba(241, 245, 249, 0.8);
-  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  background: var(--card);
+  border-radius: 2.5rem;
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.04);
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .premium-card:hover {
-  transform: translateY(-4px) scale(1.01);
-  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.08);
-  border-color: rgba(79, 70, 229, 0.1);
+  transform: translateY(-5px);
+  box-shadow: 0 20px 50px -15px rgba(79, 70, 229, 0.08);
 }
 
 .glass {
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-/* --- Animations --- */
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+/* Custom Animations */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
 }
 
-@keyframes slideUp {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
+.animate-float {
+  animation: float 6s ease-in-out infinite;
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.6s ease-out forwards;
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
 }
-
-.animate-slide-up {
-  animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* --- Layout Utilities --- */
-
-.custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
-}
-.custom-scrollbar::-webkit-scrollbar-track {
+::-webkit-scrollbar-track {
   background: transparent;
 }
-.custom-scrollbar::-webkit-scrollbar-thumb {
+::-webkit-scrollbar-thumb {
   background: #e2e8f0;
   border-radius: 10px;
 }
-
-/* --- Navigation --- */
-
-nav {
-  transition: all 0.4s ease;
+::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
 }
 
-nav:hover {
-  transform: translateY(-2px);
-}
-
-/* --- Dashboard Grid --- */
-
-.dashboard-grid {
-  display: grid;
-  gap: 1.5rem;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-}
-
-@media (max-width: 768px) {
-  :root {
-    --radius-2xl: 2rem;
-  }
-  
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  /* Mobile padding adjustments */
-  .p-10 { padding: 1.5rem !important; }
-  .p-8 { padding: 1.25rem !important; }
-  .text-5xl { font-size: 2.5rem !important; }
-}
-
-/* --- Admin Only Styles --- */
-.admin-badge {
-  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-  color: white;
-  padding: 4px 10px;
-  border-radius: 8px;
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.1em;
-}
-
-/* --- Printing --- */
+/* Printing */
 @media print {
   .no-print { display: none !important; }
   body { background: white; }
   .premium-card { box-shadow: none; border: 1px solid #eee; }
+}
+
+/* Tailwind-ish utility fallback if needed but mostly vanilla */
+.selection\:bg-indigo-100::selection { background-color: #e0e7ff; }
+.selection\:text-indigo-900::selection { color: #1e1b4b; }
+
+/* Mobile Optimization */
+@media (max-width: 768px) {
+  .premium-card {
+    border-radius: 2rem;
+    padding: 1.5rem !important;
+  }
+}
+
+/* Funnel Shape if we want to be fancy later */
+.funnel-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
