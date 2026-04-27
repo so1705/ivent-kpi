@@ -1124,16 +1124,6 @@ function Settings({ events, currentEventId, onAddEvent, onDeleteEvent, onUpdateG
     </div>
   );
 }
-ed-md text-indigo-400"><Icon p={I.ChevronRight} size={14}/></button>
-              </div>
-            </div>
-            
-            <GoalRow label="商談成約" val={goals.weekly?.deals} set={v=>updateGoalVal('weekly','deals',v)} /><GoalRow label="商談数(実施)" val={goals.weekly?.meetings} set={v=>updateGoalVal('weekly','meetings',v)} /><GoalRow label="見込(CL)" val={goals.weekly?.prospects} set={v=>updateGoalVal('weekly','prospects',v)} /><GoalRow label="失注" val={goals.weekly?.lost} set={v=>updateGoalVal('weekly','lost',v)} /><div className="border-t border-indigo-200/50 my-2"></div><GoalRow label="見込(AP)" val={goals.weekly?.apoProspects} set={v=>updateGoalVal('weekly','apoProspects',v)} /><GoalRow label="アポ" val={goals.weekly?.appts} set={v=>updateGoalVal('weekly','appts',v)} /><GoalRow label="架電" val={goals.weekly?.calls} set={v=>updateGoalVal('weekly','calls',v)} /></div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 // ==========================================
 // 6. アプリ本体
