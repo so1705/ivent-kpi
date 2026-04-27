@@ -111,14 +111,28 @@ const I = {
   Yen: <><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></>,
   Sun: <><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></>,
   Grid: <><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></>,
-  List: <><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></>
+  List: <><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></>,
+  Zap: <><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></>,
+  TrendingUp: <><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></>,
+  Activity: <><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></>
 };
+
+const BREAKDOWN_LABELS = {
+  noAnswer: '不在',
+  receptionRefusal: '受付拒否',
+  picAbsent: '担当不在',
+  picConnected: '本人接続',
+  requestInfo: '資料請求',
+  appt: 'アポ',
+  outOfTarget: '対象外'
+};
+
 
 // ==========================================
 // 3. UI部品コンポーネント (Atomic Components)
 // ==========================================
-const Icon = ({ p, size=24, color="currentColor", className="" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+const Icon = ({ p, size=24, color="currentColor", className="", strokeWidth=1.5 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}>
     {p}
   </svg>
 );
@@ -126,14 +140,16 @@ const Icon = ({ p, size=24, color="currentColor", className="" }) => (
 const NavButton = ({ active, onClick, icon, label }) => (
   <button 
     onClick={onClick} 
-    className={`flex flex-col items-center justify-center w-20 h-14 rounded-xl transition-all duration-300 ${active ? 'text-black' : 'text-gray-400 hover:text-gray-600'}`}
+    className={`flex flex-col items-center justify-center w-full h-16 transition-all duration-500 relative group`}
   >
-    <div className={`transition-all duration-300 ${active ? 'transform scale-110 drop-shadow-md' : ''}`}>
-      <Icon p={icon} size={24} strokeWidth={active ? 2 : 1.5} />
+    <div className={`transition-all duration-500 z-10 ${active ? 'transform -translate-y-1' : 'opacity-60 group-hover:opacity-100'}`}>
+      <Icon p={icon} size={24} strokeWidth={active ? 2.5 : 1.5} color={active ? 'var(--primary)' : 'var(--text-muted)'} />
     </div>
-    <span className={`text-[9px] font-bold mt-1 tracking-wide ${active ? 'opacity-100' : 'opacity-0'}`}>{label}</span>
+    <span className={`text-[10px] font-bold mt-1 tracking-tighter transition-all duration-500 ${active ? 'text-indigo-600 opacity-100' : 'text-slate-400 opacity-0 h-0 overflow-hidden'}`}>{label}</span>
+    {active && <div className="absolute top-1 w-8 h-1 bg-indigo-500 rounded-full animate-in zoom-in-50 duration-500"></div>}
   </button>
 );
+
 
 const GoalRow = ({ label, val, set }) => (
   <div className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
@@ -147,15 +163,14 @@ const GoalRow = ({ label, val, set }) => (
   </div>
 );
 
-const InputItem = ({ label, icon, val, set, step="1", color="text-gray-400" }) => (
-  <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm focus-within:ring-2 focus-within:ring-black/5 transition-all">
-    <div className={`text-[10px] font-bold uppercase mb-2 flex items-center justify-center gap-1.5 ${color}`}>
-      <Icon p={icon} size={12}/> {label}
+const InputItem = ({ label, icon, val, set, color = "text-indigo-600" }) => (
+  <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm focus-within:ring-4 focus-within:ring-indigo-50/50 transition-all group">
+    <div className={`text-[9px] font-black uppercase mb-3 flex items-center justify-center gap-2 text-slate-400 group-focus-within:text-indigo-500 transition-colors tracking-[0.2em]`}>
+      <Icon p={icon} size={14}/> {label}
     </div>
     <input 
       type="number" 
-      step={step} 
-      className="w-full bg-transparent text-3xl font-black text-gray-900 outline-none text-center placeholder-gray-200" 
+      className="w-full bg-transparent text-4xl font-black text-slate-900 outline-none text-center placeholder-slate-100" 
       placeholder="0" 
       value={val} 
       onChange={e=>set(e.target.value)} 
@@ -163,26 +178,27 @@ const InputItem = ({ label, icon, val, set, step="1", color="text-gray-400" }) =
   </div>
 );
 
+
 const StatItem = ({ label, val, highlight, color }) => (
-  <div className={`flex flex-col py-2 rounded-lg transition-colors ${highlight ? 'bg-gray-50' : ''}`}>
-    <span className="text-[9px] text-gray-400 font-bold mb-1 uppercase tracking-wider">{label}</span>
-    <span className={`text-lg font-black ${highlight && color ? color : 'text-gray-800'}`}>{val}</span>
+  <div className={`flex flex-col py-3 px-2 rounded-2xl transition-all ${highlight ? 'bg-slate-50 ring-1 ring-slate-100 shadow-sm' : ''}`}>
+    <span className="text-[10px] text-slate-400 font-extrabold mb-1 uppercase tracking-widest">{label}</span>
+    <span className={`text-xl font-black ${highlight && color ? color : 'text-slate-800'}`}>{val}</span>
   </div>
 );
 
 const MetricBar = ({ label, val, tgt, color, small }) => {
   const percent = tgt > 0 ? Math.min((val/tgt)*100, 100) : 0;
   return (
-    <div className={`flex flex-col ${small ? 'gap-1' : 'gap-1.5'}`}>
+    <div className={`flex flex-col ${small ? 'gap-1' : 'gap-2'}`}>
       <div className="flex justify-between items-end">
-        <span className={`font-bold text-gray-500 ${small ? 'text-[10px]' : 'text-xs'}`}>{label}</span>
-        <div className="font-bold text-gray-900 leading-none">
-          <span className={small ? 'text-xs' : 'text-sm'}>{val}</span>
-          {tgt > 0 && <span className="text-[10px] text-gray-300 ml-1">/{tgt}</span>}
+        <span className={`font-black text-slate-500 uppercase tracking-tighter ${small ? 'text-[9px]' : 'text-[10px]'}`}>{label}</span>
+        <div className="font-black text-slate-900 leading-none">
+          <span className={small ? 'text-sm' : 'text-base'}>{val}</span>
+          {tgt > 0 && <span className="text-[10px] text-slate-300 ml-1">/ {tgt}</span>}
         </div>
       </div>
-      <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-        <div className={`h-full ${color} transition-all duration-1000`} style={{ width: `${percent}%` }} />
+      <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
+        <div className={`h-full ${color} transition-all duration-1000 cubic-bezier(0.34, 1.56, 0.64, 1)`} style={{ width: `${percent}%` }} />
       </div>
     </div>
   );
@@ -191,25 +207,28 @@ const MetricBar = ({ label, val, tgt, color, small }) => {
 const MainMetric = ({ label, icon, current, target, color, bg }) => {
   const percent = target > 0 ? Math.min((current/target)*100, 100) : 0;
   return (
-    <div>
-      <div className="flex justify-between items-end mb-2">
-        <div className={`flex items-center gap-2 font-bold ${color}`}>
-          <Icon p={icon} size={24}/> 
-          <span className="text-2xl tracking-tight">{label}</span>
+    <div className="group">
+      <div className="flex justify-between items-end mb-4">
+        <div className={`flex items-center gap-3 font-black ${color}`}>
+          <div className={`p-2 rounded-xl bg-slate-50 group-hover:scale-110 transition-transform duration-500`}>
+            <Icon p={icon} size={24}/> 
+          </div>
+          <span className="text-xl tracking-tight uppercase">{label}</span>
         </div>
         <div className="text-right">
-          <span className="text-5xl font-black text-black tracking-tighter">{current}</span>
-          <span className="text-sm font-bold text-gray-300 ml-1">/ {target}</span>
+          <span className="text-5xl font-black text-slate-900 tracking-tighter">{current}</span>
+          <span className="text-sm font-black text-slate-200 ml-2">/ {target}</span>
         </div>
       </div>
-      <div className="h-4 w-full bg-gray-100 rounded-full overflow-hidden shadow-inner">
-        <div className={`h-full ${bg} transition-all duration-1000 ease-out relative`} style={{ width: `${percent}%` }}>
-          <div className="absolute top-0 right-0 bottom-0 w-1 bg-white/30"></div>
+      <div className="h-5 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner border border-slate-50 p-1">
+        <div className={`h-full ${bg} rounded-full transition-all duration-1000 ease-out relative group-hover:brightness-110`} style={{ width: `${percent}%` }}>
+          <div className="absolute top-0 right-0 bottom-0 w-8 bg-white/20 skew-x-20"></div>
         </div>
       </div>
     </div>
   );
 };
+
 
 // ==========================================
 // 4. 複合コンポーネント (Complex Components)
@@ -219,28 +238,28 @@ const GoalSection = ({ title, subTitle, data, goals, variant, headerAction }) =>
   const isGold = variant === "gold";
   const accentColor = isGold ? "text-amber-600" : "text-indigo-600";
   const barColor = isGold ? "bg-amber-500" : "bg-indigo-500";
-  const headerBg = isGold ? "bg-amber-50/50" : "bg-indigo-50/50";
+  const headerBg = isGold ? "bg-amber-50" : "bg-indigo-50";
   
   const safeGoals = goals || {};
 
   return (
-    <div className="bg-white p-6 rounded-[2rem] shadow-xl shadow-gray-100/50 border border-gray-100 relative overflow-hidden group hover:shadow-2xl transition-all duration-500">
-      <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${isGold ? 'from-amber-100/40' : 'from-indigo-100/40'} to-transparent rounded-bl-[4rem] -mr-8 -mt-8 transition-transform group-hover:scale-110 duration-700 pointer-events-none`}></div>
+    <div className="premium-card p-8 relative overflow-hidden group">
+      <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${isGold ? 'from-amber-100/20' : 'from-indigo-100/20'} to-transparent rounded-bl-[5rem] -mr-4 -mt-4 transition-transform group-hover:scale-110 duration-700 pointer-events-none`}></div>
 
-      <div className="flex items-center justify-between mb-6 relative z-10">
-        <div className="flex items-center gap-3">
-          <div className={`p-3 rounded-2xl ${headerBg} ${accentColor} shadow-sm`}>
-            <Icon p={isGold ? I.Trophy : I.Calendar} size={24}/>
+      <div className="flex items-center justify-between mb-8 relative z-10">
+        <div className="flex items-center gap-4">
+          <div className={`p-3 rounded-2xl ${headerBg} ${accentColor} shadow-sm border border-white`}>
+            <Icon p={isGold ? I.Trophy : I.Calendar} size={24} strokeWidth={2}/>
           </div>
           <div>
-            <h3 className="text-lg font-bold text-gray-800 leading-tight">{title} Goal</h3>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{subTitle}</p>
+            <h3 className="text-xl font-black text-slate-800 leading-none mb-1">{title} Goal</h3>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{subTitle}</p>
           </div>
         </div>
         {headerAction}
       </div>
 
-      <div className="mb-8 relative z-10">
+      <div className="mb-10 relative z-10">
         <MainMetric 
           label="商談成約数" 
           icon={I.Briefcase}
@@ -251,21 +270,21 @@ const GoalSection = ({ title, subTitle, data, goals, variant, headerAction }) =>
         />
       </div>
       
-      <div className="grid grid-cols-2 gap-8 relative z-10">
-        <div className="space-y-5">
-          <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
-            <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Apointer</span>
+      <div className="grid grid-cols-2 gap-10 relative z-10">
+        <div className="space-y-6">
+          <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+            <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Apointer</span>
           </div>
           <MetricBar label="アポ数" val={data.appts} tgt={safeGoals.appts} color="bg-emerald-500" />
           <MetricBar label="架電数" val={data.calls} tgt={safeGoals.calls} color="bg-slate-700" />
           <MetricBar label="アポ見込み" val={data.apoProspects} tgt={safeGoals.apoProspects} color="bg-cyan-500" />
         </div>
         
-        <div className="space-y-5">
-          <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
-            <div className="w-1.5 h-1.5 rounded-full bg-purple-400"></div>
-            <span className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Closer</span>
+        <div className="space-y-6">
+          <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+            <div className="w-2 h-2 rounded-full bg-purple-400"></div>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Closer</span>
           </div>
           <MetricBar label="商談数 (実施)" val={data.meetings} tgt={safeGoals.meetings} color="bg-purple-600" />
           <MetricBar label="商談見込み" val={data.dealProspects} tgt={safeGoals.prospects} color="bg-amber-500" />
@@ -276,12 +295,9 @@ const GoalSection = ({ title, subTitle, data, goals, variant, headerAction }) =>
   );
 };
 
-// ==========================================
-// 5. メイン画面コンポーネント (Views)
-// ==========================================
 
-const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBaseDate, activeWeeklyGoals, eventReports }) => {
-  const [statsPeriod, setStatsPeriod] = useState('total'); // 'total', 'month', 'week', 'day'
+const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBaseDate, activeWeeklyGoals, eventReports, members }) => {
+  const [statsPeriod, setStatsPeriod] = useState('total');
   const [filterType, setFilterType] = useState('all');
 
   const g = {
@@ -292,12 +308,6 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
   const wr = getWeekRange(currentBaseDate);
   const weekRangeString = `${wr.start.getMonth()+1}/${wr.start.getDate()} - ${wr.end.getMonth()+1}/${wr.end.getDate()}`;
   
-  const shiftWeek = (days) => {
-    const newDate = new Date(currentBaseDate);
-    newDate.setDate(newDate.getDate() + days);
-    setCurrentBaseDate(newDate);
-  };
-
   const shiftDate = (amount, unit) => {
     const newDate = new Date(currentBaseDate);
     if(unit === 'month') newDate.setMonth(newDate.getMonth() + amount);
@@ -307,191 +317,163 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
   };
   
   const handleDateChange = (e) => {
-    if(e.target.value) {
-      setCurrentBaseDate(new Date(e.target.value));
-    }
+    if(e.target.value) setCurrentBaseDate(new Date(e.target.value));
   };
   
   const dateString = toLocalDateString(currentBaseDate);
 
-  // Stats calculation based on period
-  const filteredMemberStats = useMemo(() => {
-    let targetReports = eventReports;
+  // --- Logic for Predictions ---
+  const predictionStats = useMemo(() => {
+    const activeMembers = members.filter(m => m.role === 'apo');
+    const memberCount = activeMembers.length || 1;
     
-    if (statsPeriod === 'week') {
-      const { start, end } = getWeekRange(currentBaseDate);
-      targetReports = eventReports.filter(r => {
-         if (!r.date) return false;
-         const d = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
-         return d >= start && d <= end;
-      });
-    } else if (statsPeriod === 'month') {
-      const targetYear = currentBaseDate.getFullYear();
-      const targetMonth = currentBaseDate.getMonth();
-      targetReports = eventReports.filter(r => {
-         if (!r.date) return false;
-         const d = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
-         return d.getFullYear() === targetYear && d.getMonth() === targetMonth;
-      });
-    } else if (statsPeriod === 'day') {
-      const targetDateStr = toLocalDateString(currentBaseDate);
-      targetReports = eventReports.filter(r => {
-         if (!r.date) return false;
-         const d = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
-         return d.toISOString().slice(0, 10) === targetDateStr;
-      });
-    }
+    // Remaining needed for event
+    const remainingNeeded = Math.max(0, (g.total.appts || 0) - (totals.total.appts || 0));
+    const individualTarget = (remainingNeeded / memberCount).toFixed(1);
 
-    return memberStats.map(m => {
-      const myReps = targetReports.filter(r => r.memberId === m.id);
-      const myTot = myReps.reduce((acc, r) => ({
-        deals: acc.deals + (Number(r.deals)||0),
-        prospects: acc.prospects + (Number(r.prospects)||0),
-        lost: acc.lost + (Number(r.lost)||0),
-        appts: acc.appts + (Number(r.appts)||0),
-        calls: acc.calls + (Number(r.calls)||0),
-        requests: acc.requests + (Number(r.requests)||0),
-        hours: acc.hours + (Number(r.hours)||0),
-      }), { deals: 0, prospects: 0, lost: 0, appts: 0, calls: 0, requests: 0, hours: 0 });
-      const meetings = myTot.deals + (m.role==='closer' ? myTot.prospects : 0) + myTot.lost;
-      return { ...m, ...myTot, meetings, cph: myTot.hours > 0 ? (myTot.calls / myTot.hours).toFixed(1) : "0.0" };
-    }).sort((a,b) => b.cph - a.cph);
-  }, [memberStats, eventReports, statsPeriod, currentBaseDate]);
+    // Calculate individual expectations
+    const memberStatsWithPredictions = memberStats.map(m => {
+      // Historical Avg (All time in this event)
+      const avgApptPerHour = m.hours > 0 ? (m.appts / m.hours) : 0;
+      
+      // Target for this person (simple average for now)
+      const target = individualTarget;
+      const hoursNeeded = avgApptPerHour > 0 ? (target / avgApptPerHour).toFixed(1) : "??";
+      
+      return { 
+        ...m, 
+        avgApptPerHour, 
+        target, 
+        hoursNeeded,
+        gap: (m.appts - target).toFixed(1)
+      };
+    });
 
-  const filteredMembers = filteredMemberStats.filter(m => {
+    return { individualTarget, members: memberStatsWithPredictions };
+  }, [memberStats, members, totals, g.total]);
+
+  const funnelData = useMemo(() => {
+    const counts = { noAnswer: 0, receptionRefusal: 0, picAbsent: 0, picConnected: 0, requestInfo: 0, appt: 0, outOfTarget: 0 };
+    eventReports.forEach(r => {
+      Object.keys(BREAKDOWN_LABELS).forEach(key => {
+        counts[key] += (Number(r[key]) || 0);
+      });
+    });
+    return counts;
+  }, [eventReports]);
+
+  const filteredMembers = predictionStats.members.filter(m => {
     if (filterType === 'all') return true;
     return m.role === filterType;
   });
 
-  const periodLabel = useMemo(() => {
-    if (statsPeriod === 'total') return '全期間';
-    if (statsPeriod === 'month') return `${currentBaseDate.getMonth() + 1}月`;
-    if (statsPeriod === 'week') return `${wr.start.getMonth()+1}/${wr.start.getDate()}週`;
-    if (statsPeriod === 'day') return `${currentBaseDate.getMonth()+1}/${currentBaseDate.getDate()}`;
-    return '';
-  }, [statsPeriod, currentBaseDate, wr]);
-
   return (
-    <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-700 md:grid md:grid-cols-2 md:gap-8 md:space-y-0">
-      <div className="space-y-8">
-        <GoalSection 
-          title="週間目標" 
-          subTitle={weekRangeString} 
-          data={totals.weekly} 
-          goals={g.weekly} 
-          variant="indigo" 
+    <div className="space-y-10 animate-in fade-in duration-1000">
+      {/* Top Banner: Individual Goal Focus */}
+      <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl -mr-20 -mt-20"></div>
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="bg-indigo-500 text-[10px] font-black px-2 py-1 rounded-md uppercase tracking-widest text-indigo-100">Target Analytics</span>
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+            </div>
+            <h2 className="text-3xl font-black tracking-tight mb-1">現在の個人目標</h2>
+            <p className="text-slate-400 text-sm font-medium">残り {Math.max(0, (g.total.appts||0) - (totals.total.appts||0))} アポ ÷ {members.filter(m=>m.role==='apo').length} 人</p>
+          </div>
+          <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/10 flex items-center gap-6">
+            <div className="text-center">
+              <div className="text-4xl font-black">{predictionStats.individualTarget}</div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Needed / Person</div>
+            </div>
+            <div className="w-px h-10 bg-white/10"></div>
+            <div className="text-center">
+              <div className="text-4xl font-black text-emerald-400">{(totals.total.appts / (g.total.appts || 1) * 100).toFixed(0)}%</div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Overall Progress</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="dashboard-grid no-print">
+        <GoalSection title="週間" subTitle={weekRangeString} data={totals.weekly} goals={g.weekly} variant="indigo" 
           headerAction={
-            <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-1 border border-gray-200 shadow-sm">
-              <button onClick={() => shiftWeek(-7)} className="p-1.5 hover:bg-white rounded-md text-gray-500 transition-all hover:shadow-sm active:scale-95"><Icon p={I.ChevronLeft} size={16}/></button>
-              <button onClick={() => setCurrentBaseDate(new Date())} className="px-3 text-[10px] font-bold text-gray-600 hover:text-black transition-colors">今週</button>
-              <button onClick={() => shiftWeek(7)} className="p-1.5 hover:bg-white rounded-md text-gray-500 transition-all hover:shadow-sm active:scale-95"><Icon p={I.ChevronRight} size={16}/></button>
-              <div className="relative ml-1 border-l border-gray-200 pl-1">
-                <input 
-                  type="date" 
-                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" 
-                  onChange={handleDateChange}
-                  value={dateString}
-                />
-                <button className="p-1.5 hover:bg-white rounded-md text-indigo-500 transition-all hover:shadow-sm">
-                  <Icon p={I.Calendar} size={16}/>
-                </button>
-              </div>
+            <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-100">
+               <button onClick={() => shiftDate(-7, 'week')} className="p-2 hover:bg-white rounded-lg text-slate-400"><Icon p={I.ChevronLeft} size={16}/></button>
+               <input type="date" value={dateString} onChange={handleDateChange} className="bg-transparent text-xs font-bold text-slate-700 outline-none w-24 cursor-pointer" />
+               <button onClick={() => shiftDate(7, 'week')} className="p-2 hover:bg-white rounded-lg text-slate-400"><Icon p={I.ChevronRight} size={16}/></button>
             </div>
           }
         />
-        <GoalSection title="全体目標" subTitle={`${event.date} まで`} data={totals.total} goals={g.total} variant="gold" />
+        <GoalSection title="全体" subTitle={`Target: ${event.date}`} data={totals.total} goals={g.total} variant="gold" />
       </div>
 
-      <section className="md:h-full md:flex md:flex-col">
-        <div className="mb-4 px-2 space-y-3">
-          <div className="flex justify-between items-end">
-            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-3">
-              <div className="p-2 bg-gray-100 rounded-xl text-gray-600"><Icon p={I.Users} size={20}/></div>
-              Members
-            </h2>
-            <div className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg">
-              表示: {periodLabel}
+      {/* Funnel & Results Breakdown */}
+      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+        <h3 className="text-xl font-bold mb-8 flex items-center gap-3">
+          <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Icon p={I.TrendingUp} size={20}/></div>
+          Funnel Analysis
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+          {Object.entries(BREAKDOWN_LABELS).map(([key, label]) => (
+            <div key={key} className="p-4 rounded-3xl bg-slate-50 border border-slate-100 group hover:bg-indigo-50 hover:border-indigo-100 transition-all">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{label}</div>
+              <div className="text-2xl font-black text-slate-800 group-hover:text-indigo-600">{funnelData[key] || 0}</div>
             </div>
-          </div>
-          
-          <div className="flex flex-wrap gap-2 justify-between">
-             {/* Period Filter */}
-             <div className="flex bg-gray-100 rounded-lg p-1">
-              <button onClick={() => setStatsPeriod('total')} className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${statsPeriod === 'total' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>全体</button>
-              <button onClick={() => setStatsPeriod('month')} className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${statsPeriod === 'month' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>月</button>
-              <button onClick={() => setStatsPeriod('week')} className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${statsPeriod === 'week' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>週</button>
-              <button onClick={() => setStatsPeriod('day')} className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${statsPeriod === 'day' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>日</button>
-            </div>
+          ))}
+        </div>
+      </div>
 
-            {/* Role Filter */}
-            <div className="flex bg-gray-100 rounded-lg p-1">
-              <button onClick={() => setFilterType('all')} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${filterType === 'all' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>All</button>
-              <button onClick={() => setFilterType('apo')} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${filterType === 'apo' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>Apo</button>
-              <button onClick={() => setFilterType('closer')} className={`px-3 py-1 text-[10px] font-bold rounded-md transition-all ${filterType === 'closer' ? 'bg-white text-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>Closer</button>
-            </div>
-          </div>
-
-          {/* Date Navigation Control */}
-          {statsPeriod !== 'total' && (
-            <div className="flex items-center justify-between bg-white p-2 rounded-xl border border-gray-100 shadow-sm mt-2">
-              <button onClick={() => shiftDate(-1, statsPeriod)} className="p-2 hover:bg-gray-50 rounded-lg text-gray-500"><Icon p={I.ChevronLeft} size={16}/></button>
-              <div className="flex items-center gap-2 relative">
-                <span className="text-sm font-bold text-gray-800">
-                  {statsPeriod === 'day' && `${currentBaseDate.getMonth()+1}/${currentBaseDate.getDate()} (${['日','月','火','水','木','金','土'][currentBaseDate.getDay()]})`}
-                  {statsPeriod === 'month' && `${currentBaseDate.getFullYear()}年 ${currentBaseDate.getMonth()+1}月`}
-                  {statsPeriod === 'week' && `${getWeekRange(currentBaseDate).start.getMonth()+1}/${getWeekRange(currentBaseDate).start.getDate()} - ${getWeekRange(currentBaseDate).end.getMonth()+1}/${getWeekRange(currentBaseDate).end.getDate()}`}
-                </span>
-                {/* 日付ピッカー (Dayモード時のみ、あるいは常時) */}
-                <input 
-                  type="date" 
-                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                  onChange={handleDateChange}
-                  value={dateString}
-                />
-                <Icon p={I.Calendar} size={14} className="text-indigo-400"/>
-              </div>
-              <button onClick={() => shiftDate(1, statsPeriod)} className="p-2 hover:bg-gray-50 rounded-lg text-gray-500"><Icon p={I.ChevronRight} size={16}/></button>
-            </div>
-          )}
+      {/* Prediction Table */}
+      <section className="space-y-6">
+        <div className="flex justify-between items-end px-2">
+           <h2 className="text-2xl font-black flex items-center gap-3">
+             <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><Icon p={I.Zap} size={20}/></div>
+             Predictions
+           </h2>
+           <div className="flex bg-slate-100 p-1 rounded-xl">
+              <button onClick={() => setFilterType('all')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${filterType==='all' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'}`}>ALL</button>
+              <button onClick={() => setFilterType('apo')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${filterType==='apo' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'}`}>APO</button>
+           </div>
         </div>
 
-        <div className="space-y-4 md:flex-1 md:overflow-y-auto md:pr-2 pb-20 md:pb-0">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {filteredMembers.map((m, i) => (
-            <div key={m.id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100/80 transition-all hover:shadow-lg hover:-translate-y-1 group relative overflow-hidden">
-              <div className={`absolute top-0 left-0 w-1 h-full ${i===0 ? 'bg-black' : 'bg-transparent'}`}></div>
-              <div className="flex justify-between items-center mb-4 pl-3">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-black border-2 ${m.role === 'closer' ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-sky-50 text-sky-700 border-sky-100'}`}>
+            <div key={m.id} className="premium-card p-6 relative overflow-hidden group">
+              <div className="flex justify-between items-start mb-6">
+                <div className="flex items-center gap-4">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-black ${m.role === 'closer' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
                     {m.name.slice(0, 2)}
                   </div>
                   <div>
-                    <div className="font-bold text-gray-800 text-lg leading-none mb-1">{m.name}</div>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider ${m.role === 'closer' ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800'}`}>
-                      {m.role === 'closer' ? 'Closer' : 'Apo'}
-                    </span>
+                    <h4 className="text-xl font-bold text-slate-800">{m.name}</h4>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${m.role==='closer'?'bg-amber-50 text-amber-600':'bg-indigo-50 text-indigo-600'}`}>{m.role}</span>
+                      <span className="text-[10px] text-slate-400 font-bold">AVG: {m.avgApptPerHour.toFixed(2)}/h</span>
+                    </div>
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="text-2xl font-black text-gray-800">{m.cph}</span>
-                  <div className="text-[9px] font-bold text-gray-400 uppercase">Call / H</div>
+                  <div className={`text-2xl font-black ${Number(m.gap) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                    {Number(m.gap) > 0 ? `+${m.gap}` : m.gap}
+                  </div>
+                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Goal Gap</div>
                 </div>
               </div>
-              <div className="grid grid-cols-4 gap-2 text-center pl-3">
-                {m.role === 'closer' ? (
-                  <>
-                    <StatItem label="商談" val={m.meetings} />
-                    <StatItem label="契約" val={m.deals} highlight color="text-amber-600" />
-                    <StatItem label="見込" val={m.prospects} />
-                    <StatItem label="失注" val={m.lost} />
-                  </>
-                ) : (
-                  <>
-                    <StatItem label="アポ" val={m.appts} highlight color="text-emerald-600" />
-                    <StatItem label="架電" val={m.calls} />
-                    <StatItem label="資料請求" val={m.requests} />
-                    <StatItem label="見込" val={m.prospects} />
-                  </>
-                )}
+              
+              <div className="grid grid-cols-3 gap-2 py-4 border-t border-slate-50">
+                <div className="text-center">
+                  <div className="text-sm font-black text-slate-800">{m.appts}</div>
+                  <div className="text-[8px] font-bold text-slate-400 uppercase">Actual</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-sm font-black text-slate-800">{m.target}</div>
+                  <div className="text-[8px] font-bold text-slate-400 uppercase">Target</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-sm font-black text-indigo-600">{m.hoursNeeded}h</div>
+                  <div className="text-[8px] font-bold text-slate-400 uppercase">Extra Time</div>
+                </div>
               </div>
             </div>
           ))}
@@ -499,9 +481,9 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
       </section>
     </div>
   );
-};
 
 const AttendanceView = ({ members, reports, onEdit }) => {
+
   const [selectedMonth, setSelectedMonth] = useState(toLocalMonthString(new Date())); 
   const [selectedMemberId, setSelectedMemberId] = useState("");
   const apoMembers = members.filter(m => m.role !== 'closer');
@@ -853,7 +835,11 @@ const ShiftInputModal = ({ members, initialDate, onAdd, onClose }) => {
 
 function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData = null }) {
   const today = toLocalDateString(new Date());
-  const [val, setVal] = useState({ memberId: '', date: today, calls: '', appts: '', requests: '', prospects: '', lost: '', deals: '', hours: '', startTime: '', endTime: '' });
+  const [val, setVal] = useState({ 
+    memberId: '', date: today, 
+    calls: '', appts: '', requests: '', prospects: '', lost: '', deals: '', hours: '', startTime: '', endTime: '',
+    noAnswer: '', receptionRefusal: '', picAbsent: '', picConnected: '', outOfTarget: ''
+  });
   
   useEffect(() => {
     if (initialData) {
@@ -862,7 +848,24 @@ function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData =
         const d = initialData.date.toDate ? initialData.date.toDate() : new Date(initialData.date);
         dateStr = toLocalDateString(d);
       }
-      setVal({ ...initialData, date: dateStr, calls: initialData.calls || '', appts: initialData.appts || '', requests: initialData.requests || '', prospects: initialData.prospects || '', lost: initialData.lost || '', deals: initialData.deals || '', hours: initialData.hours || '', startTime: initialData.startTime || '', endTime: initialData.endTime || '' });
+      setVal({ 
+        ...initialData, 
+        date: dateStr, 
+        calls: initialData.calls || '', 
+        appts: initialData.appts || '', 
+        requests: initialData.requests || '', 
+        prospects: initialData.prospects || '', 
+        lost: initialData.lost || '', 
+        deals: initialData.deals || '', 
+        hours: initialData.hours || '', 
+        startTime: initialData.startTime || '', 
+        endTime: initialData.endTime || '',
+        noAnswer: initialData.noAnswer || '',
+        receptionRefusal: initialData.receptionRefusal || '',
+        picAbsent: initialData.picAbsent || '',
+        picConnected: initialData.picConnected || '',
+        outOfTarget: initialData.outOfTarget || ''
+      });
     }
   }, [initialData]);
 
@@ -884,7 +887,21 @@ function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData =
   const submit = (e) => {
     e.preventDefault();
     if (!val.memberId) return alert("Please select a member");
-    const data = { ...val, calls: Number(val.calls), appts: Number(val.appts), requests: Number(val.requests), prospects: Number(val.prospects), lost: Number(val.lost), deals: Number(val.deals), hours: Number(val.hours) };
+    
+    // Auto-calculate Total Calls if breakdown is provided? 
+    // Or just save as is. User requested "Breakdown", so we save all.
+    const data = { 
+      ...val, 
+      calls: Number(val.calls), appts: Number(val.appts), requests: Number(val.requests), 
+      prospects: Number(val.prospects), lost: Number(val.lost), deals: Number(val.deals), 
+      hours: Number(val.hours),
+      noAnswer: Number(val.noAnswer),
+      receptionRefusal: Number(val.receptionRefusal),
+      picAbsent: Number(val.picAbsent),
+      picConnected: Number(val.picConnected),
+      outOfTarget: Number(val.outOfTarget)
+    };
+    
     if (isEditMode) onUpdate(data); else onAdd(data);
     onClose();
   };
@@ -894,45 +911,88 @@ function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData =
   };
 
   return (
-    <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col animate-in fade-in duration-300 md:items-center md:justify-center no-print text-gray-900">
-      <div className="w-full h-full md:max-w-md md:h-auto md:max-h-[90vh] md:bg-white md:rounded-[2rem] md:shadow-2xl md:border md:border-gray-100 flex flex-col overflow-hidden">
-        <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-white/50 backdrop-blur-md sticky top-0 z-10">
-          <div className="flex items-center gap-2"><button onClick={onClose} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500 transition-colors"><Icon p={I.X}/></button>{isEditMode && (<button onClick={handleDelete} className="p-2 bg-red-50 hover:bg-red-100 rounded-full text-red-500 transition-colors"><Icon p={I.Trash} size={20}/></button>)}</div><h2 className="font-bold text-lg text-gray-800">{isEditMode ? '記録の修正' : '稼働報告'}</h2><div className="w-10"/>
-        </div>
-        <form onSubmit={submit} className="flex-1 overflow-y-auto p-6 space-y-8 bg-white">
-          <div className="space-y-3">
-            <label className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest pl-1">基本情報</label>
-            <input type="date" className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-gray-900 outline-none focus:ring-2 focus:ring-gray-200 transition-all" value={val.date} onChange={e => setVal({...val, date: e.target.value})} />
-            <div className="flex flex-wrap gap-2">{members.map(m => (<label key={m.id} className={`px-4 py-3 rounded-2xl border cursor-pointer font-bold transition-all text-xs flex items-center gap-2 shadow-sm ${val.memberId===m.id ? 'border-black bg-black text-white transform scale-105' : 'border-gray-100 bg-white text-gray-500 hover:border-gray-300'}`}><input type="radio" name="mem" value={m.id} className="hidden" onChange={e=>setVal({...val, memberId: e.target.value})} /><span className={`w-2 h-2 rounded-full ${m.role === 'closer' ? 'bg-black border border-white' : 'bg-gray-300'}`}></span>{m.name}</label>))}</div>
+    <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50 flex flex-col animate-in fade-in duration-500 md:items-center md:justify-center no-print text-slate-900 overflow-hidden">
+      <div className="w-full h-full md:max-w-2xl md:h-auto md:max-h-[90vh] bg-white md:rounded-[2.5rem] shadow-2xl flex flex-col relative overflow-hidden">
+        <div className="p-6 border-b border-slate-50 flex justify-between items-center sticky top-0 bg-white/80 backdrop-blur-xl z-20">
+          <div className="flex items-center gap-3">
+             <button onClick={onClose} className="p-2.5 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-500 transition-all active:scale-90"><Icon p={I.X}/></button>
+             {isEditMode && <button onClick={handleDelete} className="p-2.5 bg-rose-50 hover:bg-rose-100 rounded-full text-rose-500 transition-all"><Icon p={I.Trash} size={20}/></button>}
           </div>
+          <h2 className="font-black text-xl tracking-tight">{isEditMode ? '記録の修正' : '稼働報告'}</h2>
+          <div className="w-12"/>
+        </div>
+
+        <form onSubmit={submit} className="flex-1 overflow-y-auto p-8 space-y-10">
+          <section className="space-y-4">
+             <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block ml-1">Basic Info</label>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input type="date" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-100 transition-all" value={val.date} onChange={e => setVal({...val, date: e.target.value})} />
+                <div className="flex flex-wrap gap-2">
+                  {members.map(m => (
+                    <label key={m.id} className={`px-4 py-3 rounded-2xl border cursor-pointer font-bold transition-all text-xs flex items-center gap-2 ${val.memberId===m.id ? 'border-indigo-600 bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'border-slate-100 bg-white text-slate-500 hover:border-slate-300 shadow-sm'}`}>
+                      <input type="radio" name="mem" value={m.id} className="hidden" onChange={e=>setVal({...val, memberId: e.target.value})} />
+                      {m.name}
+                    </label>
+                  ))}
+                </div>
+             </div>
+          </section>
+
           {selectedMember && (
-            <div className="animate-in slide-in-from-bottom-4 duration-500 space-y-6">
+            <div className="animate-in slide-in-from-bottom-8 duration-700 space-y-10">
               {!isCloser ? (
                 <>
-                  <div className="flex items-center gap-2 text-sm font-bold text-sky-700 bg-sky-50 px-4 py-2 rounded-xl border border-sky-100"><div className="w-2 h-2 bg-sky-500 rounded-full animate-pulse"></div> Apo Metrics</div>
-                  <div className="bg-gray-50 p-4 rounded-3xl border border-gray-100 space-y-4">
-                    <div className="flex gap-3 items-center"><div className="flex-1"><label className="text-[10px] font-bold text-gray-400 block mb-1 text-center">START</label><input type="time" className="w-full p-3 rounded-xl bg-white font-bold text-gray-800 outline-none text-center shadow-sm" value={val.startTime} onChange={e=>setVal({...val, startTime: e.target.value})} /></div><div className="text-gray-300">➜</div><div className="flex-1"><label className="text-[10px] font-bold text-gray-400 block mb-1 text-center">END</label><input type="time" className="w-full p-3 rounded-xl bg-white font-bold text-gray-800 outline-none text-center shadow-sm" value={val.endTime} onChange={e=>setVal({...val, endTime: e.target.value})} /></div></div>
-                    <div className="flex items-center justify-between pt-2 border-t border-gray-200"><span className="text-xs font-bold text-gray-500">Total Hours</span><input type="number" step="0.5" className="w-24 text-right font-black text-2xl bg-transparent outline-none text-gray-800" value={val.hours} onChange={e=>setVal({...val, hours: e.target.value})} placeholder="0.0" /></div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4"><InputItem label="架電数" icon={I.Phone} val={val.calls} set={v=>setVal({...val, calls:v})} /><InputItem label="アポ数" icon={I.Check} val={val.appts} set={v=>setVal({...val, appts:v})} color="text-emerald-600" /><InputItem label="資料請求" icon={I.FileText} val={val.requests} set={v=>setVal({...val, requests:v})} /><InputItem label="見込み" icon={I.Help} val={val.prospects} set={v=>setVal({...val, prospects:v})} color="text-blue-500" /></div>
+                  <section className="space-y-5">
+                    <div className="flex items-center gap-2 text-xs font-black text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl w-fit">Working Hours</div>
+                    <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                       <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase text-center block">Start</label><input type="time" className="w-full p-3 rounded-xl bg-white font-bold text-center border border-slate-100" value={val.startTime} onChange={e=>setVal({...val, startTime: e.target.value})} /></div>
+                       <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase text-center block">End</label><input type="time" className="w-full p-3 rounded-xl bg-white font-bold text-center border border-slate-100" value={val.endTime} onChange={e=>setVal({...val, endTime: e.target.value})} /></div>
+                       <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase text-center block">Total (H)</label><input type="number" step="0.5" className="w-full p-3 rounded-xl bg-transparent font-black text-2xl text-center outline-none" value={val.hours} onChange={e=>setVal({...val, hours: e.target.value})} /></div>
+                    </div>
+                  </section>
+
+                  <section className="space-y-5">
+                    <div className="flex items-center gap-2 text-xs font-black text-emerald-600 bg-emerald-50 px-4 py-2 rounded-xl w-fit">Results Breakdown</div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                       <InputItem label="全体架電" icon={I.Phone} val={val.calls} set={v=>setVal({...val, calls: v})} color="text-slate-400" />
+                       <InputItem label="不在" icon={I.Clock} val={val.noAnswer} set={v=>setVal({...val, noAnswer: v})} />
+                       <InputItem label="受付拒否" icon={I.Ban} val={val.receptionRefusal} set={v=>setVal({...val, receptionRefusal: v})} />
+                       <InputItem label="担当不在" icon={I.Users} val={val.picAbsent} set={v=>setVal({...val, picAbsent: v})} />
+                       <InputItem label="本人接続" icon={I.Zap} val={val.picConnected} set={v=>setVal({...val, picConnected: v})} color="text-indigo-500" />
+                       <InputItem label="資料請求" icon={I.FileText} val={val.requests} set={v=>setVal({...val, requests: v})} color="text-blue-500" />
+                       <InputItem label="アポ" icon={I.Check} val={val.appts} set={v=>setVal({...val, appts: v})} color="text-emerald-500" />
+                       <InputItem label="対象外" icon={I.X} val={val.outOfTarget} set={v=>setVal({...val, outOfTarget: v})} />
+                       <InputItem label="見込み" icon={I.Help} val={val.prospects} set={v=>setVal({...val, prospects: v})} color="text-amber-500" />
+                    </div>
+                  </section>
                 </>
               ) : (
-                <>
-                  <div className="flex items-center gap-2 text-sm font-bold text-amber-700 bg-amber-50 px-4 py-2 rounded-xl border border-amber-100"><div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div> Closer Metrics</div>
-                  <div className="bg-amber-50 p-6 rounded-3xl border border-amber-100 shadow-sm"><div className="flex items-center justify-center gap-2 mb-2 text-amber-800 font-bold text-xs uppercase tracking-widest"><Icon p={I.Briefcase} size={16}/> Deals Won</div><input type="number" className="w-full bg-white p-4 rounded-2xl text-4xl font-black text-center text-gray-900 outline-none shadow-sm focus:ring-4 focus:ring-amber-200 transition-all" placeholder="0" value={val.deals} onChange={e=>setVal({...val, deals: e.target.value})} /></div>
-                  <div className="grid grid-cols-2 gap-4"><InputItem label="見込み" icon={I.Help} val={val.prospects} set={v=>setVal({...val, prospects:v})} color="text-blue-500" /><InputItem label="失注" icon={I.Ban} val={val.lost} set={v=>setVal({...val, lost:v})} color="text-rose-500" /></div>
-                </>
+                <section className="space-y-6">
+                  <div className="flex items-center gap-2 text-xs font-black text-amber-600 bg-amber-50 px-4 py-2 rounded-xl w-fit">Closer Stats</div>
+                  <div className="bg-amber-50 p-8 rounded-[2.5rem] border border-amber-100 flex flex-col items-center">
+                    <div className="text-[10px] font-black text-amber-800 uppercase tracking-widest mb-4">Deals Won</div>
+                    <input type="number" className="w-48 bg-white p-6 rounded-[2rem] text-5xl font-black text-center shadow-xl shadow-amber-200/50 outline-none" value={val.deals} onChange={e=>setVal({...val, deals: e.target.value})} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <InputItem label="見込み" icon={I.Help} val={val.prospects} set={v=>setVal({...val, prospects: v})} color="text-amber-500" />
+                    <InputItem label="失注" icon={I.Ban} val={val.lost} set={v=>setVal({...val, lost: v})} color="text-rose-500" />
+                  </div>
+                </section>
               )}
             </div>
           )}
-          <button className="w-full bg-black text-white py-4 rounded-2xl font-bold text-lg shadow-xl shadow-gray-200 active:scale-95 transition-transform hover:bg-gray-800">{isEditMode ? '修正内容を保存' : '報告を送信'}</button>
+          
+          <button className="w-full bg-slate-900 text-white py-5 rounded-3xl font-black text-lg shadow-2xl shadow-slate-200 transition-all hover:bg-black active:scale-[0.98]">
+            {isEditMode ? '修正内容を保存' : '稼働を報告する'}
+          </button>
         </form>
       </div>
     </div>
   );
-};
+}
 
 function Settings({ events, currentEventId, onAddEvent, onDeleteEvent, onUpdateGoals, onUpdateWeeklyGoals, members, onAddMember, onDelMember, onClose }) {
+
   const cur = events.find(e => e.id === currentEventId) || {};
   const [targetDate, setTargetDate] = useState(new Date()); 
   const [goals, setGoals] = useState({ total: {}, weekly: {} });
@@ -959,69 +1019,112 @@ function Settings({ events, currentEventId, onAddEvent, onDeleteEvent, onUpdateG
     if (currentEventId) { 
       onUpdateGoals(currentEventId, { ...cur.goals, total: goals.total });
       onUpdateWeeklyGoals(currentEventId, targetWeekKey, goals.weekly);
-      alert(`${getWeekRange(targetDate).start.toLocaleDateString()} の週の目標設定を保存しました`); 
+      alert(`Saved goals for week of ${getWeekRange(targetDate).start.toLocaleDateString()}`); 
     } 
   };
   
   const updateGoalVal = (type, key, val) => { setGoals(prev => ({ ...prev, [type]: { ...prev[type], [key]: Number(val) } })); };
-
-  const shiftWeek = (days) => {
-    const newDate = new Date(targetDate);
-    newDate.setDate(newDate.getDate() + days);
-    setTargetDate(newDate);
-  };
-
+  const shiftWeek = (days) => { const newDate = new Date(targetDate); newDate.setDate(newDate.getDate() + days); setTargetDate(newDate); };
   const wr = getWeekRange(targetDate);
   const weekRangeLabel = `${wr.start.getMonth()+1}/${wr.start.getDate()} - ${wr.end.getMonth()+1}/${wr.end.getDate()}`;
 
   return (
-    <div className="space-y-8 md:grid md:grid-cols-2 md:gap-8 md:space-y-0 pb-20 no-print">
-      <div className="md:col-span-2 flex items-center gap-2"><button onClick={onClose} className="p-3 bg-white rounded-full shadow-sm hover:bg-gray-50 transition-colors"><Icon p={I.X}/></button><h2 className="font-bold text-2xl text-gray-900">設定</h2></div>
-      <div className="space-y-6">
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-6">
-          <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2"><Icon p={I.Calendar} size={20}/> イベント設定</h3>
-          
-          {/* イベント追加 */}
-          <div className="space-y-3">
-            <input className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100" placeholder="イベント名" value={newEventName} onChange={e=>setNewEventName(e.target.value)} />
-            <input className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100" placeholder="日付 (例: 2026-06-30)" value={newEventDate} onChange={e=>setNewEventDate(e.target.value)} />
-          </div>
-          <button onClick={() => { if(newEventName){ onAddEvent(newEventName, newEventDate); setNewEventName(""); setNewEventDate(""); }}} className="w-full bg-gray-900 text-white py-4 rounded-2xl font-bold text-sm shadow-lg shadow-gray-200 hover:bg-black transition-all">イベントを追加</button>
-
-          {/* イベント削除リスト */}
-          <div className="pt-4 border-t border-gray-100">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2 block">既存のイベント一覧</label>
-            <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-              {events.map(e => (
-                <div key={e.id} className="flex justify-between items-center p-2 hover:bg-gray-50 rounded-lg group transition-colors">
-                  <span className={`text-sm font-bold ${e.id === currentEventId ? 'text-indigo-600' : 'text-gray-600'}`}>{e.name}</span>
-                  <button onClick={() => { if(window.confirm(`${e.name} を本当に削除しますか？`)) onDeleteEvent(e.id); }} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
-                    <Icon p={I.Trash} size={16}/>
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-6">
-          <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2"><Icon p={I.Users} size={20}/> メンバー管理</h3>
-          <div className="flex flex-col gap-2"><div className="flex gap-2"><input className="flex-1 p-4 bg-gray-50 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100" placeholder="名前" value={newMem} onChange={e=>setNewMem(e.target.value)} /><select className="p-4 bg-gray-50 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-indigo-100 cursor-pointer" value={newRole} onChange={e => setNewRole(e.target.value)}><option value="apo">アポインター</option><option value="closer">クローザー</option></select></div><div className="relative"><input type="number" className="w-full p-4 bg-gray-50 rounded-2xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-100 pl-12" placeholder="時給 (円)" value={newHourlyWage} onChange={e=>setNewHourlyWage(e.target.value)} /><div className="absolute left-4 top-4 text-gray-400"><Icon p={I.Yen} size={20}/></div></div><button onClick={()=>{if(newMem){onAddMember(newMem, newRole, newHourlyWage);setNewMem("");setNewHourlyWage("");}}} className="w-full bg-indigo-50 text-indigo-600 py-3 rounded-2xl font-bold hover:bg-indigo-100 transition-colors mt-2">メンバーを追加</button></div>
-          <div className="space-y-2 mt-4 max-h-60 overflow-y-auto pr-2">{members.map(m => (<div key={m.id} className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-xl transition-colors"><div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black uppercase ${m.role === 'closer' ? 'bg-amber-100 text-amber-700' : 'bg-sky-100 text-sky-700'}`}>{m.role === 'closer' ? 'CL' : 'AP'}</div><div><span className="font-bold text-sm text-gray-700 block">{m.name}</span>{m.hourlyWage > 0 && <span className="text-[10px] text-gray-400 font-medium">¥{Number(m.hourlyWage).toLocaleString()}/h</span>}</div></div><button onClick={() => { if(window.confirm(`${m.name} を削除しますか？この操作は取り消せません。`)) onDelMember(m.id); }} className="text-gray-300 hover:text-rose-500 transition-colors p-2"><Icon p={I.Trash} size={18}/></button></div>))}</div>
+    <div className="space-y-10 md:grid md:grid-cols-2 md:gap-10 md:space-y-0 pb-24 no-print animate-in fade-in duration-700">
+      <div className="md:col-span-2 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button onClick={onClose} className="p-4 bg-white rounded-full shadow-lg shadow-slate-200/50 hover:bg-slate-50 transition-all active:scale-90"><Icon p={I.X}/></button>
+          <h2 className="font-black text-3xl text-slate-900 tracking-tight">Settings</h2>
         </div>
       </div>
-      <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-6 h-fit">
-        <div className="flex justify-between items-center"><div><h3 className="font-bold text-lg text-gray-900">目標値設定</h3><p className="text-xs text-gray-400 font-bold">{cur.name}</p></div><button onClick={saveGoals} className="bg-emerald-500 text-white px-6 py-2 rounded-xl text-xs font-bold shadow-lg shadow-emerald-200 hover:bg-emerald-600 transition-all">保存</button></div>
-        <div className="space-y-6">
-          <div className="p-5 bg-amber-50 rounded-[2rem] border border-amber-100 space-y-3"><div className="text-xs font-extrabold text-amber-800 uppercase tracking-widest mb-2 flex items-center gap-2"><Icon p={I.Trophy} size={14}/> 全体目標</div><GoalRow label="商談成約" val={goals.total?.deals} set={v=>updateGoalVal('total','deals',v)} /><GoalRow label="商談数(実施)" val={goals.total?.meetings} set={v=>updateGoalVal('total','meetings',v)} /><GoalRow label="見込(CL)" val={goals.total?.prospects} set={v=>updateGoalVal('total','prospects',v)} /><GoalRow label="失注" val={goals.total?.lost} set={v=>updateGoalVal('total','lost',v)} /><div className="border-t border-amber-200/50 my-2"></div><GoalRow label="見込(AP)" val={goals.total?.apoProspects} set={v=>updateGoalVal('total','apoProspects',v)} /><GoalRow label="アポ" val={goals.total?.appts} set={v=>updateGoalVal('total','appts',v)} /><GoalRow label="架電" val={goals.total?.calls} set={v=>updateGoalVal('total','calls',v)} /></div>
-          <div className="p-5 bg-indigo-50 rounded-[2rem] border border-indigo-100 space-y-3">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-xs font-extrabold text-indigo-800 uppercase tracking-widest flex items-center gap-2"><Icon p={I.Calendar} size={14}/> 週間目標</div>
-              
-              <div className="flex items-center gap-1 bg-white rounded-lg p-1 border border-indigo-100">
-                <button onClick={() => shiftWeek(-7)} className="p-1 hover:bg-indigo-50 rounded-md text-indigo-400"><Icon p={I.ChevronLeft} size={14}/></button>
-                <span className="text-[10px] font-bold text-indigo-900 w-24 text-center">{weekRangeLabel}</span>
-                <button onClick={() => shiftWeek(7)} className="p-1 hover:bg-indigo-50 rounded-md text-indigo-400"><Icon p={I.ChevronRight} size={14}/></button>
+
+      <div className="space-y-10">
+        <section className="premium-card p-8 space-y-8">
+          <h3 className="font-black text-xl text-slate-800 flex items-center gap-3">
+            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Icon p={I.Trophy} size={20}/></div>
+            Projects
+          </h3>
+          <div className="space-y-4">
+            <input className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-700 outline-none" placeholder="Project Name" value={newEventName} onChange={e=>setNewEventName(e.target.value)} />
+            <input className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-700 outline-none" placeholder="Target Date (YYYY-MM-DD)" value={newEventDate} onChange={e=>setNewEventDate(e.target.value)} />
+            <button onClick={() => { if(newEventName){ onAddEvent(newEventName, newEventDate); setNewEventName(""); setNewEventDate(""); }}} className="w-full bg-slate-900 text-white py-5 rounded-3xl font-black text-sm hover:bg-black transition-all">Add Project</button>
+          </div>
+          <div className="space-y-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
+            {events.map(e => (
+              <div key={e.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all ${currentEventId===e.id ? 'bg-indigo-50 border-indigo-100' : 'bg-white border-slate-50'}`}>
+                 <span className={`font-bold text-sm ${currentEventId===e.id ? 'text-indigo-900' : 'text-slate-600'}`}>{e.name}</span>
+                 <button onClick={() => {if(window.confirm(`${e.name} を削除しますか？`)) onDeleteEvent(e.id)}} className="p-2 text-rose-300 hover:text-rose-500 transition-colors"><Icon p={I.Trash} size={18}/></button>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="premium-card p-8 space-y-8">
+          <h3 className="font-black text-xl text-slate-800 flex items-center gap-3">
+            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><Icon p={I.Users} size={20}/></div>
+            Team
+          </h3>
+          <div className="flex flex-col gap-4">
+             <input className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-700 outline-none" placeholder="Full Name" value={newMem} onChange={e=>setNewMem(e.target.value)} />
+             <div className="grid grid-cols-2 gap-4">
+                <select className="p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-700 outline-none cursor-pointer" value={newRole} onChange={e=>setNewRole(e.target.value)}>
+                    <option value="apo">Apo-inter</option>
+                    <option value="closer">Closer</option>
+                </select>
+                <input className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-slate-700 outline-none" placeholder="Wage (JPY)" type="number" value={newHourlyWage} onChange={e=>setNewHourlyWage(e.target.value)} />
+             </div>
+             <button onClick={()=>{if(newMem){onAddMember(newMem, newRole, newHourlyWage); setNewMem(""); setNewHourlyWage("");}}} className="w-full bg-emerald-600 text-white py-5 rounded-3xl font-black text-sm shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all">Add Member</button>
+          </div>
+          <div className="grid grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+            {members.map(m => (
+              <div key={m.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between group">
+                <span className="text-xs font-black text-slate-700">{m.name}</span>
+                <button onClick={()=>onDelMember(m.id)} className="opacity-0 group-hover:opacity-100 p-2 text-rose-300 hover:text-rose-500 transition-all"><Icon p={I.X} size={14}/></button>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <div className="space-y-10 h-fit">
+        <section className="premium-card p-10 space-y-10 border-indigo-200/30">
+          <div className="flex items-center justify-between border-b border-slate-50 pb-6">
+             <h3 className="font-black text-2xl text-slate-800 tracking-tight">Finance Targets</h3>
+             <div className="flex bg-slate-100 p-1 rounded-xl">
+                <button onClick={() => shiftWeek(-7)} className="p-2 hover:bg-white rounded-lg text-slate-500 transition-all"><Icon p={I.ChevronLeft} size={16}/></button>
+                <div className="px-4 flex items-center text-[10px] font-black text-slate-700 uppercase tracking-widest">{weekRangeLabel}</div>
+                <button onClick={() => shiftWeek(7)} className="p-2 hover:bg-white rounded-lg text-slate-500 transition-all"><Icon p={I.ChevronRight} size={16}/></button>
+             </div>
+          </div>
+
+          <div className="space-y-10">
+            <div className="p-8 bg-amber-50/50 rounded-[2.5rem] border border-amber-100 space-y-6">
+              <div className="text-[10px] font-black text-amber-800 uppercase tracking-[0.2em] flex items-center gap-2"><Icon p={I.Trophy} size={14}/> Total KPI</div>
+              <div className="grid grid-cols-2 gap-6">
+                <GoalRow label="成約 (Deals)" val={goals.total?.deals} set={v=>updateGoalVal('total','deals',v)} />
+                <GoalRow label="アポ (Appts)" val={goals.total?.appts} set={v=>updateGoalVal('total','appts',v)} />
+              </div>
+            </div>
+
+            <div className="p-8 bg-indigo-50/50 rounded-[2.5rem] border border-indigo-100 space-y-6">
+              <div className="text-[10px] font-black text-indigo-800 uppercase tracking-[0.2em] flex items-center gap-2"><Icon p={I.Calendar} size={14}/> Weekly KPI</div>
+              <div className="grid grid-cols-2 gap-6">
+                <GoalRow label="成約 (Deals)" val={goals.weekly?.deals} set={v=>updateGoalVal('weekly','deals',v)} />
+                <GoalRow label="アポ (Appts)" val={goals.weekly?.appts} set={v=>updateGoalVal('weekly','appts',v)} />
+                <GoalRow label="架電 (Calls)" val={goals.weekly?.calls} set={v=>updateGoalVal('weekly','calls',v)} />
+                <GoalRow label="実施 (MTG)" val={goals.weekly?.meetings} set={v=>updateGoalVal('weekly','meetings',v)} />
+              </div>
+            </div>
+          </div>
+          
+          <button onClick={saveGoals} className="w-full bg-slate-900 text-white py-6 rounded-[2.5rem] font-black text-xl shadow-2xl shadow-indigo-100 flex items-center justify-center gap-3 active:scale-95 transition-all hover:bg-black">
+            <Icon p={I.Check} size={24} strokeWidth={3}/> Save Config
+          </button>
+        </section>
+      </div>
+    </div>
+  );
+}
+ed-md text-indigo-400"><Icon p={I.ChevronRight} size={14}/></button>
               </div>
             </div>
             
@@ -1250,7 +1353,7 @@ function App() {
           <div className="flex gap-2">{connectionStatus === "offline" && <span className="text-red-400 bg-red-50 p-2 rounded-full"><Icon p={I.WifiOff} size={16}/></span>}<button onClick={() => setActiveTab('settings')} className="p-2 bg-slate-100 rounded-full text-slate-500 active:bg-slate-200"><Icon p={I.Settings} size={20} /></button></div>
         </header>
         <div className="flex-1 p-4 overflow-y-auto space-y-6">
-          {activeTab === 'dashboard' && (<div className="no-print"><Dashboard event={currentEvent} totals={totals} memberStats={memberStats} currentBaseDate={currentBaseDate} setCurrentBaseDate={setCurrentBaseDate} activeWeeklyGoals={activeWeeklyGoals} eventReports={eventReports} /></div>)}
+          {activeTab === 'dashboard' && (<div className="no-print"><Dashboard event={currentEvent} totals={totals} memberStats={memberStats} currentBaseDate={currentBaseDate} setCurrentBaseDate={setCurrentBaseDate} activeWeeklyGoals={activeWeeklyGoals} eventReports={eventReports} members={members} /></div>)}
           {activeTab === 'attendance' && (<AttendanceView members={members} reports={eventReports} onEdit={(report) => setEditingReport(report)} />)}
           {activeTab === 'shift' && (<div className="no-print"><ShiftView members={members} shifts={shifts} onDeleteShift={deleteShift} onAddShift={addShift} /></div>)}
           {activeTab === 'settings' && (<div className="no-print"><Settings events={events} currentEventId={currentEventId} onAddEvent={addEvent} onDeleteEvent={deleteEvent} onUpdateGoals={updateEventGoals} onUpdateWeeklyGoals={updateEventWeeklyGoals} members={members} onAddMember={addMember} onDelMember={deleteMember} onClose={() => setActiveTab('dashboard')} /></div>)}
