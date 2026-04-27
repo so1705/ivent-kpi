@@ -12,7 +12,7 @@ import {
 // ==========================================
 // 1. 設定 & ヘルパー関数
 // ==========================================
-const appId = 'tele-apo-manager-v42-final-unified';
+const appId = 'tele-apo-manager-v42-date-nav';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBnvOnuKhldjHQGGpKSpI4TGo4a74_eaj0",
@@ -434,34 +434,99 @@ const AttendanceView = ({ members, reports, onEdit }) => {
 
 const ShiftView = ({ members, shifts, onAddShift, onDeleteShift }) => {
   const [showModal, setShowModal] = useState(false);
+  const [viewMode, setViewMode] = useState('day'); // 'day', 'week'
   const [selectedDate, setSelectedDate] = useState(toLocalDateString(new Date()));
-  const dayShifts = shifts.filter(s => s.date === selectedDate).sort((a,b)=>a.startTime.localeCompare(b.startTime));
+
+  const wr = getWeekRange(selectedDate);
+  
+  const displayShifts = useMemo(() => {
+    if (viewMode === 'day') {
+      return shifts.filter(s => s.date === selectedDate).sort((a,b)=>a.startTime.localeCompare(b.startTime));
+    } else {
+      return shifts.filter(s => {
+        const d = new Date(s.date);
+        return d >= wr.start && d <= wr.end;
+      }).sort((a,b)=>a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+    }
+  }, [shifts, selectedDate, viewMode, wr]);
+
   return (
     <div className="space-y-6 animate-in fade-in pb-24 font-sans">
-       <div className="flex items-center justify-between"><h2 className="text-xl font-black flex items-center gap-3"><div className="p-2 bg-pink-50 text-pink-500 rounded-xl"><Icon p={I.Calendar} size={20}/></div> シフト管理</h2><input type="date" className="bg-white border p-3 rounded-2xl font-bold" value={selectedDate} onChange={e=>setSelectedDate(e.target.value)} /></div>
-       <div className="space-y-4">
-          {dayShifts.length === 0 ? <div className="p-20 text-center text-slate-300 font-bold">この日のシフトはありません</div> : dayShifts.map(s => {
-            const m = members.find(mem=>mem.id===s.memberId);
-            return (
-              <div key={s.id} className="bg-white p-5 rounded-2xl border border-slate-100 flex items-center justify-between">
-                 <div className="flex items-center gap-4"><div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white ${m?.role==='closer'?'bg-amber-400':'bg-sky-400'}`}>{m?.name?.slice(0,1)}</div><span className="font-black">{m?.name}</span></div>
-                 <div className="flex items-center gap-4"><span className="font-black text-slate-400">{s.startTime} - {s.endTime}</span><button onClick={()=>{if(window.confirm('Delete?')) onDeleteShift(s.id)}} className="p-2 text-rose-300 hover:text-rose-500"><Icon p={I.Trash} size={18}/></button></div>
-              </div>
-            );
-          })}
+       <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-black flex items-center gap-3"><div className="p-2 bg-pink-50 text-pink-500 rounded-xl"><Icon p={I.Calendar} size={20}/></div> シフト管理</h2>
+            <div className="flex bg-slate-100 p-1 rounded-xl">
+               <button onClick={()=>setViewMode('day')} className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${viewMode==='day'?'bg-white text-pink-500 shadow-sm':'text-slate-400'}`}>日別</button>
+               <button onClick={()=>setViewMode('week')} className={`px-4 py-2 rounded-lg text-xs font-black transition-all ${viewMode==='week'?'bg-white text-pink-500 shadow-sm':'text-slate-400'}`}>週間</button>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+             <input type="date" className="flex-1 bg-white border p-3 rounded-2xl font-bold" value={selectedDate} onChange={e=>setSelectedDate(e.target.value)} />
+             {viewMode === 'week' && <span className="text-[10px] font-black text-slate-400 whitespace-nowrap">選択日の週を表示中</span>}
+          </div>
        </div>
-       <button onClick={()=>setShowModal(true)} className="fixed bottom-32 right-8 w-16 h-16 bg-pink-500 text-white rounded-full shadow-2xl flex items-center justify-center border-4 border-white transition-all active:scale-90"><Icon p={I.Plus} size={32} strokeWidth={3}/></button>
+
+       <div className="space-y-4">
+          {displayShifts.length === 0 ? (
+            <div className="p-20 text-center text-slate-300 font-bold bg-white rounded-[2.5rem] border border-dashed border-slate-200">
+               シフトが登録されていません
+            </div>
+          ) : (
+            displayShifts.map(s => {
+              const m = members.find(mem=>mem.id===s.memberId);
+              return (
+                <div key={s.id} className="bg-white p-5 rounded-3xl border border-slate-100 flex items-center justify-between hover:shadow-lg hover:shadow-slate-100 transition-all">
+                   <div className="flex items-center gap-4">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white ${m?.role==='closer'?'bg-amber-400':'bg-sky-400'}`}>
+                        {m?.name?.slice(0,1)}
+                      </div>
+                      <div>
+                        <div className="font-black text-slate-800">{m?.name}</div>
+                        {viewMode === 'week' && <div className="text-[9px] font-black text-slate-400">{s.date}</div>}
+                      </div>
+                   </div>
+                   <div className="flex items-center gap-4">
+                      <span className="font-black text-slate-500 bg-slate-50 px-3 py-1.5 rounded-xl text-xs">{s.startTime} - {s.endTime}</span>
+                      <button onClick={()=>{if(window.confirm('削除しますか？')) onDeleteShift(s.id)}} className="p-2 text-rose-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all"><Icon p={I.Trash} size={18}/></button>
+                   </div>
+                </div>
+              );
+            })
+          )}
+       </div>
+       
+       <button onClick={()=>setShowModal(true)} className="fixed bottom-32 right-8 w-16 h-16 bg-pink-500 text-white rounded-full shadow-2xl flex items-center justify-center border-4 border-white transition-all active:scale-90 hover:scale-105 z-40">
+         <Icon p={I.Plus} size={32} strokeWidth={3}/>
+       </button>
+
        {showModal && (
          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 space-y-6">
-               <h3 className="text-xl font-black">シフトを追加</h3>
-               <div className="space-y-2">
-                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">スタッフ選択</label>
-                 <div className="flex flex-wrap gap-2">
-                   {members.map(m => <button key={m.id} onClick={()=>setSelectedDate(prev=>prev)} className="px-3 py-2 border rounded-xl font-bold text-xs"> {m.name} </button>)}
+            <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 space-y-6 shadow-2xl">
+               <div className="flex justify-between items-center">
+                 <h3 className="text-xl font-black">シフトを追加</h3>
+                 <button onClick={()=>setShowModal(false)} className="text-slate-400"><Icon p={I.X} /></button>
+               </div>
+               <div className="space-y-4">
+                 <div>
+                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">スタッフ選択</label>
+                   <div className="flex flex-wrap gap-2">
+                     {members.map(m => (
+                       <button key={m.id} className="px-3 py-2 border rounded-xl font-bold text-xs hover:bg-slate-50"> {m.name} </button>
+                     ))}
+                   </div>
+                 </div>
+                 <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">開始時間</label>
+                      <input type="time" className="w-full p-3 border rounded-xl font-bold" defaultValue="10:00" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">終了時間</label>
+                      <input type="time" className="w-full p-3 border rounded-xl font-bold" defaultValue="19:00" />
+                    </div>
                  </div>
                </div>
-               <button onClick={()=>setShowModal(false)} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black">閉じる (デモ版)</button>
+               <button onClick={()=>setShowModal(false)} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black hover:bg-black transition-all">登録する (デモ保存不可)</button>
             </div>
          </div>
        )}
@@ -472,30 +537,55 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift }) => {
 const AnalyticsView = ({ members, reports, event, userRole }) => {
   const [selectedMid, setSelectedMid] = useState('all');
   const fReports = selectedMid === 'all' ? reports : reports.filter(r => r.memberId === selectedMid);
-  const s = fReports.reduce((acc, r)=>({ calls: acc.calls+(Number(r.calls)||0), appts: acc.appts+(Number(r.appts)||0), requests: acc.requests+(Number(r.requests)||0), deals: acc.deals+(Number(r.deals)||0) }), { calls: 0, appts: 0, requests: 0, deals: 0 });
+  const s = fReports.reduce((acc, r)=>({ 
+    calls: acc.calls+(Number(r.calls)||0), 
+    appts: acc.appts+(Number(r.appts)||0), 
+    requests: acc.requests+(Number(r.requests)||0), 
+    deals: acc.deals+(Number(r.deals)||0),
+    noAnswer: acc.noAnswer+(Number(r.noAnswer)||0),
+    picAbsent: acc.picAbsent+(Number(r.picAbsent)||0),
+  }), { calls: 0, appts: 0, requests: 0, deals: 0, noAnswer: 0, picAbsent: 0 });
+  
   const apptR = (s.appts / (s.calls || 1)) * 100;
+  const maxVal = Math.max(s.calls, s.appts, s.requests, s.deals, 1);
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700 pb-24 font-sans">
        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <h2 className="text-2xl font-black flex items-center gap-3"><div className="p-2 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100"><Icon p={I.PieChart} size={20}/></div> データ分析</h2>
+          <h2 className="text-2xl font-black flex items-center gap-3"><div className="p-2 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100"><Icon p={I.PieChart} size={20}/></div> データ詳細分析</h2>
           <select className="bg-white border border-slate-200 p-3 rounded-2xl font-bold text-slate-700 outline-none shadow-sm" value={selectedMid} onChange={e=>setSelectedMid(e.target.value)}>
-             <option value="all">プロジェクト全体</option>
+             <option value="all">プロジェクト全体を表示</option>
              {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
        </div>
-       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="premium-card p-6 border-b-4 border-slate-400"><div className="text-[9px] font-black text-slate-400 uppercase mb-1">架電数</div><div className="text-3xl font-black text-slate-800">{s.calls}</div></div>
-          <div className="premium-card p-6 border-b-4 border-emerald-500"><div className="text-[9px] font-black text-slate-400 uppercase mb-1">アポ数</div><div className="text-3xl font-black text-emerald-600">{s.appts}</div></div>
-          <div className="premium-card p-6 border-b-4 border-indigo-400"><div className="text-[9px] font-black text-slate-400 uppercase mb-1">アポ率</div><div className="text-3xl font-black text-indigo-600">{apptR.toFixed(1)}%</div></div>
-          <div className="premium-card p-6 border-b-4 border-amber-500"><div className="text-[9px] font-black text-slate-400 uppercase mb-1">成約数</div><div className="text-3xl font-black text-amber-600">{s.deals}</div></div>
+
+       <div className="premium-card p-8 bg-white border border-slate-100 shadow-sm">
+          <h3 className="font-black text-slate-400 text-xs uppercase tracking-widest mb-10">架電〜アポ・成約のボリューム推移</h3>
+          <div className="h-48 flex items-end gap-2 md:gap-8 px-4">
+             <ChartBar label="架電" value={s.calls} max={maxVal} color="bg-slate-200" />
+             <ChartBar label="不在" value={s.noAnswer} max={maxVal} color="bg-slate-100" />
+             <ChartBar label="担当不在" value={s.picAbsent} max={maxVal} color="bg-slate-100" />
+             <ChartBar label="資料請求" value={s.requests} max={maxVal} color="bg-blue-400" />
+             <ChartBar label="アポ" value={s.appts} max={maxVal} color="bg-emerald-500" />
+             <ChartBar label="成約" value={s.deals} max={maxVal} color="bg-amber-400" />
+          </div>
        </div>
+
+       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="premium-card p-6 border-b-4 border-slate-200 bg-white"><div className="text-[9px] font-black text-slate-400 uppercase mb-1">架電数</div><div className="text-3xl font-black text-slate-800">{s.calls}</div></div>
+          <div className="premium-card p-6 border-b-4 border-emerald-500 bg-white"><div className="text-[9px] font-black text-slate-400 uppercase mb-1">アポ数</div><div className="text-3xl font-black text-emerald-600">{s.appts}</div></div>
+          <div className="premium-card p-6 border-b-4 border-indigo-500 bg-white"><div className="text-[9px] font-black text-slate-400 uppercase mb-1">アポ率</div><div className="text-3xl font-black text-indigo-600">{apptR.toFixed(1)}%</div></div>
+          <div className="premium-card p-6 border-b-4 border-amber-500 bg-white"><div className="text-[9px] font-black text-slate-400 uppercase mb-1">成約数</div><div className="text-3xl font-black text-amber-600">{s.deals}</div></div>
+       </div>
+
        <div className="premium-card p-8 bg-slate-900 border-none relative overflow-hidden flex flex-col">
-          <div className="relative z-10 flex items-center gap-3 mb-6"><div className="p-2 bg-indigo-500 rounded-lg animate-pulse"><Icon p={I.Zap} size={20} color="white" /></div><h3 className="font-black text-xl text-white">AIアドバイザー・深層分析</h3></div>
-          <div className="relative z-10 text-indigo-100 text-sm leading-relaxed font-bold whitespace-pre-wrap">
-             【{selectedMid === 'all' ? 'チーム全体' : members.find(m=>m.id===selectedMid)?.name}さんの分析レポート】
+          <div className="absolute top-0 right-0 p-8 opacity-10"><Icon p={I.Zap} size={80} color="white" /></div>
+          <div className="relative z-10 flex items-center gap-3 mb-6"><div className="p-2 bg-indigo-500 rounded-lg animate-pulse"><Icon p={I.Zap} size={20} color="white" /></div><h3 className="font-black text-xl text-white">AIアドバイザー分析</h3></div>
+          <div className="relative z-10 text-indigo-100 text-sm leading-relaxed font-bold whitespace-pre-wrap font-sans">
+             【{selectedMid === 'all' ? '全体' : members.find(m=>m.id===selectedMid)?.name} への戦略提案】
              
-             現状、架電数に対するアポ率は {apptR.toFixed(1)}% となっています。
-             接続できている時間帯を分析したところ、15:00以降のレスポンスが良好です。この時間帯に集中してアポ打診を行うことで、今の行動量のままアポ数を1.5倍に伸ばせる可能性があります。
+             現在の架電ボリューム {s.calls} 件に対してアポ獲得率は {apptR.toFixed(1)}% です。
+             1回のアポに対する平均架電数を20%削減するためのスクリプト改善が必要です。特に「担当不在」への対策を強化しましょう。
           </div>
        </div>
     </div>
@@ -764,6 +854,9 @@ function App() {
       <nav className="fixed bottom-6 left-6 right-6 z-50 bg-white/80 backdrop-blur-2xl border border-slate-200/50 rounded-[2.5rem] shadow-xl p-2 flex items-center justify-between no-print">
         <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={I.Grid} label="ホーム" />
         <NavButton active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} icon={I.PieChart} label="分析" />
+        <div className="relative -mt-12">
+           <button onClick={() => setShowInput(true)} className="w-16 h-16 bg-slate-900 text-white rounded-full flex items-center justify-center shadow-xl border-4 border-white transition-all active:scale-90 hover:scale-105"><Icon p={I.Plus} size={32} strokeWidth={3} /></button>
+        </div>
         <NavButton active={activeTab === 'shifts'} onClick={() => setActiveTab('shifts')} icon={I.Calendar} label="シフト" />
         <NavButton active={activeTab === 'settings' || activeTab === 'attendance'} onClick={() => setActiveTab(userRole === 'admin' ? 'settings' : 'attendance')} icon={userRole === 'admin' ? I.Settings : I.Clock} label={userRole === 'admin' ? '管理者' : '稼働履歴'} />
       </nav>
