@@ -114,7 +114,8 @@ const I = {
   List: <><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></>,
   Zap: <><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></>,
   TrendingUp: <><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></>,
-  Activity: <><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></>
+  Activity: <><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></>,
+  PieChart: <><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></>
 };
 
 const BREAKDOWN_LABELS = {
@@ -122,8 +123,8 @@ const BREAKDOWN_LABELS = {
   receptionRefusal: '受付拒否',
   picAbsent: '担当不在',
   picConnected: '本人接続',
-  requestInfo: '資料請求',
-  appt: 'アポ',
+  requests: '資料送付',
+  appts: 'アポ',
   outOfTarget: '対象外'
 };
 
@@ -140,13 +141,13 @@ const Icon = ({ p, size=24, color="currentColor", className="", strokeWidth=1.5 
 const NavButton = ({ active, onClick, icon, label }) => (
   <button 
     onClick={onClick} 
-    className={`flex flex-col items-center justify-center w-full h-16 transition-all duration-500 relative group`}
+    className={`flex flex-col items-center justify-center w-full h-16 transition-all duration-500 relative group flex-1`}
   >
-    <div className={`transition-all duration-500 z-10 ${active ? 'transform -translate-y-1' : 'opacity-60 group-hover:opacity-100'}`}>
-      <Icon p={icon} size={24} strokeWidth={active ? 2.5 : 1.5} color={active ? 'var(--primary)' : 'var(--text-muted)'} />
+    <div className={`transition-all duration-300 z-10 ${active ? 'transform -translate-y-0.5' : 'opacity-40 group-hover:opacity-70'}`}>
+      <Icon p={icon} size={22} strokeWidth={active ? 2.5 : 2} color={active ? '#4f46e5' : '#64748b'} />
     </div>
-    <span className={`text-[10px] font-bold mt-1 tracking-tighter transition-all duration-500 ${active ? 'text-indigo-600 opacity-100' : 'text-slate-400 opacity-0 h-0 overflow-hidden'}`}>{label}</span>
-    {active && <div className="absolute top-1 w-8 h-1 bg-indigo-500 rounded-full animate-in zoom-in-50 duration-500"></div>}
+    <span className={`text-[10px] font-black mt-1 tracking-tighter transition-all duration-300 ${active ? 'text-indigo-600 opacity-100' : 'text-slate-400 opacity-80'}`}>{label}</span>
+    {active && <div className="absolute top-1 w-8 h-1 bg-indigo-500 rounded-full shadow-[0_0_8px_rgba(79,70,229,0.4)] animate-in slide-in-from-top-1 duration-500"></div>}
   </button>
 );
 
@@ -362,79 +363,72 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
   });
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-1000">
-      {/* 達成目標・分析バナー */}
-      <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl -mr-20 -mt-20"></div>
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="bg-indigo-500 text-[10px] font-black px-2 py-1 rounded-md uppercase tracking-widest text-indigo-100">目標分析データ</span>
-              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-            </div>
-            <h2 className="text-3xl font-black tracking-tight mb-2">現在の個人目標アポ数</h2>
-            <p className="text-slate-400 text-sm font-medium">
-              全体残り {Math.max(0, (g.total.appts||0) - (totals.total.appts||0))}件 を {members.filter(m=>m.role==='apo').length}名で分割
-            </p>
-          </div>
-          <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/10 flex items-center gap-8">
-            <div className="text-center">
-              <div className="text-4xl font-black text-white">{predictionStats.individualTarget}</div>
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">1名あたりの目標</div>
-            </div>
-            <div className="w-px h-10 bg-white/10"></div>
-            <div className="text-center">
-              <div className="text-4xl font-black text-emerald-400">{(totals.total.appts / (g.total.appts || 1) * 100).toFixed(0)}%</div>
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">全体の進捗率</div>
-            </div>
-          </div>
+    <div className="space-y-10 animate-in fade-in duration-700">
+      {/* 1. 今週の個人目標と進捗 (TOP) */}
+      <section className="space-y-4">
+        <div className="flex justify-between items-end px-2">
+           <h2 className="text-2xl font-black flex items-center gap-3 text-slate-900">
+             <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Icon p={I.Target} size={20}/></div>
+             今週の個人目標・進捗状況
+           </h2>
+           <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl border border-slate-100">
+              <button onClick={() => shiftDate(-7, 'week')} className="p-2 hover:bg-white rounded-lg text-slate-400 transition-all"><Icon p={I.ChevronLeft} size={16}/></button>
+              <span className="text-[10px] font-black text-slate-600 px-2">{weekRangeString}</span>
+              <button onClick={() => shiftDate(7, 'week')} className="p-2 hover:bg-white rounded-lg text-slate-400 transition-all"><Icon p={I.ChevronRight} size={16}/></button>
+           </div>
         </div>
-      </div>
 
-      <div className="dashboard-grid no-print">
-        <GoalSection title="今週の" subTitle={`${weekRangeString} の稼働`} data={totals.weekly} goals={g.weekly} variant="indigo" 
-          headerAction={
-            <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-100">
-               <button onClick={() => shiftDate(-7, 'week')} className="p-2 hover:bg-white rounded-lg text-slate-400"><Icon p={I.ChevronLeft} size={16}/></button>
-               <input type="date" value={dateString} onChange={handleDateChange} className="bg-transparent text-xs font-bold text-slate-700 outline-none w-24 cursor-pointer" />
-               <button onClick={() => shiftDate(7, 'week')} className="p-2 hover:bg-white rounded-lg text-slate-400"><Icon p={I.ChevronRight} size={16}/></button>
-            </div>
-          }
-        />
-        <GoalSection title="全体の" subTitle={`終了予定日: ${event.date}`} data={totals.total} goals={g.total} variant="gold" />
-      </div>
-
-      {/* 架電状況・詳細分析 */}
-      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
-        <h3 className="text-xl font-bold mb-8 flex items-center gap-3 text-slate-800">
-          <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><Icon p={I.TrendingUp} size={20}/></div>
-          架電結果の状況（ファネル分析）
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-          {Object.entries(BREAKDOWN_LABELS).map(([key, label]) => (
-            <div key={key} className="p-5 rounded-3xl bg-slate-50 border border-slate-100 group hover:bg-white hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/10 transition-all duration-300">
-              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{label}</div>
-              <div className="text-2xl font-black text-slate-800 group-hover:text-indigo-600">{funnelData[key] || 0}</div>
-            </div>
-          ))}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {members.filter(m => m.role === 'apo').map(m => {
+            const stats = memberStats.find(s => s.id === m.id) || {};
+            const weeklyReps = eventReports.filter(r => {
+              if (!r.date || r.memberId !== m.id) return false;
+              const d = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
+              return d >= wr.start && d <= wr.end;
+            });
+            const w = {
+              appts: weeklyReps.reduce((s, r) => s + (Number(r.appts)||0), 0),
+              calls: weeklyReps.reduce((s, r) => s + (Number(r.calls)||0), 0),
+              requests: weeklyReps.reduce((s, r) => s + (Number(r.requests)||0), 0),
+            };
+            const target = event.individualWeeklyGoals?.[getMondayKey(currentBaseDate)]?.[m.id] || { appts: 0, calls: 0, requests: 0 };
+            
+            return (
+              <div key={m.id} className="premium-card p-6 border-l-4 border-indigo-500">
+                <div className="flex justify-between items-start mb-6">
+                  <div className="font-black text-lg text-slate-800">{m.name}</div>
+                  {w.appts >= target.appts && target.appts > 0 ? (
+                    <span className="bg-emerald-50 text-emerald-600 text-[8px] font-black px-2 py-1 rounded-full uppercase">目標達成中！</span>
+                  ) : (
+                    <span className="bg-slate-50 text-slate-400 text-[8px] font-black px-2 py-1 rounded-full uppercase">集計中</span>
+                  )}
+                </div>
+                <div className="space-y-4">
+                  <MetricBar label="今週のアポ" val={w.appts} tgt={target.appts} color="bg-emerald-500" small />
+                  <MetricBar label="今週の資料送付" val={w.requests} tgt={target.requests} color="bg-blue-500" small />
+                  <MetricBar label="今週の架電数" val={w.calls} tgt={target.calls} color="bg-slate-400" small />
+                </div>
+              </div>
+            );
+          })}
         </div>
-      </div>
+      </section>
 
-      {/* 個人別の達成予測 */}
+      {/* 2. 個人別の詳細予測分析 (MIDDLE TOP) */}
       <section className="space-y-6">
         <div className="flex justify-between items-end px-2">
            <h2 className="text-2xl font-black flex items-center gap-3 text-slate-900">
              <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><Icon p={I.Zap} size={20}/></div>
-             個人別の達成状況・予測
+             個人別の予測・改善指標
            </h2>
            <div className="flex bg-slate-100 p-1 rounded-xl">
               <button onClick={() => setFilterType('all')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${filterType==='all' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'}`}>全員</button>
-              <button onClick={() => setFilterType('apo')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${filterType==='apo' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'}`}>アポインターのみ</button>
+              <button onClick={() => setFilterType('apo')} className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all ${filterType==='apo' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-400'}`}>アポインター</button>
            </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredMembers.map((m, i) => (
+          {filteredMembers.map((m) => (
             <div key={m.id} className="premium-card p-8 group">
               <div className="flex justify-between items-start mb-8">
                 <div className="flex items-center gap-5">
@@ -444,8 +438,8 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
                   <div>
                     <h4 className="text-xl font-black text-slate-900 mb-1">{m.name}</h4>
                     <div className="flex items-center gap-3">
-                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${m.role==='closer'?'bg-amber-50 text-amber-600 font-sans':'bg-indigo-50 text-indigo-600 font-sans'}`}>{m.role==='closer'?'クローザー':'アポインター'}</span>
-                      <span className="text-[10px] text-slate-400 font-black tracking-wider uppercase">実績平均: {m.avgApptPerHour.toFixed(2)} 件/時</span>
+                      <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${m.role==='closer'?'bg-amber-50 text-amber-600':'bg-indigo-50 text-indigo-600'}`}>{m.role==='closer'?'クローザー':'アポインター'}</span>
+                      <span className="text-[10px] text-slate-400 font-black tracking-wider uppercase">CPH: {m.cph}</span>
                     </div>
                   </div>
                 </div>
@@ -453,28 +447,57 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
                   <div className={`text-2xl font-black ${Number(m.gap) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                     {Number(m.gap) > 0 ? `+${m.gap}` : m.gap}
                   </div>
-                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">目標との差分</div>
+                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">完遂までの差分</div>
                 </div>
               </div>
               
               <div className="grid grid-cols-3 gap-4 pt-6 border-t border-slate-50">
                 <div className="text-center p-3 bg-slate-50/50 rounded-2xl">
                   <div className="text-lg font-black text-slate-900 leading-none mb-2">{m.appts}</div>
-                  <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">現在の実績</div>
+                  <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">現在実績</div>
                 </div>
                 <div className="text-center p-3 bg-slate-50/50 rounded-2xl">
                   <div className="text-lg font-black text-slate-900 leading-none mb-2">{m.target}</div>
-                  <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">個人目標</div>
+                  <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">プロジェクト分配目標</div>
                 </div>
                 <div className="text-center p-3 bg-indigo-50/30 rounded-2xl border border-indigo-50">
                   <div className="text-lg font-black text-indigo-600 leading-none mb-2">{m.hoursNeeded}h</div>
-                  <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">達成に必要な時間</div>
+                  <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">完遂までの想定時間</div>
                 </div>
               </div>
             </div>
           ))}
         </div>
       </section>
+
+      {/* 3. 架電状況のファネル分析 (MIDDLE BOTTOM) */}
+      <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-48 h-48 bg-slate-50 rounded-full -mr-24 -mt-24 pointer-events-none"></div>
+        <h3 className="text-xl font-bold mb-8 flex items-center gap-3 text-slate-800 relative z-10">
+          <div className="p-2 bg-slate-900 text-white rounded-xl shadow-lg shadow-slate-200"><Icon p={I.TrendingUp} size={20}/></div>
+          架電結果の状況（全体ファネル）
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 relative z-10">
+          {Object.entries(BREAKDOWN_LABELS).map(([key, label]) => (
+            <div key={key} className="p-5 rounded-3xl bg-white border border-slate-50 group hover:border-indigo-200 hover:shadow-xl hover:shadow-indigo-500/10 transition-all duration-300">
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{label}</div>
+              <div className="text-2xl font-black text-slate-800 group-hover:text-indigo-600">{funnelData[key] || 0}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 4. プロジェクト全体目標 (BOTTOM) */}
+      <div className="space-y-6">
+        <h2 className="text-2xl font-black flex items-center gap-3 text-slate-900 px-2">
+          <div className="p-2 bg-amber-50 text-amber-600 rounded-xl"><Icon p={I.Trophy} size={20}/></div>
+          プロジェクト全体目標の進捗状況
+        </h2>
+        <div className="dashboard-grid no-print">
+          <GoalSection title="今週の" subTitle="全体進捗" data={totals.weekly} goals={g.weekly} variant="indigo" />
+          <GoalSection title="全体の" subTitle={`終了予定日: ${event.date}`} data={totals.total} goals={g.total} variant="gold" />
+        </div>
+      </div>
     </div>
   );
 };
@@ -830,6 +853,115 @@ const ShiftInputModal = ({ members, initialDate, onAdd, onClose }) => {
     </div>
   );
 };
+const AnalyticsView = ({ members, reports, event }) => {
+  const [selectedMemberId, setSelectedMemberId] = useState("all");
+  
+  const filteredReports = useMemo(() => {
+    return selectedMemberId === "all" ? reports : reports.filter(r => r.memberId === selectedMemberId);
+  }, [reports, selectedMemberId]);
+
+  const stats = useMemo(() => {
+    return filteredReports.reduce((acc, r) => ({
+      appts: acc.appts + (Number(r.appts)||0),
+      calls: acc.calls + (Number(r.calls)||0),
+      requests: acc.requests + (Number(r.requests)||0),
+      deals: acc.deals + (Number(r.deals)||0),
+    }), { appts: 0, calls: 0, requests: 0, deals: 0 });
+  }, [filteredReports]);
+
+  const ChartBar = ({ label, value, max, color }) => {
+    const height = max > 0 ? (value / max) * 100 : 0;
+    return (
+      <div className="flex flex-col items-center gap-2 flex-1">
+        <div className="flex-1 w-full bg-slate-50 rounded-2xl relative flex items-end overflow-hidden border border-slate-100">
+           <div className={`w-full ${color} rounded-t-lg transition-all duration-1000 animate-in slide-in-from-bottom-full`} style={{ height: `${height}%` }}>
+              <div className="absolute top-2 left-0 right-0 text-center text-[10px] font-black mix-blend-overlay">{value}</div>
+           </div>
+        </div>
+        <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter text-center h-8 flex items-center leading-tight">{label}</span>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-700 pb-20">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2">
+        <h2 className="text-2xl font-black flex items-center gap-3 text-slate-900">
+          <div className="p-2 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-100"><Icon p={I.PieChart} size={20}/></div>
+          データ詳細・可視化
+        </h2>
+        <select 
+          className="bg-white border border-slate-200 p-3 rounded-2xl font-bold text-slate-700 outline-none shadow-sm focus:ring-4 focus:ring-indigo-50"
+          value={selectedMemberId}
+          onChange={(e) => setSelectedMemberId(e.target.value)}
+        >
+          <option value="all">プロジェクト全体</option>
+          {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: '累計アポ', val: stats.appts, icon: I.Check, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: '累計資料送付', val: stats.requests, icon: I.FileText, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: '累計架電', val: stats.calls, icon: I.Phone, color: 'text-slate-600', bg: 'bg-slate-50' },
+          { label: '累計成約', val: stats.deals, icon: I.Trophy, color: 'text-amber-600', bg: 'bg-amber-50' },
+        ].map((item, i) => (
+          <div key={i} className="premium-card p-6 flex flex-col items-center justify-center text-center group">
+            <div className={`p-3 rounded-2xl ${item.bg} ${item.color} mb-3 group-hover:scale-110 transition-transform`}>
+              <Icon p={item.icon} size={24} />
+            </div>
+            <div className="text-2xl font-black text-slate-900">{item.val.toLocaleString()}</div>
+            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{item.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="premium-card p-8 space-y-8">
+        <div className="flex items-center justify-between">
+          <h3 className="font-black text-lg text-slate-800">重要KPIのボリューム</h3>
+          <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">累計ベース</span>
+        </div>
+        <div className="h-64 flex items-end gap-4 md:gap-8 px-4">
+          <ChartBar label="架電" value={stats.calls} max={Math.max(stats.calls * 1.2, 100)} color="bg-slate-400" />
+          <ChartBar label="本人接続" value={filteredReports.reduce((s,r)=>s+(Number(r.picConnected)||0),0)} max={stats.calls} color="bg-indigo-300" />
+          <ChartBar label="資料送付" value={stats.requests} max={stats.calls} color="bg-blue-500" />
+          <ChartBar label="アポ数" value={stats.appts} max={stats.calls} color="bg-emerald-500" />
+          <ChartBar label="成約数" value={stats.deals} max={stats.calls} color="bg-amber-500" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="premium-card p-8">
+          <h3 className="font-black text-lg text-slate-800 mb-6">生産性指標</h3>
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+               <span className="text-sm font-bold text-slate-500">アポ率 (架電比)</span>
+               <span className="text-xl font-black text-slate-900">{stats.calls > 0 ? ((stats.appts / stats.calls)*100).toFixed(1) : 0}%</span>
+            </div>
+            <div className="flex justify-between items-center">
+               <span className="text-sm font-bold text-slate-500">資料送付率 (架電比)</span>
+               <span className="text-xl font-black text-slate-900">{stats.calls > 0 ? ((stats.requests / stats.calls)*100).toFixed(1) : 0}%</span>
+            </div>
+            <div className="flex justify-between items-center">
+               <span className="text-sm font-bold text-slate-500">成約率 (アポ比)</span>
+               <span className="text-xl font-black text-slate-900">{stats.appts > 0 ? ((stats.deals / stats.appts)*100).toFixed(1) : 0}%</span>
+            </div>
+          </div>
+        </div>
+        <div className="premium-card p-8 bg-indigo-600 text-white relative overflow-hidden">
+          <div className="absolute bottom-0 right-0 w-32 h-32 bg-white/10 rounded-full -mb-10 -mr-10"></div>
+          <h3 className="font-black text-lg mb-6 relative z-10">アドバイス</h3>
+          <p className="text-indigo-100 text-sm leading-relaxed font-medium relative z-10">
+            {stats.appts > 20 ? "高い成果が出ています！このペースを維持しましょう。" : 
+             stats.calls > 100 ? "活動量は十分です。クロージングのトークを強化しましょう。" : 
+             "まずは架電数を増やすことに集中し、分母を大きくしましょう。"}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData = null }) {
   const today = toLocalDateString(new Date());
@@ -992,6 +1124,8 @@ function Settings({ events, currentEventId, onAddEvent, onDeleteEvent, onUpdateG
   const cur = events.find(e => e.id === currentEventId) || {};
   const [targetDate, setTargetDate] = useState(new Date()); 
   const [goals, setGoals] = useState({ total: {}, weekly: {} });
+  const [memberGoals, setMemberGoals] = useState({}); // { memberId: { appts, calls, requests } }
+  
   const [newEventName, setNewEventName] = useState("");
   const [newEventDate, setNewEventDate] = useState("");
   const [newMem, setNewMem] = useState("");
@@ -1002,21 +1136,29 @@ function Settings({ events, currentEventId, onAddEvent, onDeleteEvent, onUpdateG
   useEffect(() => {
     if (cur.goals) {
       const specificWeeklyGoal = cur.weeklyGoals?.[targetWeekKey] || cur.goals.weekly || {};
+      const individualWeeklyGoal = cur.individualWeeklyGoals?.[targetWeekKey] || {};
       setGoals({
         total: cur.goals.total || {},
         weekly: specificWeeklyGoal
       });
+      setMemberGoals(individualWeeklyGoal);
     }
   }, [cur, targetWeekKey]);
 
   const saveGoals = () => { 
     if (currentEventId) { 
       onUpdateGoals(currentEventId, { ...cur.goals, total: goals.total });
-      onUpdateWeeklyGoals(currentEventId, targetWeekKey, goals.weekly);
-      alert(`${getWeekRange(targetDate).start.toLocaleDateString()} の週の目標を保存しました。`); 
+      onUpdateWeeklyGoals(currentEventId, targetWeekKey, goals.weekly, memberGoals);
+      alert(`${getWeekRange(targetDate).start.toLocaleDateString()} の週の目標（個別目標含む）を保存しました。`); 
     } 
   };
   const updateGoalVal = (type, key, val) => { setGoals(prev => ({ ...prev, [type]: { ...prev[type], [key]: Number(val) } })); };
+  const updateIndividualGoalVal = (memberId, key, val) => {
+    setMemberGoals(prev => ({
+      ...prev,
+      [memberId]: { ...(prev[memberId] || {}), [key]: Number(val) }
+    }));
+  };
   const shiftWeek = (days) => { const newDate = new Date(targetDate); newDate.setDate(newDate.getDate() + days); setTargetDate(newDate); };
   const wr = getWeekRange(targetDate);
   const weekRangeLabel = `${wr.start.getMonth()+1}/${wr.start.getDate()} - ${wr.end.getMonth()+1}/${wr.end.getDate()}`;
@@ -1108,6 +1250,33 @@ function Settings({ events, currentEventId, onAddEvent, onDeleteEvent, onUpdateG
                 <GoalRow label="成約数" val={goals.weekly?.deals} set={v=>updateGoalVal('weekly','deals',v)} />
                 <GoalRow label="架電数" val={goals.weekly?.calls} set={v=>updateGoalVal('weekly','calls',v)} />
                 <GoalRow label="商談数" val={goals.weekly?.meetings} set={v=>updateGoalVal('weekly','meetings',v)} />
+              </div>
+            </div>
+            <div className="space-y-6 pt-4 border-t border-slate-50">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">メンバー別 週間個別目標</label>
+              <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                {members.filter(m => m.role !== 'closer').map(m => (
+                  <div key={m.id} className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 space-y-3">
+                    <div className="flex items-center gap-2">
+                       <div className="w-2 h-2 rounded-full bg-indigo-500"></div>
+                       <span className="text-xs font-black text-slate-700">{m.name}</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-bold text-slate-400 uppercase ml-1">架電</label>
+                        <input type="number" className="w-full bg-white border border-slate-100 rounded-lg p-2 text-xs font-bold text-center outline-none" value={memberGoals[m.id]?.calls || 0} onChange={e=>updateIndividualGoalVal(m.id, 'calls', e.target.value)} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-bold text-slate-400 uppercase ml-1">資料</label>
+                        <input type="number" className="w-full bg-white border border-slate-100 rounded-lg p-2 text-xs font-bold text-center outline-none" value={memberGoals[m.id]?.requests || 0} onChange={e=>updateIndividualGoalVal(m.id, 'requests', e.target.value)} />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-bold text-slate-400 uppercase ml-1">アポ</label>
+                        <input type="number" className="w-full bg-white border border-slate-100 rounded-lg p-2 text-xs font-bold text-center outline-none" value={memberGoals[m.id]?.appts || 0} onChange={e=>updateIndividualGoalVal(m.id, 'appts', e.target.value)} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -1206,11 +1375,13 @@ function App() {
     setEvents(events.map(e => e.id === eventId ? { ...e, goals: newGoals } : e));
   };
   
-  const updateEventWeeklyGoals = async (eventId, weekKey, weeklyGoal) => {
-    const fieldPath = `weeklyGoals.${weekKey}`;
+  const updateEventWeeklyGoals = async (eventId, weekKey, weeklyGoal, individualGoal) => {
+    const weeklyPath = `weeklyGoals.${weekKey}`;
+    const individualPath = `individualWeeklyGoals.${weekKey}`;
     if (db && user) {
       await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', eventId), {
-        [fieldPath]: weeklyGoal
+        [weeklyPath]: weeklyGoal,
+        [individualPath]: individualGoal
       });
     }
   };
@@ -1342,6 +1513,7 @@ function App() {
           {activeTab === 'dashboard' && (<div className="no-print"><Dashboard event={currentEvent} totals={totals} memberStats={memberStats} currentBaseDate={currentBaseDate} setCurrentBaseDate={setCurrentBaseDate} activeWeeklyGoals={activeWeeklyGoals} eventReports={eventReports} members={members} /></div>)}
           {activeTab === 'attendance' && (<AttendanceView members={members} reports={eventReports} onEdit={(report) => setEditingReport(report)} />)}
           {activeTab === 'shift' && (<div className="no-print"><ShiftView members={members} shifts={shifts} onDeleteShift={deleteShift} onAddShift={addShift} /></div>)}
+          {activeTab === 'analytics' && (<div className="no-print"><AnalyticsView members={members} reports={eventReports} event={currentEvent} /></div>)}
           {activeTab === 'settings' && (<div className="no-print"><Settings events={events} currentEventId={currentEventId} onAddEvent={addEvent} onDeleteEvent={deleteEvent} onUpdateGoals={updateEventGoals} onUpdateWeeklyGoals={updateEventWeeklyGoals} members={members} onAddMember={addMember} onDelMember={deleteMember} onClose={() => setActiveTab('dashboard')} /></div>)}
         </div>
         {activeTab !== 'settings' && (<div className="fixed bottom-24 right-6 z-30 md:bottom-10 md:right-10 no-print"><button onClick={() => setShowInput(true)} className="bg-indigo-600 text-white p-4 rounded-full shadow-xl shadow-indigo-500/40 hover:scale-110 active:scale-95 transition-all border-4 border-white"><Icon p={I.Plus} size={28} /></button></div>)}
@@ -1350,6 +1522,7 @@ function App() {
           <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={I.Briefcase} label="ホーム" />
           <NavButton active={activeTab === 'attendance'} onClick={() => setActiveTab('attendance')} icon={I.Clock} label="稼働管理" />
           <NavButton active={activeTab === 'shift'} onClick={() => setActiveTab('shift')} icon={I.Calendar} label="シフト" />
+          <NavButton active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} icon={I.PieChart} label="データ分析" />
           <NavButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={I.Settings} label="設定" />
         </nav>
       </div>
