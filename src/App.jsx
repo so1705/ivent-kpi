@@ -481,6 +481,7 @@ const Dashboard = ({ event, totals, memberStats, currentBaseDate, setCurrentBase
       </section>
     </div>
   );
+};
 
 const AttendanceView = ({ members, reports, onEdit }) => {
 
@@ -1361,4 +1362,4 @@ function App() {
   );
 }
 
-export default App;
+export default App;
