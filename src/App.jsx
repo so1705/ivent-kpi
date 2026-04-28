@@ -250,7 +250,7 @@ const MainMetric = ({ label, icon, current, target }) => {
 
 const CustomChart = ({ data, color, type = 'area' }) => {
   if (!data || data.length === 0) return <div className="h-full flex items-center justify-center text-slate-300 font-bold text-xs uppercase tracking-widest">データがありません</div>;
-  const max = Math.max(...data.map(d => d.value), 1); // Prevent division by zero
+  const max = Math.max(...data.map(d => d.value), 1); 
   const points = data.map((d, i) => `${(i / (data.length - 1)) * 100},${100 - (d.value / max) * 100}`).join(' ');
   const areaPoints = `${points} 100,100 0,100`;
 
@@ -287,7 +287,8 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
         appts: acc.appts + (Number(r.appts) || 0),
         calls: acc.calls + (Number(r.calls) || 0),
         picConnected: acc.picConnected + (Number(r.picConnected) || 0),
-     }), { appts: 0, calls: 0, picConnected: 0 });
+        hours: acc.hours + (Number(r.hours) || 0),
+     }), { appts: 0, calls: 0, picConnected: 0, hours: 0 });
   }, [myReports]);
 
   const activeWeeklyGoals = event.weeklyGoals?.[getMondayKey(currentBaseDate)] || event.goals?.weekly || {};
@@ -311,107 +312,146 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
        </div>
 
        {viewMode === 'personal' ? (
-                <div className="space-y-10">
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <div className="space-y-6">
-                         <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
-                           <div className="w-1.5 h-4 bg-blue-600 rounded-full"></div> 主要目標
-                         </h3>
-                         <MainMetric label="週間アポイント数" icon={I.Target} current={myTotals.appts} target={activeIndivGoals.appts} />
-                         <button onClick={()=>setEditingGoal(activeIndivGoals)} className="w-full py-4 bg-white border border-slate-200 text-slate-500 rounded-2xl text-[11px] font-bold hover:bg-slate-50 transition-all">数値を調整する</button>
-                      </div>
-                      <div className="space-y-6">
-                         <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
-                           <div className="w-1.5 h-4 bg-slate-300 rounded-full"></div> 効率解析
-                         </h3>
-                         <div className="flex flex-col gap-10 p-10 bg-white border border-slate-100 rounded-[2rem] shadow-sm">
-                            <MetricBar label="接続率 (架電比)" val={myTotals.picConnected} tgt={myTotals.calls} />
-                            <MetricBar label="アポ率 (接続比)" val={myTotals.appts} tgt={myTotals.picConnected} />
-                         </div>
-                      </div>
-                   </div>
-                </div>
-             ) : (
-                <div className="space-y-12">
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                      <div className="space-y-6">
-                         <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
-                           <div className="w-1.5 h-4 bg-blue-600 rounded-full"></div> チーム目標
-                         </h3>
-                         <MainMetric label="全社アポイント獲得数" icon={I.Check} current={totals.weekly.appts} target={activeWeeklyGoals.appts} />
-                      </div>
-                      <div className="space-y-6">
-                         <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
-                           <div className="w-1.5 h-4 bg-slate-300 rounded-full"></div> 全体効率
-                         </h3>
-                         <div className="flex flex-col gap-10 p-10 bg-white border border-slate-100 rounded-[3rem] shadow-sm">
-                            <MetricBar label="全体接続率" val={totals.weekly.picConnected} tgt={totals.weekly.calls} />
-                            <MetricBar label="全体アポ率" val={totals.weekly.appts} tgt={totals.weekly.picConnected} />
-                         </div>
-                      </div>
-                   </div>
+                 <div className="space-y-10">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                       <div className="space-y-6">
+                          <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                            <div className="w-1.5 h-4 bg-blue-600 rounded-full"></div> 主要目標 (週間)
+                          </h3>
+                          <MainMetric label="アポイント獲得数" icon={I.Target} current={myTotals.appts} target={activeIndivGoals.appts} />
+                          <button onClick={()=>setEditingGoal(activeIndivGoals)} className="w-full py-4 bg-white border border-slate-200 text-slate-500 rounded-2xl text-[11px] font-bold hover:bg-slate-50 transition-all">目標数値を調整する</button>
+                       </div>
+                       <div className="space-y-6">
+                          <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                            <div className="w-1.5 h-4 bg-slate-300 rounded-full"></div> 稼働効率解析
+                          </h3>
+                          <div className="flex flex-col gap-10 p-10 bg-white border border-slate-100 rounded-[2rem] shadow-sm">
+                             <div className="grid grid-cols-2 gap-4">
+                                <div className="p-4 bg-slate-50 rounded-xl">
+                                   <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">累計架電数</div>
+                                   <div className="text-2xl font-black">{myTotals.calls}</div>
+                                </div>
+                                <div className="p-4 bg-slate-50 rounded-xl">
+                                   <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">1hあたり(CPH)</div>
+                                   <div className="text-2xl font-black text-blue-600">{(myTotals.calls / (myTotals.hours || 1)).toFixed(1)}</div>
+                                </div>
+                             </div>
+                             <MetricBar label="接続率 (架電比)" val={myTotals.picConnected} tgt={myTotals.calls} />
+                             <MetricBar label="アポ率 (接続比)" val={myTotals.appts} tgt={myTotals.picConnected} />
+                          </div>
+                       </div>
+                    </div>
+                 </div>
+              ) : (
+                 <div className="space-y-12">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                       <div className="space-y-6">
+                          <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                            <div className="w-1.5 h-4 bg-blue-600 rounded-full"></div> チーム目標
+                          </h3>
+                          <MainMetric label="全社アポイント獲得数" icon={I.Check} current={totals.weekly.appts} target={activeWeeklyGoals.appts} />
+                       </div>
+                       <div className="space-y-6">
+                          <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                            <div className="w-1.5 h-4 bg-slate-300 rounded-full"></div> 全体効率
+                          </h3>
+                          <div className="flex flex-col gap-10 p-10 bg-white border border-slate-100 rounded-[3rem] shadow-sm">
+                             <MetricBar label="全体接続率" val={totals.weekly.picConnected} tgt={totals.weekly.calls} />
+                             <MetricBar label="全体アポ率" val={totals.weekly.appts} tgt={totals.weekly.picConnected} />
+                          </div>
+                       </div>
+                    </div>
 
-                   <div className="bg-white border border-slate-100 rounded-[2.5rem] shadow-sm overflow-hidden">
-                      <div className="p-6 bg-slate-50 border-b border-slate-100 text-xs font-black flex items-center justify-between text-slate-600 uppercase tracking-widest">
-                         <span className="flex items-center gap-3"><Icon p={I.Users} size={16}/> メンバー別パフォーマンス</span>
-                      </div>
-                      <div className="divide-y divide-slate-50">
-                         {members.map(m => {
-                            const stats = memberStats.find(s=>s.id===m.id);
-                            return (
-                              <button key={m.id} onClick={()=>setDrilldownMember(m)} className="w-full p-8 flex items-center justify-between hover:bg-slate-50 transition-all text-left group">
-                                 <div className="flex items-center gap-6">
-                                    <div className={`w-14 h-14 rounded-2xl ${m.role==='closer'?'bg-amber-400':'bg-blue-600'} text-white flex items-center justify-center font-black text-lg shadow-sm group-hover:scale-105 transition-transform`}>{m.name.slice(0,1)}</div>
-                                    <div>
-                                       <div className="font-bold text-xl text-slate-900 leading-tight">{m.name}</div>
-                                       <div className="text-[10px] font-bold text-slate-400 mt-1">¥{m.hourlyWage.toLocaleString()} / 時間</div>
-                                    </div>
-                                 </div>
-                                 <div className="flex items-center gap-10">
-                                    <div className="text-right">
-                                       <div className="text-[10px] font-black text-slate-200 uppercase tracking-widest">獲得数</div>
-                                       <div className="text-4xl font-black text-slate-900 tabular-nums">{stats?.appts || 0}</div>
-                                    </div>
-                                    <div className="p-3 bg-slate-50 rounded-2xl text-slate-200 group-hover:bg-blue-600 group-hover:text-white transition-colors"><Icon p={I.ChevronRight} size={20}/></div>
-                                 </div>
-                              </button>
-                            );
-                         })}
-                      </div>
-                   </div>
-                </div>
-             )}
+                    <div className="bg-white border border-slate-100 rounded-[2.5rem] shadow-sm overflow-hidden">
+                       <div className="p-6 bg-slate-50 border-b border-slate-100 text-xs font-black flex items-center justify-between text-slate-600 uppercase tracking-widest">
+                          <span className="flex items-center gap-3"><Icon p={I.Users} size={16}/> メンバー別パフォーマンス詳細</span>
+                          <span className="text-[10px] text-slate-400">CPH順にソート</span>
+                       </div>
+                       <div className="divide-y divide-slate-50 overflow-x-auto">
+                          <table className="w-full text-left border-collapse min-w-[600px]">
+                             <thead className="bg-slate-50/50">
+                                <tr className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">
+                                   <th className="p-6">氏名</th>
+                                   <th className="p-6">架電数</th>
+                                   <th className="p-6">本人接続</th>
+                                   <th className="p-6">資料請求</th>
+                                   <th className="p-6 text-blue-600">アポ</th>
+                                   <th className="p-6">1h効率</th>
+                                   <th className="p-6 text-right">詳細</th>
+                                </tr>
+                             </thead>
+                             <tbody className="divide-y divide-slate-50">
+                                {memberStats.map(m => (
+                                   <tr key={m.id} onClick={()=>setDrilldownMember(m)} className="hover:bg-slate-50 transition-all cursor-pointer group">
+                                      <td className="p-6">
+                                         <div className="flex items-center gap-4">
+                                            <div className={`w-10 h-10 rounded-xl ${m.role==='closer'?'bg-amber-400':'bg-blue-600'} text-white flex items-center justify-center font-black text-sm shadow-sm`}>{m.name.slice(0,1)}</div>
+                                            <div className="font-bold text-slate-900">{m.name}</div>
+                                         </div>
+                                      </td>
+                                      <td className="p-6 font-bold tabular-nums text-slate-600">{m.calls}</td>
+                                      <td className="p-6 font-bold tabular-nums text-slate-600">{m.picConnected}</td>
+                                      <td className="p-6 font-bold tabular-nums text-slate-600">{m.requests}</td>
+                                      <td className="p-6 font-black tabular-nums text-blue-600 text-lg">{m.appts}</td>
+                                      <td className="p-6">
+                                         <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg font-black tabular-nums">{m.cph} <span className="text-[8px]">c/h</span></span>
+                                      </td>
+                                      <td className="p-6 text-right">
+                                         <div className="inline-flex p-2 bg-slate-50 rounded-xl text-slate-200 group-hover:bg-blue-600 group-hover:text-white transition-colors"><Icon p={I.ChevronRight} size={16}/></div>
+                                      </td>
+                                   </tr>
+                                ))}
+                             </tbody>
+                          </table>
+                       </div>
+                    </div>
+                 </div>
+              )}
 
        {drilldownMember && (
-         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/95 p-4 backdrop-blur-xl">
-            <div className="bg-white w-full max-w-sm p-10 space-y-10 border-4 border-slate-900 rounded-3xl shadow-2xl overflow-y-auto max-h-[90vh]">
-               <div className="flex justify-between items-center border-b-2 border-slate-900 pb-6">
-                  <div>
-                    <h3 className="text-2xl font-black text-slate-900">{drilldownMember.name} 氏</h3>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{drilldownMember.role}</p>
-                  </div>
-                  <button onClick={()=>setDrilldownMember(null)} className="p-2 border border-slate-200 rounded-full"><Icon p={I.X}/></button>
-               </div>
-               <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
-                     <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">架電数</div>
-                     <div className="text-xl font-black">{memberStats.find(s=>s.id===drilldownMember.id)?.calls || 0}</div>
-                  </div>
-                  <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
-                     <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">アポ</div>
-                     <div className="text-xl font-black text-blue-600">{memberStats.find(s=>s.id===drilldownMember.id)?.appts || 0}</div>
-                  </div>
-               </div>
-               <div className="bg-slate-900 p-8 text-white relative rounded-3xl">
-                  <Icon p={I.Zap} className="absolute top-2 right-2 opacity-10" />
-                  <h4 className="text-[10px] font-bold text-slate-500 uppercase mb-4">個別AI分析</h4>
-                  <p className="text-xs leading-relaxed font-bold">
-                     切り返しのタイミングに迷いが見られる。冒頭の5秒をプロとして支配せよ。数字は嘘をつかない。
-                  </p>
-               </div>
-               <button onClick={()=>setDrilldownMember(null)} className="w-full bg-slate-900 text-white py-4 font-bold rounded-2xl">閉じる</button>
-            </div>
-         </div>
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/95 p-4 backdrop-blur-xl">
+             <div className="bg-white w-full max-w-md p-10 space-y-10 border-4 border-slate-900 rounded-[2.5rem] shadow-2xl overflow-y-auto max-h-[90vh]">
+                <div className="flex justify-between items-center border-b-2 border-slate-900 pb-6">
+                   <div className="flex items-center gap-4">
+                     <div className="w-16 h-16 bg-slate-900 text-white rounded-2xl flex items-center justify-center text-2xl font-black">{drilldownMember.name.slice(0,1)}</div>
+                     <div>
+                       <h3 className="text-2xl font-black text-slate-900">{drilldownMember.name} 氏</h3>
+                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{drilldownMember.role} • 1h/¥{drilldownMember.hourlyWage.toLocaleString()}</p>
+                     </div>
+                   </div>
+                   <button onClick={()=>setDrilldownMember(null)} className="p-3 border-2 border-slate-100 rounded-2xl hover:bg-slate-50 transition-all"><Icon p={I.X}/></button>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                   {[
+                     { label: '架電数', val: drilldownMember.calls, color: 'text-slate-900' },
+                     { label: '本人接続', val: drilldownMember.picConnected, color: 'text-slate-900' },
+                     { label: '資料請求', val: drilldownMember.requests, color: 'text-slate-900' },
+                     { label: 'アポ獲得', val: drilldownMember.appts, color: 'text-blue-600' },
+                     { label: '1h効率(CPH)', val: drilldownMember.cph, color: 'text-emerald-600' },
+                     { label: '稼働時間', val: `${drilldownMember.hours}H`, color: 'text-slate-400' },
+                   ].map(stat => (
+                      <div key={stat.label} className="p-5 bg-slate-50 border border-slate-100 rounded-3xl">
+                         <div className="text-[10px] font-black text-slate-400 uppercase mb-1">{stat.label}</div>
+                         <div className={`text-2xl font-black ${stat.color} tabular-nums`}>{stat.val}</div>
+                      </div>
+                   ))}
+                </div>
+
+                <div className="bg-slate-900 p-8 text-white relative rounded-[2rem] overflow-hidden">
+                   <div className="absolute top-0 right-0 p-4 opacity-5"><Icon p={I.Zap} size={80} /></div>
+                   <h4 className="text-[10px] font-bold text-blue-400 uppercase mb-4 tracking-widest">個別戦略アドバイス</h4>
+                   <div className="text-sm leading-relaxed font-bold">
+                      {getAIAdvice({
+                        calls: drilldownMember.calls,
+                        appts: drilldownMember.appts,
+                        picConnected: drilldownMember.picConnected
+                      }, true)}
+                   </div>
+                </div>
+                <button onClick={()=>setDrilldownMember(null)} className="w-full bg-slate-900 text-white py-5 font-black rounded-[2rem] shadow-xl hover:bg-black transition-all">統計を閉じる</button>
+             </div>
+          </div>
        )}
 
        {editingGoal && (
@@ -503,11 +543,9 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift }) => {
     const last = new Date(y, m + 1, 0);
     
     const days = [];
-    // Pad start of month
     for (let i = 0; i < first.getDay(); i++) {
       days.push(null);
     }
-    // Actual days
     for (let i = 1; i <= last.getDate(); i++) {
       days.push(toLocalDateString(new Date(y, m, i)));
     }
@@ -541,41 +579,58 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift }) => {
 
        {viewMode === 'month' ? (
          <div className="space-y-6">
-           <div className="p-6 bg-white border border-slate-200 shadow-sm rounded-3xl">
-              <div className="grid grid-cols-7 gap-2 mb-4 border-b border-slate-100 pb-4">
-                 {['日','月','火','水','木','金','土'].map((d, i) => <div key={d} className={`text-center text-[10px] font-black uppercase ${i===0?'text-rose-500':i===6?'text-blue-500':'text-slate-400'}`}>{d}</div>)}
+           <div className="p-10 bg-white border border-slate-200 shadow-xl rounded-[2.5rem]">
+              <div className="grid grid-cols-7 gap-px bg-slate-100 border border-slate-100 rounded-2xl overflow-hidden">
+                 {['日','月','火','水','木','金','土'].map((d, i) => (
+                    <div key={d} className={`bg-slate-50/50 p-4 text-center text-xs font-black uppercase ${i===0?'text-rose-500':i===6?'text-blue-500':'text-slate-400'}`}>{d}</div>
+                 ))}
                  {calendarData.map((d, i) => {
-                   if (!d) return <div key={`empty-${i}`} className="aspect-square" />;
+                   if (!d) return <div key={`empty-${i}`} className="bg-white aspect-[4/3]" />;
                    const dayShifts = displayShifts.filter(s => s.date === d);
                    const isSelected = d === selectedDate;
                    const isToday = d === toLocalDateString(new Date());
                    return (
-                     <button key={d} onClick={() => setSelectedDate(d)} className={`aspect-square flex flex-col items-center justify-center rounded-2xl transition-all relative ${isSelected ? 'bg-slate-900 text-white shadow-lg scale-110 z-10' : 'bg-slate-50 hover:bg-slate-100 border border-slate-100 text-slate-700'}`}>
-                       <span className={`text-xs font-black ${isSelected?'text-white':isToday?'text-blue-600':''}`}>{d.split('-')[2]}</span>
-                       {dayShifts.length > 0 && <div className={`absolute bottom-2 flex gap-0.5`}>{dayShifts.slice(0,3).map((_, i) => <div key={i} className={`w-1 h-1 rounded-full ${isSelected?'bg-white':'bg-emerald-500'}`}></div>)}{dayShifts.length > 3 && <div className={`w-1 h-1 rounded-full ${isSelected?'bg-white':'bg-emerald-500'}`}></div>}</div>}
+                     <button key={d} onClick={() => setSelectedDate(d)} className={`bg-white aspect-[4/3] p-2 flex flex-col items-start justify-start transition-all relative border-t border-l border-slate-50 hover:bg-blue-50 group ${isSelected ? 'ring-2 ring-inset ring-blue-600 z-10 bg-blue-50/30' : ''}`}>
+                       <span className={`text-sm font-black mb-1 ${isSelected?'text-blue-600':isToday?'bg-blue-600 text-white px-2 rounded-full':''}`}>{d.split('-')[2]}</span>
+                       <div className="w-full space-y-1">
+                          {dayShifts.slice(0, 3).map((s, idx) => {
+                             const m = members.find(mem=>mem.id===s.memberId);
+                             return <div key={idx} className="text-[8px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded truncate w-full">{m?.name}</div>
+                          })}
+                          {dayShifts.length > 3 && <div className="text-[8px] font-bold text-slate-300 pl-1">他 {dayShifts.length - 3} 名...</div>}
+                       </div>
                      </button>
                    );
                  })}
               </div>
            </div>
 
-           <div className="bg-white border border-slate-200 shadow-sm rounded-3xl overflow-hidden p-6">
-              <h3 className="text-sm font-black text-slate-800 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2"><Icon p={I.Calendar} size={16}/> {selectedDate.split('-')[1]}月{selectedDate.split('-')[2]}日のシフト配置</h3>
+           <div className="bg-white border border-slate-200 shadow-xl rounded-[2.5rem] overflow-hidden">
+              <div className="p-8 border-b border-slate-100 flex items-center justify-between">
+                 <h3 className="text-xl font-black text-slate-900 flex items-center gap-4"><div className="p-3 bg-blue-600 text-white rounded-xl shadow-lg"><Icon p={I.Calendar} size={20}/></div> {selectedDate.split('-')[1]}月{selectedDate.split('-')[2]}日のシフト詳細</h3>
+                 <span className="px-4 py-2 bg-slate-50 rounded-full text-xs font-black text-slate-400 uppercase tracking-widest">{selectedDateShifts.length} 名のスタッフが予定</span>
+              </div>
               {selectedDateShifts.length === 0 ? (
-                 <div className="text-center py-8 text-slate-400 font-bold text-xs">この日のシフト登録はありません</div>
+                 <div className="text-center py-20 text-slate-400 font-bold text-sm">この日のシフト登録はありません。右下の＋ボタンから登録してください。</div>
               ) : (
-                 <div className="space-y-px bg-slate-100 border border-slate-100 rounded-2xl overflow-hidden">
+                 <div className="divide-y divide-slate-50">
                     {selectedDateShifts.map(s => {
                       const m = members.find(mem=>mem.id===s.memberId);
                       return (
-                        <div key={s.id} className="flex items-center justify-between p-4 bg-white hover:bg-slate-50 transition-colors group">
-                          <div className="flex items-center gap-4">
-                             <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs">{m?.name?.slice(0,1)}</div>
-                             <span className="font-bold text-slate-900 text-sm">{m?.name}</span>
-                          </div>
+                        <div key={s.id} className="flex items-center justify-between p-8 bg-white hover:bg-slate-50 transition-colors group">
                           <div className="flex items-center gap-6">
-                             <span className="text-blue-600 bg-blue-50 px-3 py-1 rounded-full font-black text-xs">{s.startTime} - {s.endTime}</span>
-                             <button onClick={()=>{if(window.confirm('削除しますか？')) onDeleteShift(s.id)}} className="text-slate-200 hover:text-rose-600 transition-colors"><Icon p={I.Trash} size={16}/></button>
+                             <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-lg shadow-sm">{m?.name?.slice(0,1)}</div>
+                             <div>
+                                <div className="font-black text-slate-900 text-lg leading-tight">{m?.name}</div>
+                                <div className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{m?.role}</div>
+                             </div>
+                          </div>
+                          <div className="flex items-center gap-10">
+                             <div className="text-right">
+                                <div className="text-[10px] font-bold text-slate-300 uppercase mb-1">勤務時間</div>
+                                <div className="text-xl font-black text-blue-600 tabular-nums">{s.startTime} - {s.endTime}</div>
+                             </div>
+                             <button onClick={()=>{if(window.confirm('このシフトを削除しますか？')) onDeleteShift(s.id)}} className="p-3 text-slate-200 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all"><Icon p={I.Trash} size={20}/></button>
                           </div>
                         </div>
                       );
@@ -648,6 +703,7 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift }) => {
 const AnalyticsView = ({ members, reports, event }) => {
   const [selectedMid, setSelectedMid] = useState('all');
   const [chartType, setChartType] = useState('line');
+  const [chartMetric, setChartMetric] = useState('appts'); 
   
   const fReports = useMemo(() => {
     return reports.filter(r => {
@@ -671,32 +727,49 @@ const AnalyticsView = ({ members, reports, event }) => {
     fReports.forEach(r => {
       if (!r.date) return;
       const d = toLocalDateString(r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000)).slice(-5);
-      map[d] = (map[d] || 0) + (Number(r.appts) || 0);
+      map[d] = (map[d] || 0) + (Number(r[chartMetric]) || 0);
     });
-    return Object.entries(map).map(([day, value]) => ({ day, value })).sort((a,b)=>a.day.localeCompare(b.day)).slice(-7);
-  }, [fReports]);
+    return Object.entries(map).map(([day, value]) => ({ day, value })).sort((a,b)=>a.day.localeCompare(b.day)).slice(-14); 
+  }, [fReports, chartMetric]);
+
+  const metricLabels = {
+    calls: '架電数',
+    appts: 'アポ獲得数',
+    requests: '資料請求数',
+    picConnected: '本人接続数'
+  };
 
   return (
     <div className="space-y-10 pb-28">
-       <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4">
-          <h2 className="text-xl font-black flex items-center gap-3"><Icon p={I.PieChart} size={20}/> プロジェクト分析</h2>
-          <select className="bg-white border border-slate-300 p-2 font-bold text-xs outline-none rounded-xl" value={selectedMid} onChange={e=>setSelectedMid(e.target.value)}>
-             <option value="all">チーム全体の状態を見る</option>
+       <div className="flex flex-col md:flex-row md:items-center justify-between border-b-2 border-slate-900 pb-4 gap-4">
+          <h2 className="text-xl font-black flex items-center gap-3"><Icon p={I.PieChart} size={20}/> プロジェクト多角分析</h2>
+          <select className="bg-white border border-slate-300 p-2 px-4 font-bold text-xs outline-none rounded-xl shadow-sm" value={selectedMid} onChange={e=>setSelectedMid(e.target.value)}>
+             <option value="all">チーム全体の推移を表示</option>
              {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
        </div>
 
-       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-          <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-8 flex flex-col">
-             <div className="flex items-center justify-between">
-                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">週間獲得トレンド</h3>
-                <div className="flex bg-slate-100 p-1 rounded-lg gap-1">
-                   <button onClick={()=>setChartType('line')} className={`px-3 py-1 text-[9px] font-bold rounded-md transition-all ${chartType==='line'?'bg-white shadow text-blue-600':'text-slate-400'}`}>折れ線</button>
-                   <button onClick={()=>setChartType('area')} className={`px-3 py-1 text-[9px] font-bold rounded-md transition-all ${chartType==='area'?'bg-white shadow text-blue-600':'text-slate-400'}`}>エリア</button>
-                </div>
+       <div className="bg-white p-8 md:p-12 rounded-[3rem] border border-slate-100 shadow-xl space-y-10">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+             <div className="space-y-1">
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">トレンド・パフォーマンス・モニタリング</h3>
+                <div className="text-3xl font-black text-slate-900">{metricLabels[chartMetric]}の推移</div>
              </div>
-             <div className="flex-1 min-h-[200px] w-full"><CustomChart data={dailyTrend} color="#4f46e5" type={chartType} /></div>
+             <div className="flex flex-wrap bg-slate-100 p-1.5 rounded-2xl gap-1">
+                {['appts', 'calls', 'requests'].map(m => (
+                   <button key={m} onClick={()=>setChartMetric(m)} className={`px-5 py-2.5 text-[10px] font-black rounded-xl transition-all ${chartMetric===m?'bg-white shadow-md text-blue-600':'text-slate-400 hover:text-slate-600'}`}>{metricLabels[m]}</button>
+                ))}
+                <div className="w-px h-6 bg-slate-200 mx-1 self-center"></div>
+                <button onClick={()=>setChartType('line')} className={`px-5 py-2.5 text-[10px] font-black rounded-xl transition-all ${chartType==='line'?'bg-blue-600 text-white shadow-md':'text-slate-400 hover:text-slate-600'}`}>折れ線</button>
+                <button onClick={()=>setChartType('area')} className={`px-5 py-2.5 text-[10px] font-black rounded-xl transition-all ${chartType==='area'?'bg-blue-600 text-white shadow-md':'text-slate-400 hover:text-slate-600'}`}>エリア</button>
+             </div>
           </div>
+          <div className="h-[400px] w-full min-w-full">
+             <CustomChart data={dailyTrend} color={chartMetric==='appts'?'#4f46e5':chartMetric==='calls'?'#0ea5e9':'#10b981'} type={chartType} />
+          </div>
+       </div>
+
+       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
           <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-10">
              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">転換・効率（CVR）</h3>
              <div className="space-y-10">
@@ -704,24 +777,24 @@ const AnalyticsView = ({ members, reports, event }) => {
                 <MetricBar label="アポ率 (接続比)" val={stats.appts} tgt={stats.picConnected} />
              </div>
           </div>
-       </div>
 
-       <section className="p-10 bg-slate-900 text-white relative rounded-[2.5rem] shadow-xl overflow-hidden min-h-[340px] flex flex-col justify-between border border-slate-800">
-          <div className="absolute top-0 right-0 p-10 opacity-10 pointer-events-none"><Icon p={I.Zap} size={140} /></div>
-          <div className="relative z-10 space-y-8">
-             <div className="flex items-center gap-3">
-                <div className="w-1.5 h-6 bg-blue-500 rounded-full"></div>
-                <h3 className="text-xs font-black text-blue-400 uppercase tracking-widest">AI戦略アドバイザー</h3>
+          <section className="p-10 bg-slate-900 text-white relative rounded-[2.5rem] shadow-xl overflow-hidden min-h-[300px] flex flex-col justify-between border border-slate-800">
+             <div className="absolute top-0 right-0 p-10 opacity-10 pointer-events-none"><Icon p={I.Zap} size={140} /></div>
+             <div className="relative z-10 space-y-8">
+                <div className="flex items-center gap-3">
+                   <div className="w-1.5 h-6 bg-blue-500 rounded-full"></div>
+                   <h3 className="text-xs font-black text-blue-400 uppercase tracking-widest">AI戦略アドバイザー</h3>
+                </div>
+                <div className="text-sm font-bold leading-relaxed pr-6 bg-white/5 p-6 rounded-2xl border border-white/10 backdrop-blur-sm">
+                   {getAIAdvice(stats, selectedMid !== 'all')}
+                </div>
              </div>
-             <div className="text-sm font-bold leading-relaxed pr-6 bg-white/5 p-6 rounded-2xl border border-white/10 backdrop-blur-sm">
-                {getAIAdvice(stats, selectedMid !== 'all')}
+             <div className="relative z-10 border-t border-white/10 pt-6 flex items-center justify-between text-[11px] font-black text-slate-500 uppercase tracking-widest">
+                <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div> リアルタイム解析中</span>
+                <span className="opacity-40 italic">深層分析エンジン v5.0.3</span>
              </div>
-          </div>
-          <div className="relative z-10 border-t border-white/10 pt-6 flex items-center justify-between text-[11px] font-black text-slate-500 uppercase tracking-widest">
-             <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div> システム稼働中</span>
-             <span className="opacity-40 italic">深層分析エンジン v5.0.2</span>
-          </div>
-       </section>
+          </section>
+       </div>
     </div>
   );
 };
@@ -748,11 +821,18 @@ const Settings = ({ events, members, onAddEvent, onDeleteEvent, onAddMember, onD
     if (!gasUrl) return alert("GASのURLを設定してください。");
     setIsSyncing(true);
     try {
-      // 実際の通信ロジックはURLが確定したのちに実装
-      await new Promise(r => setTimeout(r, 1500)); 
-      alert("スプレッドシートとの同期が完了しました（テスト）。");
+      const res = await fetch(gasUrl, {
+        method: 'POST',
+        mode: 'no-cors', 
+        body: JSON.stringify({ 
+          action: 'sync', 
+          appId: appId, 
+          legacyAppId: legacyAppId 
+        })
+      });
+      alert("同期リクエストを送信しました。Googleスプレッドシート側のGASが正しく設定されていれば、数分以内にデータが反映されます。");
     } catch (e) {
-      alert("同期に失敗しました: " + e.message);
+      alert("同期リクエストの送信に失敗しました: " + e.message);
     }
     setIsSyncing(false);
   };
