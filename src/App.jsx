@@ -153,20 +153,55 @@ const NavButton = ({ active, onClick, icon, label }) => (
 
 const getAIAdvice = (stats, isPersonal) => {
   const { calls, appts, picConnected } = stats;
-  const connectRate = (Number(picConnected) || 0) / (Number(calls) || 1);
-  const apptRate = (Number(appts) || 0) / (Number(picConnected) || 1);
+  const connectRate = calls > 0 ? picConnected / calls : 0;
+  const apptRate = picConnected > 0 ? appts / picConnected : 0;
+  const totalCvr = calls > 0 ? appts / calls : 0;
   
+  if (calls === 0) return "データが未蓄積です。まずはアクションを起こし、初期のペースメイキングを行いましょう。";
+
+  let obs = "", strategy = "", action = "";
+
   if (isPersonal) {
-    if (calls === 0) return "今日も一日頑張りましょう！まずは50件の架電を目標に、リズムを作っていきましょう。";
-    if (apptRate < 0.05) return "架電数は十分ですが、アポイントへの繋ぎで見直しが必要かもしれません。トーク冒頭のインパクトを強めてみてください。";
-    if (connectRate < 0.15) return "現在は接続率がやや低い傾向にあります。リストのランクを見直すか、時間帯をずらしての再コールが効果的です。";
-    return "非常に良いペースです！この調子で高品質なコミュニケーションを維持し、安定した獲得を目指してください。";
+    if (connectRate < 0.15) {
+      obs = "現在、コール数に対する本人接続率が平均値を下回っています。";
+      strategy = "アプローチのタイミング最適化が必要です。";
+      action = "曜日や時間帯のターゲットリストを再編し、決済者が着座している可能性が高い時間帯にリソースを集中投下してください。";
+    } else if (apptRate < 0.05) {
+      obs = "接続からアポイントメントへの転換率が低下しています。";
+      strategy = "冒頭30秒のスクリプト構成と、ヒアリングの深度を見直す必要があります。";
+      action = "フロントの警戒心を解くアイスブレイクを強化し、相手のペインポイントに直接刺さる提案へとトークフローを調整してください。";
+    } else if (totalCvr > 0.02) {
+      obs = `全体の獲得効率は ${(totalCvr*100).toFixed(1)}% と非常に高い水準を維持しています。`;
+      strategy = "現在の獲得モデルのスケールアウトが推奨されます。";
+      action = "このペースを維持しつつ、得られた成功パターン（時間帯・トークスクリプト）をチーム全体へナレッジ共有してください。";
+    } else {
+      obs = "標準的な推移を見せています。";
+      strategy = "もう一段階のブレイクスルーには、微細なボトルネックの解消が必要です。";
+      action = "自身の過去の音声記録を確認し、クロージング前の切り返しのタイミングを1秒早める練習を行ってください。";
+    }
+  } else {
+    if (connectRate < 0.20) {
+      obs = "プロジェクト全体の接続率が目標閾値を下回って推移しています。";
+      strategy = "リスト枯渇、あるいはターゲティングの不一致が疑われます。";
+      action = "リストの供給源を見直すか、現在のアプローチ対象業界の優先順位を即座に変更してください。";
+    } else if (apptRate < 0.08) {
+      obs = "接続後の有効商談化率が低迷しています。";
+      strategy = "市場のニーズ変化に対し、現在のオファー内容が弱くなっている可能性があります。";
+      action = "提案の切り口（フック）を3パターン用意し、A/Bテストを実施して最も反応率の高いスクリプトに全体統一してください。";
+    } else {
+      obs = "プロジェクトは極めて健全なKPIツリーを形成しています。";
+      strategy = "現在のプロセスは最適化されています。";
+      action = "メンバーの疲労蓄積によるペースダウンを防ぐため、シフトの適正化とモチベーション管理に注力してください。";
+    }
   }
-  
-  if (calls === 0) return "プロジェクトのデータがまだありません。開始準備を整え、最初の数値を刻みましょう。";
-  if (apptRate < 0.08) return "チーム全体として、接続後の有効会話が短くなっているようです。スクリプトの第2セクションの強化を検討してください。";
-  if (connectRate < 0.2) return "プロジェクト全体の接続率が目標を下回っています。リストの質を精査し、鮮度の高いターゲットにリソースを集中させましょう。";
-  return "順調な運用状況です。現在の獲得効率を維持しつつ、各メンバーの稼働時間に偏りがないか確認し、持続可能な体制を維持してください。";
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-3 items-start"><div className="mt-1 w-2 h-2 rounded-full bg-rose-500 shrink-0"></div><p><span className="text-rose-400 font-bold text-[10px] uppercase block mb-0.5">Observation</span>{obs}</p></div>
+      <div className="flex gap-3 items-start"><div className="mt-1 w-2 h-2 rounded-full bg-blue-500 shrink-0"></div><p><span className="text-blue-400 font-bold text-[10px] uppercase block mb-0.5">Strategy</span>{strategy}</p></div>
+      <div className="flex gap-3 items-start"><div className="mt-1 w-2 h-2 rounded-full bg-emerald-500 shrink-0"></div><p><span className="text-emerald-400 font-bold text-[10px] uppercase block mb-0.5">Action Plan</span>{action}</p></div>
+    </div>
+  );
 };
 
 const MetricBar = ({ label, val, tgt }) => {
@@ -213,24 +248,26 @@ const MainMetric = ({ label, icon, current, target }) => {
   );
 };
 
-const AreaChart = ({ data, color }) => {
-  if (!data || data.length === 0) return <div className="h-32 flex items-center justify-center text-slate-300 font-bold text-xs uppercase tracking-widest">データがありません</div>;
-  const max = Math.max(...data.map(d => d.value), 10);
+const CustomChart = ({ data, color, type = 'area' }) => {
+  if (!data || data.length === 0) return <div className="h-full flex items-center justify-center text-slate-300 font-bold text-xs uppercase tracking-widest">データがありません</div>;
+  const max = Math.max(...data.map(d => d.value), 1); // Prevent division by zero
   const points = data.map((d, i) => `${(i / (data.length - 1)) * 100},${100 - (d.value / max) * 100}`).join(' ');
   const areaPoints = `${points} 100,100 0,100`;
 
   return (
-    <div className="w-full h-full relative group">
-      <div className="absolute inset-x-0 bottom-0 top-0 grid grid-cols-6 border-b border-l border-slate-100/50">
-        {[...Array(6)].map((_, i) => <div key={i} className="border-r border-slate-50 opacity-20" />)}
+    <div className="w-full h-full relative group flex flex-col">
+      <div className="flex-1 relative">
+        <div className="absolute inset-x-0 bottom-0 top-0 grid grid-cols-6 border-b border-l border-slate-100/50">
+          {[...Array(6)].map((_, i) => <div key={i} className="border-r border-slate-50 opacity-20" />)}
+        </div>
+        <svg viewBox="0 -5 100 110" preserveAspectRatio="none" className="w-full h-full overflow-visible relative z-10">
+          {type === 'area' && <polygon fill={`${color}15`} points={areaPoints} />}
+          <polyline fill="none" stroke={color} strokeWidth={type === 'line' ? "4" : "3"} strokeLinejoin="round" points={points} className={type === 'line' ? "drop-shadow-md" : ""} />
+          {data.map((d, i) => (
+            <circle key={i} cx={(i / (data.length - 1)) * 100} cy={100 - (d.value / max) * 100} r={type === 'line' ? "3" : "2"} fill="white" stroke={color} strokeWidth="2" className="transition-all hover:r-4 cursor-pointer" />
+          ))}
+        </svg>
       </div>
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full overflow-visible relative z-10">
-        <polygon fill={`${color}10`} points={areaPoints} />
-        <polyline fill="none" stroke={color} strokeWidth="3" strokeLinejoin="round" points={points} />
-        {data.map((d, i) => (
-          <circle key={i} cx={(i / (data.length - 1)) * 100} cy={100 - (d.value / max) * 100} r="2" fill="white" stroke={color} strokeWidth="2" />
-        ))}
-      </svg>
       <div className="flex justify-between mt-4 px-1">
         {data.map((d, i) => <span key={i} className={`text-[9px] font-black uppercase ${i===data.length-1?'text-blue-600':'text-slate-400'}`}>{d.day}</span>)}
       </div>
@@ -454,16 +491,26 @@ const AttendanceView = ({ members, reports, onEdit }) => {
 
 const ShiftView = ({ members, shifts, onAddShift, onDeleteShift }) => {
   const [showModal, setShowModal] = useState(false);
-  const [viewMode, setViewMode] = useState('day'); 
+  const [viewMode, setViewMode] = useState('month'); 
   const [selectedDate, setSelectedDate] = useState(toLocalDateString(new Date()));
 
   const wr = getWeekRange(selectedDate);
-  const currentMonthArr = useMemo(() => {
+  const calendarData = useMemo(() => {
     const d = new Date(selectedDate);
-    const y = d.getFullYear(); const m = d.getMonth();
-    const first = new Date(y, m, 1); const last = new Date(y, m + 1, 0);
+    const y = d.getFullYear(); 
+    const m = d.getMonth();
+    const first = new Date(y, m, 1); 
+    const last = new Date(y, m + 1, 0);
+    
     const days = [];
-    for (let i = 1; i <= last.getDate(); i++) days.push(toLocalDateString(new Date(y, m, i)));
+    // Pad start of month
+    for (let i = 0; i < first.getDay(); i++) {
+      days.push(null);
+    }
+    // Actual days
+    for (let i = 1; i <= last.getDate(); i++) {
+      days.push(toLocalDateString(new Date(y, m, i)));
+    }
     return days;
   }, [selectedDate]);
   
@@ -471,8 +518,12 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift }) => {
     if (viewMode === 'day') return shifts.filter(s => s.date === selectedDate).sort((a,b)=>a.startTime.localeCompare(b.startTime));
     if (viewMode === 'week') return shifts.filter(s => { const d = new Date(s.date); return d >= wr.start && d <= wr.end; }).sort((a,b)=>a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
     const monthPrefix = toLocalMonthString(selectedDate);
-    return shifts.filter(s => s.date.startsWith(monthPrefix)).sort((a,b)=>a.date.localeCompare(b.date));
+    return shifts.filter(s => s.date.startsWith(monthPrefix)).sort((a,b)=>a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
   }, [shifts, selectedDate, viewMode, wr]);
+
+  const selectedDateShifts = useMemo(() => {
+    return shifts.filter(s => s.date === selectedDate).sort((a,b)=>a.startTime.localeCompare(b.startTime));
+  }, [shifts, selectedDate]);
 
   return (
     <div className="space-y-8 pb-24 font-sans">
@@ -480,43 +531,61 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift }) => {
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold">シフト管理・人員配置</h2>
             <div className="flex bg-slate-200 p-1 rounded-full">
-               <button onClick={()=>setViewMode('day')} className={`px-4 py-1 text-[10px] font-bold rounded-full ${viewMode==='day'?'bg-slate-900 text-white shadow-md':'text-slate-500'}`}>日別</button>
-               <button onClick={()=>setViewMode('week')} className={`px-4 py-1 text-[10px] font-bold rounded-full ${viewMode==='week'?'bg-slate-900 text-white shadow-md':'text-slate-500'}`}>週別</button>
-               <button onClick={()=>setViewMode('month')} className={`px-4 py-1 text-[10px] font-bold rounded-full ${viewMode==='month'?'bg-slate-900 text-white shadow-md':'text-slate-500'}`}>月間</button>
+               <button onClick={()=>setViewMode('day')} className={`px-4 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode==='day'?'bg-slate-900 text-white shadow-md':'text-slate-500 hover:text-slate-900'}`}>日別</button>
+               <button onClick={()=>setViewMode('week')} className={`px-4 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode==='week'?'bg-slate-900 text-white shadow-md':'text-slate-500 hover:text-slate-900'}`}>週別</button>
+               <button onClick={()=>setViewMode('month')} className={`px-4 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode==='month'?'bg-slate-900 text-white shadow-md':'text-slate-500 hover:text-slate-900'}`}>月間カレンダー</button>
             </div>
           </div>
-          <input type="date" className="w-full bg-white border border-slate-300 p-3 font-bold text-sm outline-none rounded-xl" value={selectedDate} onChange={e=>setSelectedDate(e.target.value)} />
+          <input type="date" className="w-full bg-white border border-slate-300 p-3 font-bold text-sm outline-none rounded-xl focus:border-slate-900 transition-colors" value={selectedDate} onChange={e=>setSelectedDate(e.target.value)} />
        </div>
 
        {viewMode === 'month' ? (
-         <div className="p-6 bg-white border border-slate-200 shadow-sm rounded-3xl">
-            <div className="grid grid-cols-7 gap-1 mb-4 border-b border-slate-100 pb-4">
-               {['日','月','火','水','木','金','土'].map(d => <div key={d} className="text-center text-[9px] font-bold text-slate-400">{d}</div>)}
-               {currentMonthArr.map(d => {
-                 const dayShifts = displayShifts.filter(s => s.date === d);
-                 return (
-                   <div key={d} className={`aspect-square flex flex-col items-center justify-center border rounded-lg ${d === selectedDate ? 'bg-slate-900 border-slate-900' : 'bg-slate-50 border-slate-100'}`}>
-                     <span className={`text-[8px] font-bold ${d===selectedDate?'text-white':'text-slate-400'}`}>{d.split('-')[2]}</span>
-                     {dayShifts.length > 0 && <div className="w-1 h-1 bg-emerald-500 rounded-full"></div>}
-                   </div>
-                 );
-               })}
-            </div>
-            <div className="space-y-px bg-slate-100 border border-slate-100 rounded-xl overflow-hidden">
-               {displayShifts.map(s => {
-                 const m = members.find(mem=>mem.id===s.memberId);
-                 return (
-                   <div key={s.id} className="flex items-center justify-between p-3 bg-white text-[10px] font-bold">
-                     <span className="text-slate-400">{s.date.split('-')[2]}日</span>
-                     <span className="text-slate-900">{m?.name}</span>
-                     <span className="text-blue-600 border px-2 py-0.5 rounded-full">{s.startTime}-{s.endTime}</span>
-                   </div>
-                 );
-               })}
-            </div>
+         <div className="space-y-6">
+           <div className="p-6 bg-white border border-slate-200 shadow-sm rounded-3xl">
+              <div className="grid grid-cols-7 gap-2 mb-4 border-b border-slate-100 pb-4">
+                 {['日','月','火','水','木','金','土'].map((d, i) => <div key={d} className={`text-center text-[10px] font-black uppercase ${i===0?'text-rose-500':i===6?'text-blue-500':'text-slate-400'}`}>{d}</div>)}
+                 {calendarData.map((d, i) => {
+                   if (!d) return <div key={`empty-${i}`} className="aspect-square" />;
+                   const dayShifts = displayShifts.filter(s => s.date === d);
+                   const isSelected = d === selectedDate;
+                   const isToday = d === toLocalDateString(new Date());
+                   return (
+                     <button key={d} onClick={() => setSelectedDate(d)} className={`aspect-square flex flex-col items-center justify-center rounded-2xl transition-all relative ${isSelected ? 'bg-slate-900 text-white shadow-lg scale-110 z-10' : 'bg-slate-50 hover:bg-slate-100 border border-slate-100 text-slate-700'}`}>
+                       <span className={`text-xs font-black ${isSelected?'text-white':isToday?'text-blue-600':''}`}>{d.split('-')[2]}</span>
+                       {dayShifts.length > 0 && <div className={`absolute bottom-2 flex gap-0.5`}>{dayShifts.slice(0,3).map((_, i) => <div key={i} className={`w-1 h-1 rounded-full ${isSelected?'bg-white':'bg-emerald-500'}`}></div>)}{dayShifts.length > 3 && <div className={`w-1 h-1 rounded-full ${isSelected?'bg-white':'bg-emerald-500'}`}></div>}</div>}
+                     </button>
+                   );
+                 })}
+              </div>
+           </div>
+
+           <div className="bg-white border border-slate-200 shadow-sm rounded-3xl overflow-hidden p-6">
+              <h3 className="text-sm font-black text-slate-800 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2"><Icon p={I.Calendar} size={16}/> {selectedDate.split('-')[1]}月{selectedDate.split('-')[2]}日のシフト配置</h3>
+              {selectedDateShifts.length === 0 ? (
+                 <div className="text-center py-8 text-slate-400 font-bold text-xs">この日のシフト登録はありません</div>
+              ) : (
+                 <div className="space-y-px bg-slate-100 border border-slate-100 rounded-2xl overflow-hidden">
+                    {selectedDateShifts.map(s => {
+                      const m = members.find(mem=>mem.id===s.memberId);
+                      return (
+                        <div key={s.id} className="flex items-center justify-between p-4 bg-white hover:bg-slate-50 transition-colors group">
+                          <div className="flex items-center gap-4">
+                             <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs">{m?.name?.slice(0,1)}</div>
+                             <span className="font-bold text-slate-900 text-sm">{m?.name}</span>
+                          </div>
+                          <div className="flex items-center gap-6">
+                             <span className="text-blue-600 bg-blue-50 px-3 py-1 rounded-full font-black text-xs">{s.startTime} - {s.endTime}</span>
+                             <button onClick={()=>{if(window.confirm('削除しますか？')) onDeleteShift(s.id)}} className="text-slate-200 hover:text-rose-600 transition-colors"><Icon p={I.Trash} size={16}/></button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                 </div>
+              )}
+           </div>
          </div>
        ) : (
-         <div className="space-y-px bg-slate-200 border border-slate-200 rounded-3xl overflow-hidden">
+         <div className="space-y-px bg-slate-200 border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
             {displayShifts.map(s => {
                const m = members.find(mem=>mem.id===s.memberId);
                return (
@@ -527,7 +596,7 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift }) => {
                           <div className="font-bold text-slate-900">{m?.name}</div>
                           <div className="text-[9px] font-bold text-slate-400 flex gap-3 mt-0.5">
                              {viewMode === 'week' && <span className="flex items-center gap-1"><Icon p={I.Calendar} size={10}/>{s.date}</span>}
-                             <span className="flex items-center gap-1"><Icon p={I.Clock} size={10}/>{s.startTime}-{s.endTime}</span>
+                             <span className="flex items-center gap-1"><Icon p={I.Clock} size={10}/>{s.startTime} - {s.endTime}</span>
                           </div>
                        </div>
                     </div>
@@ -538,31 +607,37 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift }) => {
          </div>
        )}
        
-       <button onClick={()=>setShowModal(true)} className="fixed bottom-24 right-6 w-16 h-16 bg-slate-900 text-white flex flex-col items-center justify-center border-4 border-white shadow-2xl z-40 rounded-full">
+       <button onClick={()=>setShowModal(true)} className="fixed bottom-24 right-6 w-16 h-16 bg-slate-900 text-white flex flex-col items-center justify-center border-4 border-white shadow-2xl z-40 rounded-full hover:scale-105 transition-transform">
          <Icon p={I.Plus} size={24} />
          <span className="text-[7px] font-bold uppercase mt-0.5">登録</span>
        </button>
 
        {showModal && (
-         <div className="fixed inset-0 bg-slate-900/95 z-[200] flex items-center justify-center p-4">
-            <div className="bg-white w-full max-w-sm p-10 space-y-8 border-2 border-slate-900 rounded-3xl">
-               <div className="flex justify-between items-center border-b-2 border-slate-900 pb-4">
+         <div className="fixed inset-0 bg-slate-900/95 z-[200] flex items-center justify-center p-4 backdrop-blur-md">
+            <div className="bg-white w-full max-w-sm p-10 space-y-8 border-4 border-slate-900 rounded-3xl shadow-2xl">
+               <div className="flex justify-between items-center border-b-2 border-slate-100 pb-4">
                   <h3 className="text-xl font-bold">シフト新規登録</h3>
-                  <button onClick={()=>setShowModal(false)}><Icon p={I.X} /></button>
+                  <button onClick={()=>setShowModal(false)} className="text-slate-400 hover:text-slate-900 transition-colors"><Icon p={I.X} /></button>
                </div>
                <div className="space-y-6">
-                  <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-3 block">担当スタッフ</label>
-                  <div className="flex flex-wrap gap-2">{members.map(m => (
-                    <button key={m.id} className="px-3 py-1.5 border border-slate-200 font-bold text-xs hover:bg-slate-900 hover:text-white transition-all rounded-full">{m.name}</button>
-                  ))}</div></div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase mb-3 block">担当スタッフ</label>
+                    <div className="flex flex-wrap gap-2">{members.map(m => (
+                      <button key={m.id} className="px-4 py-2 border border-slate-200 font-bold text-xs hover:bg-slate-900 hover:text-white transition-all rounded-full">{m.name}</button>
+                    ))}</div>
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
-                     <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">開始</label>
-                     <input type="time" className="w-full p-4 border-2 border-slate-100 font-bold outline-none focus:border-slate-900 rounded-xl" defaultValue="10:00" /></div>
-                     <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">終了</label>
-                     <input type="time" className="w-full p-4 border-2 border-slate-100 font-bold outline-none focus:border-slate-900 rounded-xl" defaultValue="19:00" /></div>
+                     <div>
+                       <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">開始</label>
+                       <input type="time" className="w-full p-4 border-2 border-slate-100 font-bold outline-none focus:border-slate-900 rounded-xl transition-colors" defaultValue="10:00" />
+                     </div>
+                     <div>
+                       <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">終了</label>
+                       <input type="time" className="w-full p-4 border-2 border-slate-100 font-bold outline-none focus:border-slate-900 rounded-xl transition-colors" defaultValue="19:00" />
+                     </div>
                   </div>
                </div>
-               <button onClick={()=>setShowModal(false)} className="w-full bg-slate-900 text-white py-4 font-bold rounded-2xl">内容を保存</button>
+               <button onClick={()=>setShowModal(false)} className="w-full bg-slate-900 text-white py-4 font-bold rounded-2xl hover:bg-black transition-colors">内容を保存</button>
             </div>
          </div>
        )}
@@ -572,6 +647,8 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift }) => {
 
 const AnalyticsView = ({ members, reports, event }) => {
   const [selectedMid, setSelectedMid] = useState('all');
+  const [chartType, setChartType] = useState('line');
+  
   const fReports = useMemo(() => {
     return reports.filter(r => {
       const isEventMatch = !r.eventId || r.eventId === event?.id;
@@ -610,9 +687,15 @@ const AnalyticsView = ({ members, reports, event }) => {
        </div>
 
        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-          <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-8">
-             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">週間獲得トレンド</h3>
-             <div className="h-48 w-full"><AreaChart data={dailyTrend} color="#4f46e5" /></div>
+          <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-8 flex flex-col">
+             <div className="flex items-center justify-between">
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">週間獲得トレンド</h3>
+                <div className="flex bg-slate-100 p-1 rounded-lg gap-1">
+                   <button onClick={()=>setChartType('line')} className={`px-3 py-1 text-[9px] font-bold rounded-md transition-all ${chartType==='line'?'bg-white shadow text-blue-600':'text-slate-400'}`}>折れ線</button>
+                   <button onClick={()=>setChartType('area')} className={`px-3 py-1 text-[9px] font-bold rounded-md transition-all ${chartType==='area'?'bg-white shadow text-blue-600':'text-slate-400'}`}>エリア</button>
+                </div>
+             </div>
+             <div className="flex-1 min-h-[200px] w-full"><CustomChart data={dailyTrend} color="#4f46e5" type={chartType} /></div>
           </div>
           <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-10">
              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">転換・効率（CVR）</h3>
@@ -630,9 +713,9 @@ const AnalyticsView = ({ members, reports, event }) => {
                 <div className="w-1.5 h-6 bg-blue-500 rounded-full"></div>
                 <h3 className="text-xs font-black text-blue-400 uppercase tracking-widest">AI戦略アドバイザー</h3>
              </div>
-             <p className="text-xl font-bold leading-relaxed pr-6">
+             <div className="text-sm font-bold leading-relaxed pr-6 bg-white/5 p-6 rounded-2xl border border-white/10 backdrop-blur-sm">
                 {getAIAdvice(stats, selectedMid !== 'all')}
-             </p>
+             </div>
           </div>
           <div className="relative z-10 border-t border-white/10 pt-6 flex items-center justify-between text-[11px] font-black text-slate-500 uppercase tracking-widest">
              <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div> システム稼働中</span>
@@ -651,6 +734,29 @@ const Settings = ({ events, members, onAddEvent, onDeleteEvent, onAddMember, onD
   const [newWage, setNewWage] = useState("1500");
   const [editingMember, setEditingMember] = useState(null);
   
+  const [gasUrl, setGasUrl] = useState(localStorage.getItem('kpi_gas_url') || "");
+  const [legacyAppId, setLegacyAppId] = useState(localStorage.getItem('kpi_legacy_appid') || "");
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSaveSyncSettings = () => {
+    localStorage.setItem('kpi_gas_url', gasUrl);
+    localStorage.setItem('kpi_legacy_appid', legacyAppId);
+    alert("同期設定を保存しました。");
+  };
+
+  const handleManualSync = async () => {
+    if (!gasUrl) return alert("GASのURLを設定してください。");
+    setIsSyncing(true);
+    try {
+      // 実際の通信ロジックはURLが確定したのちに実装
+      await new Promise(r => setTimeout(r, 1500)); 
+      alert("スプレッドシートとの同期が完了しました（テスト）。");
+    } catch (e) {
+      alert("同期に失敗しました: " + e.message);
+    }
+    setIsSyncing(false);
+  };
+  
   return (
     <div className="space-y-12 pb-40 font-sans">
        <div className="flex items-center justify-between border-b-4 border-slate-900 pb-6">
@@ -665,15 +771,33 @@ const Settings = ({ events, members, onAddEvent, onDeleteEvent, onAddMember, onD
              <h3 className="text-sm font-bold text-slate-800 border-l-4 border-slate-900 pl-3">案件・プロジェクト</h3>
              <div className="p-8 bg-white border border-slate-200 space-y-4 shadow-sm rounded-3xl">
                 <input className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold focus:border-slate-900 outline-none rounded-xl" placeholder="新規案件名" value={newEName} onChange={e=>setNewEName(e.target.value)} />
-                <button onClick={()=>{if(newEName){onAddEvent(newEName, ""); setNewEName("");}}} className="w-full bg-slate-900 text-white py-4 font-bold rounded-2xl">案件をデータベースに登録</button>
+                <button onClick={()=>{if(newEName){onAddEvent(newEName, ""); setNewEName("");}}} className="w-full bg-slate-900 text-white py-4 font-bold rounded-2xl hover:bg-black transition-colors">案件をデータベースに登録</button>
              </div>
-             <div className="flex flex-col gap-px bg-slate-200 border border-slate-200 rounded-3xl overflow-hidden">
+             <div className="flex flex-col gap-px bg-slate-200 border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
                 {events.map(e => (
                   <div key={e.id} className="flex items-center justify-between p-4 bg-white text-sm font-bold">
                      <span>{e.name}</span>
-                     <button onClick={()=>{if(window.confirm('この案件を完全に削除しますか？')) onDeleteEvent(e.id)}} className="text-slate-300 hover:text-rose-600"><Icon p={I.Trash} size={18}/></button>
+                     <button onClick={()=>{if(window.confirm('この案件を完全に削除しますか？')) onDeleteEvent(e.id)}} className="text-slate-300 hover:text-rose-600 transition-colors"><Icon p={I.Trash} size={18}/></button>
                   </div>
                 ))}
+             </div>
+
+             <h3 className="text-sm font-bold text-slate-800 border-l-4 border-blue-600 pl-3 mt-12">外部データ同期 (GAS / 過去データ)</h3>
+             <div className="p-8 bg-white border border-slate-200 space-y-6 shadow-sm rounded-3xl">
+                <div className="space-y-2">
+                   <label className="text-[10px] font-bold text-slate-400 uppercase">Google Apps Script URL</label>
+                   <input className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none rounded-xl text-xs" placeholder="https://script.google.com/macros/s/..." value={gasUrl} onChange={e=>setGasUrl(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                   <label className="text-[10px] font-bold text-slate-400 uppercase">過去データ引継ぎ用 App ID</label>
+                   <input className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none rounded-xl text-xs" placeholder="例: tele-apo-manager-original" value={legacyAppId} onChange={e=>setLegacyAppId(e.target.value)} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                   <button onClick={handleSaveSyncSettings} className="w-full bg-white border-2 border-slate-200 text-slate-600 py-4 font-bold rounded-2xl hover:bg-slate-50 transition-colors">設定を保存</button>
+                   <button onClick={handleManualSync} disabled={isSyncing} className="w-full bg-blue-600 text-white py-4 font-bold rounded-2xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                      <Icon p={I.Zap} size={18} /> {isSyncing ? '同期中...' : '今すぐ同期'}
+                   </button>
+                </div>
              </div>
           </section>
 
@@ -692,11 +816,11 @@ const Settings = ({ events, members, onAddEvent, onDeleteEvent, onAddMember, onD
                    </select>
                    <input type="number" className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none rounded-xl" placeholder="時給" value={newWage} onChange={e=>setNewWage(e.target.value)} />
                 </div>
-                <button onClick={()=>{if(newMName){onAddMember(newMName, newRole, newWage, newEmail); setNewMName(""); setNewEmail("");}}} className="w-full bg-emerald-600 text-white py-4 font-bold rounded-2xl">スタッフを新規登録</button>
+                <button onClick={()=>{if(newMName){onAddMember(newMName, newRole, newWage, newEmail); setNewMName(""); setNewEmail("");}}} className="w-full bg-emerald-600 text-white py-4 font-bold rounded-2xl hover:bg-emerald-700 transition-colors">スタッフを新規登録</button>
              </div>
-             <div className="flex flex-col gap-px bg-slate-200 border border-slate-200 rounded-3xl overflow-hidden">
+             <div className="flex flex-col gap-px bg-slate-200 border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
                 {members.map(m => (
-                  <button key={m.id} onClick={() => setEditingMember(m)} className="p-4 bg-white flex items-center justify-between text-left hover:bg-slate-50 group">
+                  <button key={m.id} onClick={() => setEditingMember(m)} className="p-4 bg-white flex items-center justify-between text-left hover:bg-slate-50 group transition-colors">
                      <div className="flex items-center gap-4">
                         <div className={`w-10 h-10 flex items-center justify-center font-bold text-white rounded-full ${m.role==='admin'?'bg-slate-900':'bg-slate-400'}`}>{m.name.slice(0,1)}</div>
                         <div>
@@ -704,7 +828,7 @@ const Settings = ({ events, members, onAddEvent, onDeleteEvent, onAddMember, onD
                            <div className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">¥{m.hourlyWage}/H • {m.role}</div>
                         </div>
                      </div>
-                     <Icon p={I.Settings} size={16} className="text-slate-200 group-hover:text-slate-900" />
+                     <Icon p={I.Settings} size={16} className="text-slate-200 group-hover:text-slate-900 transition-colors" />
                   </button>
                 ))}
              </div>
@@ -730,7 +854,7 @@ const Settings = ({ events, members, onAddEvent, onDeleteEvent, onAddMember, onD
                   <button onClick={()=>{onDelMember(editingMember.id); setEditingMember(null);}} className="bg-rose-50 text-rose-500 py-4 font-bold border border-rose-100 transition-all active:bg-rose-100 rounded-2xl">削除</button>
                   <button onClick={()=>{onUpdateMember(editingMember.id, editingMember); setEditingMember(null);}} className="bg-slate-900 text-white py-4 font-bold transition-all active:bg-black rounded-2xl">更新を確定</button>
                </div>
-               <button onClick={()=>setEditingMember(null)} className="w-full text-slate-400 text-sm font-bold pt-4">キャンセル</button>
+               <button onClick={()=>setEditingMember(null)} className="w-full text-slate-400 text-sm font-bold pt-4 hover:text-slate-900 transition-colors">キャンセル</button>
             </div>
          </div>
        )}
