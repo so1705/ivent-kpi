@@ -312,37 +312,62 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
        </div>
 
        {viewMode === 'personal' ? (
-                 <div className="space-y-10">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                       <div className="space-y-6">
-                          <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
-                            <div className="w-1.5 h-4 bg-blue-600 rounded-full"></div> 主要目標 (週間)
-                          </h3>
-                          <MainMetric label="アポイント獲得数" icon={I.Target} current={myTotals.appts} target={activeIndivGoals.appts} />
-                          <button onClick={()=>setEditingGoal(activeIndivGoals)} className="w-full py-4 bg-white border border-slate-200 text-slate-500 rounded-2xl text-[11px] font-bold hover:bg-slate-50 transition-all">目標数値を調整する</button>
-                       </div>
-                       <div className="space-y-6">
-                          <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
-                            <div className="w-1.5 h-4 bg-slate-300 rounded-full"></div> 稼働効率解析
-                          </h3>
-                          <div className="flex flex-col gap-10 p-10 bg-white border border-slate-100 rounded-[2rem] shadow-sm">
-                             <div className="grid grid-cols-2 gap-4">
-                                <div className="p-4 bg-slate-50 rounded-xl">
-                                   <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">累計架電数</div>
-                                   <div className="text-2xl font-black">{myTotals.calls}</div>
-                                </div>
-                                <div className="p-4 bg-slate-50 rounded-xl">
-                                   <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">1hあたり(CPH)</div>
-                                   <div className="text-2xl font-black text-blue-600">{(myTotals.calls / (myTotals.hours || 1)).toFixed(1)}</div>
-                                </div>
-                             </div>
-                             <MetricBar label="接続率 (架電比)" val={myTotals.picConnected} tgt={myTotals.calls} />
-                             <MetricBar label="アポ率 (接続比)" val={myTotals.appts} tgt={myTotals.picConnected} />
-                          </div>
-                       </div>
-                    </div>
-                 </div>
-              ) : (
+                  <div className="space-y-10">
+                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="lg:col-span-1 space-y-6">
+                           <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                             <div className="w-1.5 h-4 bg-blue-600 rounded-full"></div> 個人目標 (自動配分)
+                           </h3>
+                           <div className="p-8 bg-white border-2 border-slate-900 rounded-[2rem] shadow-sm space-y-6">
+                              <div className="flex justify-between items-center">
+                                 <span className="text-xs font-bold text-slate-400">一律目標 / 人</span>
+                                 <span className="text-2xl font-black text-slate-900">{(memberStats.find(m=>m.email===currentUserEmail)?.uniformGoal || 0)} <span className="text-xs">件</span></span>
+                              </div>
+                              <MetricBar label="達成率" val={myTotals.appts} tgt={memberStats.find(m=>m.email===currentUserEmail)?.uniformGoal || 1} />
+                           </div>
+                        </div>
+
+                        <div className="lg:col-span-1 space-y-6">
+                           <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                             <div className="w-1.5 h-4 bg-emerald-500 rounded-full"></div> 今週の着地予測
+                           </h3>
+                           <div className="p-8 bg-emerald-900 text-white rounded-[2rem] shadow-xl relative overflow-hidden">
+                              <div className="absolute top-0 right-0 p-4 opacity-10"><Icon p={I.TrendingUp} size={100} /></div>
+                              <div className="relative z-10 space-y-4">
+                                 <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">データに基づく期待値</div>
+                                 <div className="text-5xl font-black">{memberStats.find(m=>m.email===currentUserEmail)?.expectedAppts || 0}<span className="text-sm font-normal ml-2 opacity-50">件</span></div>
+                                 <div className="pt-4 border-t border-emerald-800 flex justify-between items-center">
+                                    <span className="text-xs font-bold opacity-60">目標との差分</span>
+                                    <span className="text-lg font-black">
+                                       {((memberStats.find(m=>m.email===currentUserEmail)?.expectedAppts || 0) - (memberStats.find(m=>m.email===currentUserEmail)?.uniformGoal || 0)).toFixed(1)}
+                                       <span className="text-xs ml-1">件</span>
+                                    </span>
+                                 </div>
+                              </div>
+                           </div>
+                        </div>
+
+                        <div className="lg:col-span-1 space-y-6">
+                           <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                             <div className="w-1.5 h-4 bg-slate-300 rounded-full"></div> 稼働効率
+                           </h3>
+                           <div className="p-8 bg-white border border-slate-100 rounded-[2rem] shadow-sm flex flex-col justify-between h-[180px]">
+                              <div className="flex justify-between items-start">
+                                 <div>
+                                    <div className="text-[10px] font-bold text-slate-400 uppercase">1hあたり(CPH)</div>
+                                    <div className="text-3xl font-black text-blue-600">{(myTotals.calls / (myTotals.hours || 1)).toFixed(1)}</div>
+                                 </div>
+                                 <div>
+                                    <div className="text-[10px] font-bold text-slate-400 uppercase text-right">予定稼働時間</div>
+                                    <div className="text-xl font-black text-slate-900 text-right">{memberStats.find(m=>m.email===currentUserEmail)?.scheduledHours || 0}H</div>
+                                 </div>
+                              </div>
+                              <div className="text-[10px] text-slate-400 font-bold leading-tight">過去実績から算出された期待値です。稼働時間を増やすか、効率を上げることで目標達成に近づきます。</div>
+                           </div>
+                        </div>
+                     </div>
+                  </div>
+               ) : (
                  <div className="space-y-12">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                        <div className="space-y-6">
@@ -428,14 +453,41 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                      { label: '本人接続', val: drilldownMember.picConnected, color: 'text-slate-900' },
                      { label: '資料請求', val: drilldownMember.requests, color: 'text-slate-900' },
                      { label: 'アポ獲得', val: drilldownMember.appts, color: 'text-blue-600' },
-                     { label: '1h効率(CPH)', val: drilldownMember.cph, color: 'text-emerald-600' },
-                     { label: '稼働時間', val: `${drilldownMember.hours}H`, color: 'text-slate-400' },
+                     { label: '期待着地', val: drilldownMember.expectedAppts, color: 'text-emerald-600' },
+                     { label: '予定稼働', val: `${drilldownMember.scheduledHours}H`, color: 'text-slate-400' },
                    ].map(stat => (
                       <div key={stat.label} className="p-5 bg-slate-50 border border-slate-100 rounded-3xl">
                          <div className="text-[10px] font-black text-slate-400 uppercase mb-1">{stat.label}</div>
                          <div className={`text-2xl font-black ${stat.color} tabular-nums`}>{stat.val}</div>
                       </div>
                    ))}
+                </div>
+
+                <div className="space-y-4">
+                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">架電結果の内訳解析</h4>
+                   <div className="space-y-3">
+                      {[
+                        { label: 'アポ獲得', val: drilldownMember.appts, color: 'bg-blue-600' },
+                        { label: '資料請求', val: drilldownMember.requests, color: 'bg-emerald-500' },
+                        { label: '本人接続 (その他)', val: drilldownMember.picConnected - drilldownMember.appts - drilldownMember.requests, color: 'bg-slate-400' },
+                        { label: '受付拒否', val: drilldownMember.receptionRefusal, color: 'bg-rose-400' },
+                        { label: '不在 / その他', val: drilldownMember.calls - drilldownMember.picConnected - drilldownMember.receptionRefusal, color: 'bg-slate-100' },
+                      ].map(item => {
+                         const p = Math.max(0, Math.min(100, (item.val / (drilldownMember.calls || 1)) * 100));
+                         if (item.val <= 0 && item.label !== 'アポ獲得') return null;
+                         return (
+                            <div key={item.label} className="space-y-1">
+                               <div className="flex justify-between text-[9px] font-bold">
+                                  <span className="text-slate-500">{item.label}</span>
+                                  <span className="text-slate-900">{item.val}件 ({p.toFixed(1)}%)</span>
+                               </div>
+                               <div className="h-1.5 w-full bg-slate-50 rounded-full overflow-hidden">
+                                  <div className={`h-full ${item.color} transition-all duration-1000`} style={{ width: `${p}%` }}></div>
+                                </div>
+                            </div>
+                         );
+                      })}
+                   </div>
                 </div>
 
                 <div className="bg-slate-900 p-8 text-white relative rounded-[2rem] overflow-hidden">
@@ -943,9 +995,9 @@ const Settings = ({ events, members, onAddEvent, onDeleteEvent, onAddMember, onD
 };
 
 function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData = null }) {
-  const [val, setVal] = useState({ memberId: '', date: toLocalDateString(new Date()), calls: '', appts: '', requests: '', lost: '', deals: '', hours: '', startTime: '10:00', endTime: '19:00', picConnected: '' });
+  const [val, setVal] = useState({ memberId: '', date: toLocalDateString(new Date()), calls: '', appts: '', requests: '', lost: '', deals: '', hours: '', startTime: '10:00', endTime: '19:00', picConnected: '', noAnswer: '', receptionRefusal: '', picAbsent: '', outOfTarget: '' });
   useEffect(() => { if (initialData) { const d = initialData.date?.toDate ? initialData.date.toDate() : new Date(initialData.date); setVal({ ...initialData, date: toLocalDateString(d) }); } }, [initialData]);
-  const submit = (e) => { e.preventDefault(); if (!val.memberId) return alert("スタッフを選択してください"); const d = { ...val, calls: Number(val.calls), appts: Number(val.appts), requests: Number(val.requests), lost: Number(val.lost), deals: Number(val.deals), hours: Number(val.hours), picConnected: Number(val.picConnected) }; if (initialData) onUpdate(d); else onAdd(d); onClose(); };
+  const submit = (e) => { e.preventDefault(); if (!val.memberId) return alert("スタッフを選択してください"); const d = { ...val, calls: Number(val.calls), appts: Number(val.appts), requests: Number(val.requests), lost: Number(val.lost), deals: Number(val.deals), hours: Number(val.hours), picConnected: Number(val.picConnected), noAnswer: Number(val.noAnswer), receptionRefusal: Number(val.receptionRefusal), picAbsent: Number(val.picAbsent), outOfTarget: Number(val.outOfTarget) }; if (initialData) onUpdate(d); else onAdd(d); onClose(); };
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 z-[100] flex flex-col md:items-center md:justify-center p-4">
@@ -962,11 +1014,15 @@ function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData =
                    {members.map(m => ( <label key={m.id} className={`px-4 py-2 border-2 cursor-pointer font-bold transition-all text-xs rounded-full ${val.memberId===m.id ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-100 text-slate-400'}`}> <input type="radio" value={m.id} className="hidden" onChange={e=>setVal({...val, memberId: e.target.value})} /> {m.name} </label> ))}
                 </div>
              </div>
-             <div className="grid grid-cols-2 md:grid-cols-3 gap-px bg-slate-200 border border-slate-200 shadow-sm rounded-3xl overflow-hidden">
+             <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-slate-200 border border-slate-200 shadow-sm rounded-3xl overflow-hidden">
                 <div className="bg-white"><InputItem label="全体架電数" icon={I.Phone} val={val.calls} set={v=>setVal({...val, calls: v})} /></div>
                 <div className="bg-white"><InputItem label="本人接続数" icon={I.Zap} val={val.picConnected} set={v=>setVal({...val, picConnected: v})} /></div>
-                <div className="bg-white"><InputItem label="アポイント獲得" icon={I.Check} val={val.appts} set={v=>setVal({...val, appts: v})} /></div>
+                <div className="bg-white"><InputItem label="アポイント" icon={I.Check} val={val.appts} set={v=>setVal({...val, appts: v})} /></div>
                 <div className="bg-white"><InputItem label="資料請求" icon={I.FileText} val={val.requests} set={v=>setVal({...val, requests: v})} /></div>
+                
+                <div className="bg-white"><InputItem label="受付拒否" icon={I.Ban} val={val.receptionRefusal} set={v=>setVal({...val, receptionRefusal: v})} /></div>
+                <div className="bg-white"><InputItem label="担当不在" icon={I.Users} val={val.picAbsent} set={v=>setVal({...val, picAbsent: v})} /></div>
+                <div className="bg-white"><InputItem label="不在/その他" icon={I.Phone} val={val.noAnswer} set={v=>setVal({...val, noAnswer: v})} /></div>
                 <div className="bg-white"><InputItem label="稼働時間" icon={I.Clock} val={val.hours} set={v=>setVal({...val, hours: v})} /></div>
              </div>
              <button className="w-full bg-slate-900 text-white py-6 font-bold text-lg hover:bg-black transition-all rounded-2xl">実績を確定し送信</button>
@@ -1101,10 +1157,27 @@ function App() {
       hours: acc.hours + (Number(r.hours) || 0),
       picConnected: acc.picConnected + (Number(r.picConnected) || 0),
     }), { appts: 0, calls: 0, requests: 0, meetings: 0, deals: 0, lost: 0, hours: 0, picConnected: 0 });
-    return { weekly: sum(wD), total: sum(tD) };
-  }, [reports, currentEventId, currentBaseDate]);
+    const s = sum(wD);
+    // 今週の全メンバーのシフトから総予定時間を算出
+    const weekShifts = shifts.filter(sh => {
+      const d = new Date(sh.date);
+      return d >= wr.start && d <= wr.end;
+    });
+    const totalScheduledHours = weekShifts.reduce((acc, sh) => {
+      const [h1, m1] = sh.startTime.split(':').map(Number);
+      const [h2, m2] = sh.endTime.split(':').map(Number);
+      return acc + (h2 + m2/60) - (h1 + m1/60);
+    }, 0);
+
+    return { weekly: s, total: sum(tD), totalScheduledHours };
+  }, [reports, currentEventId, currentBaseDate, shifts]);
 
   const memberStats = useMemo(() => {
+    const wr = getWeekRange(currentBaseDate);
+    const activeWeeklyGoals = currentEvent.weeklyGoals?.[getMondayKey(currentBaseDate)] || currentEvent.goals?.weekly || {};
+    // 一律目標の算出（メンバー数で割る）
+    const uniformGoal = members.length > 0 ? Math.ceil(activeWeeklyGoals.appts / members.length) : 0;
+
     return members.map(m => {
       const myReps = reports.filter(r => r.memberId === m.id && r.eventId === currentEventId);
       const myTot = myReps.reduce((acc, r) => ({
@@ -1116,11 +1189,34 @@ function App() {
         requests: acc.requests + (Number(r.requests)||0),
         hours: acc.hours + (Number(r.hours)||0),
         picConnected: acc.picConnected + (Number(r.picConnected)||0),
-      }), { deals: 0, prospects: 0, lost: 0, appts: 0, calls: 0, requests: 0, hours: 0, picConnected: 0 });
+        noAnswer: acc.noAnswer + (Number(r.noAnswer)||0),
+        receptionRefusal: acc.receptionRefusal + (Number(r.receptionRefusal)||0),
+        picAbsent: acc.picAbsent + (Number(r.picAbsent)||0),
+        outOfTarget: acc.outOfTarget + (Number(r.outOfTarget)||0),
+      }), { deals: 0, prospects: 0, lost: 0, appts: 0, calls: 0, requests: 0, hours: 0, picConnected: 0, noAnswer: 0, receptionRefusal: 0, picAbsent: 0, outOfTarget: 0 });
+      
       const meetings = myTot.deals + (m.role==='closer' ? myTot.prospects : 0) + myTot.lost;
-      return { ...m, ...myTot, meetings, cph: myTot.hours > 0 ? (myTot.calls / myTot.hours).toFixed(1) : "0.0" };
+      const cph = myTot.hours > 0 ? (myTot.calls / myTot.hours).toFixed(1) : "0.0";
+      
+      // 今週の稼働予定時間の計算
+      const myWeekShifts = shifts.filter(sh => {
+        const d = new Date(sh.date);
+        return sh.memberId === m.id && d >= wr.start && d <= wr.end;
+      });
+      const scheduledHours = myWeekShifts.reduce((acc, sh) => {
+        const [h1, m1] = sh.startTime.split(':').map(Number);
+        const [h2, m2] = sh.endTime.split(':').map(Number);
+        return acc + (h2 + m2/60) - (h1 + m1/60);
+      }, 0);
+
+      // 期待アポ数の計算: (過去のアポ数 / 過去の稼働時間) * 今週の予定時間
+      // データ不足の場合は全体平均（あるいは0.05程度）を仮置き
+      const apptRatePerHour = myTot.hours > 0 ? (myTot.appts / myTot.hours) : 0.05; 
+      const expectedAppts = (apptRatePerHour * scheduledHours).toFixed(1);
+
+      return { ...m, ...myTot, meetings, cph, scheduledHours, expectedAppts, uniformGoal };
     }).sort((a,b) => b.cph - a.cph);
-  }, [members, reports, currentEventId]);
+  }, [members, reports, currentEventId, shifts, currentEvent, currentBaseDate]);
 
   if (connectionStatus === "unauthenticated" || !user) {
     return (
