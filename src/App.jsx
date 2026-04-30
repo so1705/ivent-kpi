@@ -467,19 +467,21 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">架電結果の内訳解析</h4>
                    <div className="space-y-3">
                       {[
-                        { label: 'アポ獲得', val: drilldownMember.appts, color: 'bg-blue-600' },
-                        { label: '資料請求', val: drilldownMember.requests, color: 'bg-emerald-500' },
-                        { label: '本人接続 (その他)', val: drilldownMember.picConnected - drilldownMember.appts - drilldownMember.requests, color: 'bg-slate-400' },
-                        { label: '受付拒否', val: drilldownMember.receptionRefusal, color: 'bg-rose-400' },
-                        { label: '不在 / その他', val: drilldownMember.calls - drilldownMember.picConnected - drilldownMember.receptionRefusal, color: 'bg-slate-100' },
+                        { label: 'アポ獲得', val: drilldownMember.appts || 0, color: 'bg-blue-600' },
+                        { label: '資料請求', val: drilldownMember.requests || 0, color: 'bg-emerald-500' },
+                        { label: '本人接続 (その他)', val: (drilldownMember.picConnected || 0) - (drilldownMember.appts || 0) - (drilldownMember.requests || 0), color: 'bg-slate-400' },
+                        { label: '受付拒否', val: drilldownMember.receptionRefusal || 0, color: 'bg-rose-400' },
+                        { label: '不在 / その他', val: (drilldownMember.calls || 0) - (drilldownMember.picConnected || 0) - (drilldownMember.receptionRefusal || 0), color: 'bg-slate-100' },
                       ].map(item => {
-                         const p = Math.max(0, Math.min(100, (item.val / (drilldownMember.calls || 1)) * 100));
-                         if (item.val <= 0 && item.label !== 'アポ獲得') return null;
+                         const safeVal = Math.max(0, item.val);
+                         const safeCalls = Math.max(1, drilldownMember.calls || 1);
+                         const p = Math.max(0, Math.min(100, (safeVal / safeCalls) * 100));
+                         if (safeVal <= 0 && item.label !== 'アポ獲得') return null;
                          return (
                             <div key={item.label} className="space-y-1">
                                <div className="flex justify-between text-[9px] font-bold">
                                   <span className="text-slate-500">{item.label}</span>
-                                  <span className="text-slate-900">{item.val}件 ({p.toFixed(1)}%)</span>
+                                  <span className="text-slate-900">{safeVal}件 ({p.toFixed(1)}%)</span>
                                </div>
                                <div className="h-1.5 w-full bg-slate-50 rounded-full overflow-hidden">
                                   <div className={`h-full ${item.color} transition-all duration-1000`} style={{ width: `${p}%` }}></div>
@@ -1042,7 +1044,65 @@ function InputItem({ label, icon, val, set }) {
 }
 
 // ==========================================
-// 5. メインAppコンポーネント (Logic)
+// 5. GAS連携データ表示コンポーネント
+// ==========================================
+const GasSyncDataView = ({ gasData }) => {
+  return (
+    <div className="space-y-8 pb-24 font-sans">
+       <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4">
+          <h2 className="text-xl font-bold flex items-center gap-3"><Icon p={I.Zap} size={24} className="text-blue-600"/> GAS自動同期データ</h2>
+       </div>
+       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center">
+             <div className="text-[10px] font-bold text-slate-400 uppercase">同期済み総アクション数</div>
+             <div className="text-4xl font-black text-slate-900 mt-2">{gasData.length}</div>
+          </div>
+          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center">
+             <div className="text-[10px] font-bold text-slate-400 uppercase">アポ獲得同期数</div>
+             <div className="text-4xl font-black text-blue-600 mt-2">{gasData.filter(d=>d.type==='appt').length}</div>
+          </div>
+          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center">
+             <div className="text-[10px] font-bold text-slate-400 uppercase">資料送付同期数</div>
+             <div className="text-4xl font-black text-emerald-500 mt-2">{gasData.filter(d=>d.type==='request').length}</div>
+          </div>
+       </div>
+
+       <div className="space-y-2">
+          {gasData.sort((a,b) => {
+             const tA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp);
+             const tB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp);
+             return tB - tA;
+          }).map((d, i) => (
+             <div key={i} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:shadow-md transition-all">
+                <div className="flex flex-col">
+                   <span className="font-bold text-slate-900">{d.memberId}</span>
+                   <span className="text-[10px] text-slate-400 font-bold">{d.industry || '未設定'}</span>
+                </div>
+                <div className="flex items-center gap-4">
+                   <span className="px-3 py-1 bg-slate-100 rounded-full text-[10px] font-bold text-slate-600">{
+                      d.type === 'call' ? '架電' :
+                      d.type === 'appt' ? 'アポ獲得' :
+                      d.type === 'request' ? '資料送付' :
+                      d.type === 'meeting' ? '商談' : d.type
+                   }</span>
+                   <span className="text-[10px] font-bold text-slate-400">
+                     {d.timestamp?.toDate ? d.timestamp.toDate().toLocaleString() : new Date(d.timestamp).toLocaleString()}
+                   </span>
+                </div>
+             </div>
+          ))}
+          {gasData.length === 0 && (
+            <div className="p-8 text-center text-slate-400 font-bold bg-white rounded-3xl border border-slate-100">
+              まだ同期されたデータがありません
+            </div>
+          )}
+       </div>
+    </div>
+  );
+};
+
+// ==========================================
+// 6. メインAppコンポーネント (Logic)
 // ==========================================
 
 function App() {
@@ -1058,6 +1118,7 @@ function App() {
   const [members, setMembers] = useState([]);
   const [reports, setReports] = useState([]);
   const [shifts, setShifts] = useState([]);
+  const [gasData, setGasData] = useState([]);
   const [editingReport, setEditingReport] = useState(null);
 
   const defaultGoals = {
@@ -1106,6 +1167,9 @@ function App() {
         });
         onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'shifts'), (s) => {
           setShifts(s.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+        onSnapshot(collection(db, 'kpi_sync'), (s) => {
+          setGasData(s.docs.map(d => ({ id: d.id, ...d.data() })));
         });
       } else {
         setConnectionStatus("unauthenticated");
@@ -1283,6 +1347,7 @@ function App() {
             onDeleteShift={(id) => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shifts', id))} 
           />
         )}
+        {activeTab === 'gas' && <GasSyncDataView gasData={gasData} />}
         {activeTab === 'settings' && (
           <Settings 
             events={events} currentEventId={currentEventId} 
@@ -1294,12 +1359,13 @@ function App() {
         )}
       </main>
 
-      {(activeTab === 'dashboard' || activeTab === 'analytics' || activeTab === 'shifts' || activeTab === 'attendance' || activeTab === 'settings') && (
+      {(activeTab === 'dashboard' || activeTab === 'analytics' || activeTab === 'shifts' || activeTab === 'attendance' || activeTab === 'gas' || activeTab === 'settings') && (
         <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t-2 border-slate-100 flex items-center justify-between no-print pt-2 pb-6 px-4">
           <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={I.Grid} label="ホーム" />
           <NavButton active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} icon={I.PieChart} label="分析" />
           <NavButton active={activeTab === 'shifts'} onClick={() => setActiveTab('shifts')} icon={I.Calendar} label="シフト" />
           <NavButton active={activeTab === 'attendance'} onClick={() => setActiveTab('attendance')} icon={I.Clock} label="履歴/成果" />
+          <NavButton active={activeTab === 'gas'} onClick={() => setActiveTab('gas')} icon={I.Zap} label="GAS連携" />
           <NavButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={I.Settings} label="設定" />
         </nav>
       )}
