@@ -1046,52 +1046,99 @@ function InputItem({ label, icon, val, set }) {
 // ==========================================
 // 5. GAS連携データ表示コンポーネント
 // ==========================================
-const GasSyncDataView = ({ gasData }) => {
+const GasSyncDataView = ({ gasData, members }) => {
+  const [selectedMember, setSelectedMember] = useState('all');
+
+  const filteredData = selectedMember === 'all' 
+    ? gasData 
+    : gasData.filter(d => d.memberId === selectedMember);
+
+  const counts = filteredData.reduce((acc, d) => {
+    acc[d.type] = (acc[d.type] || 0) + 1;
+    return acc;
+  }, {});
+
+  const uniqueMemberIds = Array.from(new Set([
+    ...members.map(m => m.name),
+    ...gasData.map(d => d.memberId)
+  ])).filter(Boolean);
+
+  const STATUS_LIST = [
+    { key: '新規', label: '新規', color: 'text-slate-600' },
+    { key: '担当者不在', label: '担当者不在', color: 'text-slate-600' },
+    { key: '折り返し', label: '折り返し', color: 'text-orange-500' },
+    { key: '再架電🔥', label: '再架電🔥', color: 'text-rose-500' },
+    { key: '再架電😍', label: '再架電😍', color: 'text-pink-500' },
+    { key: '資料送付予定A', label: '資料A', color: 'text-emerald-600' },
+    { key: '資料送付予定B', label: '資料B', color: 'text-emerald-500' },
+    { key: '資料送付予定C', label: '資料C', color: 'text-emerald-400' },
+    { key: 'アポ確定', label: 'アポ確定', color: 'text-blue-600' },
+    { key: '受付拒否', label: '受付拒否', color: 'text-rose-600' },
+    { key: '担当者拒否', label: '担当者拒否', color: 'text-rose-700' },
+    { key: '営業時間外', label: '営業時間外', color: 'text-slate-500' },
+    { key: 'call', label: '架電 (自動)', color: 'text-slate-400' },
+    { key: 'appt', label: 'アポ (自動)', color: 'text-blue-400' },
+    { key: 'request', label: '資料 (自動)', color: 'text-emerald-400' },
+    { key: 'meeting', label: '商談 (自動)', color: 'text-purple-400' }
+  ];
+
   return (
     <div className="space-y-8 pb-24 font-sans">
-       <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4">
+       <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b-2 border-slate-900 pb-4 gap-4">
           <h2 className="text-xl font-bold flex items-center gap-3"><Icon p={I.Zap} size={24} className="text-blue-600"/> GAS自動同期データ</h2>
+          <select 
+            value={selectedMember} 
+            onChange={e => setSelectedMember(e.target.value)}
+            className="p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 outline-none shadow-sm min-w-[200px]"
+          >
+            <option value="all">全員のデータ (All)</option>
+            {uniqueMemberIds.map(m => (
+              <option key={m} value={m}>{m} のデータ</option>
+            ))}
+          </select>
        </div>
-       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center">
-             <div className="text-[10px] font-bold text-slate-400 uppercase">同期済み総アクション数</div>
-             <div className="text-4xl font-black text-slate-900 mt-2">{gasData.length}</div>
-          </div>
-          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center">
-             <div className="text-[10px] font-bold text-slate-400 uppercase">アポ獲得同期数</div>
-             <div className="text-4xl font-black text-blue-600 mt-2">{gasData.filter(d=>d.type==='appt').length}</div>
-          </div>
-          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center">
-             <div className="text-[10px] font-bold text-slate-400 uppercase">資料送付同期数</div>
-             <div className="text-4xl font-black text-emerald-500 mt-2">{gasData.filter(d=>d.type==='request').length}</div>
-          </div>
+
+       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+         <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-sm flex flex-col items-center col-span-2 md:col-span-4">
+             <div className="text-xs font-bold text-slate-400 uppercase">選択中のアクション総数</div>
+             <div className="text-5xl font-black mt-2">{filteredData.length}</div>
+         </div>
+         {STATUS_LIST.map(st => {
+            const c = counts[st.key] || 0;
+            if (c === 0 && st.key.match(/call|appt|request|meeting/)) return null; 
+            return (
+              <div key={st.key} className="bg-white p-4 rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center">
+                 <div className="text-[10px] font-bold text-slate-400 uppercase">{st.label}</div>
+                 <div className={`text-2xl font-black mt-1 ${st.color}`}>{c}</div>
+              </div>
+            );
+         })}
        </div>
 
        <div className="space-y-2">
-          {gasData.sort((a,b) => {
+          <h3 className="text-sm font-bold text-slate-500 pl-2">最近の履歴</h3>
+          {filteredData.sort((a,b) => {
              const tA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(a.timestamp);
              const tB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(b.timestamp);
              return tB - tA;
-          }).map((d, i) => (
-             <div key={i} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:shadow-md transition-all">
-                <div className="flex flex-col">
-                   <span className="font-bold text-slate-900">{d.memberId}</span>
-                   <span className="text-[10px] text-slate-400 font-bold">{d.industry || '未設定'}</span>
-                </div>
-                <div className="flex items-center gap-4">
-                   <span className="px-3 py-1 bg-slate-100 rounded-full text-[10px] font-bold text-slate-600">{
-                      d.type === 'call' ? '架電' :
-                      d.type === 'appt' ? 'アポ獲得' :
-                      d.type === 'request' ? '資料送付' :
-                      d.type === 'meeting' ? '商談' : d.type
-                   }</span>
-                   <span className="text-[10px] font-bold text-slate-400">
-                     {d.timestamp?.toDate ? d.timestamp.toDate().toLocaleString() : new Date(d.timestamp).toLocaleString()}
-                   </span>
-                </div>
-             </div>
-          ))}
-          {gasData.length === 0 && (
+          }).slice(0, 100).map((d, i) => {
+             const stInfo = STATUS_LIST.find(s => s.key === d.type) || { label: d.type, color: 'text-slate-600' };
+             return (
+               <div key={i} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:shadow-md transition-all">
+                  <div className="flex flex-col">
+                     <span className="font-bold text-slate-900">{d.memberId}</span>
+                     <span className="text-[10px] text-slate-400 font-bold">{d.industry || '未設定'}</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                     <span className={`px-3 py-1 bg-slate-50 rounded-full text-[10px] font-bold ${stInfo.color}`}>{stInfo.label}</span>
+                     <span className="text-[10px] font-bold text-slate-400">
+                       {d.timestamp?.toDate ? d.timestamp.toDate().toLocaleString() : new Date(d.timestamp).toLocaleString()}
+                     </span>
+                  </div>
+               </div>
+             )
+          })}
+          {filteredData.length === 0 && (
             <div className="p-8 text-center text-slate-400 font-bold bg-white rounded-3xl border border-slate-100">
               まだ同期されたデータがありません
             </div>
@@ -1347,7 +1394,7 @@ function App() {
             onDeleteShift={(id) => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shifts', id))} 
           />
         )}
-        {activeTab === 'gas' && <GasSyncDataView gasData={gasData} />}
+        {activeTab === 'gas' && <GasSyncDataView gasData={gasData} members={members} />}
         {activeTab === 'settings' && (
           <Settings 
             events={events} currentEventId={currentEventId} 
