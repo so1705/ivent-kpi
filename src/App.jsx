@@ -251,25 +251,40 @@ const MainMetric = ({ label, icon, current, target }) => {
 const CustomChart = ({ data, color, type = 'area' }) => {
   if (!data || data.length === 0) return <div className="h-full flex items-center justify-center text-slate-300 font-bold text-xs uppercase tracking-widest">データがありません</div>;
   const max = Math.max(...data.map(d => d.value), 1); 
-  const points = data.map((d, i) => `${(i / (data.length - 1)) * 100},${100 - (d.value / max) * 100}`).join(' ');
+  const len = Math.max(data.length - 1, 1);
+  const points = data.map((d, i) => `${(i / len) * 100},${100 - (d.value / max) * 100}`).join(' ');
   const areaPoints = `${points} 100,100 0,100`;
 
   return (
-    <div className="w-full h-full relative group flex flex-col">
-      <div className="flex-1 relative">
-        <div className="absolute inset-x-0 bottom-0 top-0 grid grid-cols-6 border-b border-l border-slate-100/50">
-          {[...Array(6)].map((_, i) => <div key={i} className="border-r border-slate-50 opacity-20" />)}
+    <div className="w-full h-full relative flex flex-col">
+      <div className="flex-1 relative flex">
+        <div className="w-8 flex flex-col justify-between text-[9px] font-bold text-slate-400 pb-2 pr-2 text-right">
+          <span>{max}</span>
+          <span>{Math.round(max / 2)}</span>
+          <span>0</span>
         </div>
-        <svg viewBox="0 -5 100 110" preserveAspectRatio="none" className="w-full h-full overflow-visible relative z-10">
-          {type === 'area' && <polygon fill={`${color}15`} points={areaPoints} />}
-          <polyline fill="none" stroke={color} strokeWidth={type === 'line' ? "4" : "3"} strokeLinejoin="round" points={points} className={type === 'line' ? "drop-shadow-md" : ""} />
-          {data.map((d, i) => (
-            <circle key={i} cx={(i / (data.length - 1)) * 100} cy={100 - (d.value / max) * 100} r={type === 'line' ? "3" : "2"} fill="white" stroke={color} strokeWidth="2" className="transition-all hover:r-4 cursor-pointer" />
-          ))}
-        </svg>
+        <div className="flex-1 relative pb-2">
+          <div className="absolute inset-x-0 top-0 bottom-2 border-b-2 border-l-2 border-slate-200 grid grid-cols-5">
+            {[...Array(5)].map((_, i) => <div key={i} className="border-r border-slate-100 opacity-50" />)}
+          </div>
+          <svg viewBox="0 -2 100 104" preserveAspectRatio="none" className="w-full h-full overflow-visible relative z-10 pb-2">
+            {type === 'area' && <polygon fill={`${color}15`} points={areaPoints} />}
+            <polyline fill="none" stroke={color} strokeWidth={type === 'line' ? "3" : "2"} strokeLinejoin="round" points={points} className={type === 'line' ? "drop-shadow-md" : ""} />
+            {data.map((d, i) => (
+              <circle key={i} cx={(i / len) * 100} cy={100 - (d.value / max) * 100} r="3" fill="white" stroke={color} strokeWidth="2" className="transition-all hover:r-4 cursor-pointer" />
+            ))}
+          </svg>
+        </div>
       </div>
-      <div className="flex justify-between mt-4 px-1">
-        {data.map((d, i) => <span key={i} className={`text-[9px] font-black uppercase ${i===data.length-1?'text-blue-600':'text-slate-400'}`}>{d.day}</span>)}
+      <div className="ml-8 mt-1 flex justify-between relative px-2">
+        {data.map((d, i) => {
+           const isShow = data.length <= 7 || i === 0 || i === data.length - 1 || i % Math.ceil(data.length/5) === 0;
+           return (
+             <span key={i} className={`text-[8px] font-black uppercase whitespace-nowrap absolute transform -translate-x-1/2 ${i===data.length-1?'text-blue-600':'text-slate-400'}`} style={{ left: `${(i/len)*100}%`, opacity: isShow ? 1 : 0 }}>
+               {d.day}
+             </span>
+           );
+        })}
       </div>
     </div>
   );
@@ -1048,15 +1063,47 @@ function InputItem({ label, icon, val, set }) {
 // ==========================================
 const GasSyncDataView = ({ gasData, members }) => {
   const [selectedMember, setSelectedMember] = useState('all');
+  const [selectedPeriod, setSelectedPeriod] = useState('all');
 
-  const filteredData = selectedMember === 'all' 
-    ? gasData 
-    : gasData.filter(d => d.memberId === selectedMember);
+  const now = new Date();
+  
+  const filteredData = gasData.filter(d => {
+    if (selectedMember !== 'all' && d.memberId !== selectedMember) return false;
+    
+    if (selectedPeriod !== 'all') {
+      const dDate = d.timestamp?.toDate ? d.timestamp.toDate() : new Date(d.timestamp);
+      if (selectedPeriod === 'today') {
+        if (dDate.toDateString() !== now.toDateString()) return false;
+      } else if (selectedPeriod === 'week') {
+        const weekAgo = new Date();
+        weekAgo.setDate(now.getDate() - 7);
+        if (dDate < weekAgo) return false;
+      } else if (selectedPeriod === 'month') {
+        if (dDate.getMonth() !== now.getMonth() || dDate.getFullYear() !== now.getFullYear()) return false;
+      }
+    }
+    return true;
+  });
 
   const counts = filteredData.reduce((acc, d) => {
     acc[d.type] = (acc[d.type] || 0) + 1;
     return acc;
   }, {});
+
+  const dailyTrend = useMemo(() => {
+    const map = {};
+    filteredData.forEach(r => {
+      if (!r.timestamp) return;
+      const d = r.timestamp?.toDate ? r.timestamp.toDate() : new Date(r.timestamp);
+      const dayStr = `${d.getMonth()+1}/${d.getDate()}`;
+      map[dayStr] = (map[dayStr] || 0) + 1;
+    });
+    return Object.entries(map).map(([day, value]) => ({ day, value })).sort((a,b) => {
+      const [am, ad] = a.day.split('/').map(Number);
+      const [bm, bd] = b.day.split('/').map(Number);
+      return am !== bm ? am - bm : ad - bd;
+    }).slice(-14);
+  }, [filteredData]);
 
   const uniqueMemberIds = Array.from(new Set([
     ...members.map(m => m.name),
@@ -1086,17 +1133,38 @@ const GasSyncDataView = ({ gasData, members }) => {
     <div className="space-y-8 pb-24 font-sans">
        <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b-2 border-slate-900 pb-4 gap-4">
           <h2 className="text-xl font-bold flex items-center gap-3"><Icon p={I.Zap} size={24} className="text-blue-600"/> GAS自動同期データ</h2>
-          <select 
-            value={selectedMember} 
-            onChange={e => setSelectedMember(e.target.value)}
-            className="p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 outline-none shadow-sm min-w-[200px]"
-          >
-            <option value="all">全員のデータ (All)</option>
-            {uniqueMemberIds.map(m => (
-              <option key={m} value={m}>{m} のデータ</option>
-            ))}
-          </select>
+          <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+            <select 
+              value={selectedPeriod} 
+              onChange={e => setSelectedPeriod(e.target.value)}
+              className="p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 outline-none shadow-sm flex-1 md:flex-none"
+            >
+              <option value="all">全期間 (All Time)</option>
+              <option value="today">今日 (Today)</option>
+              <option value="week">直近1週間 (7 Days)</option>
+              <option value="month">今月 (This Month)</option>
+            </select>
+            <select 
+              value={selectedMember} 
+              onChange={e => setSelectedMember(e.target.value)}
+              className="p-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-700 outline-none shadow-sm flex-1 md:flex-none min-w-[200px]"
+            >
+              <option value="all">全員のデータ (All)</option>
+              {uniqueMemberIds.map(m => (
+                <option key={m} value={m}>{m} のデータ</option>
+              ))}
+            </select>
+          </div>
        </div>
+
+       {dailyTrend.length > 0 && (
+         <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm h-[300px]">
+           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">アクション数の推移</h3>
+           <div className="h-[200px]">
+             <CustomChart data={dailyTrend} color="#4f46e5" type="area" />
+           </div>
+         </div>
+       )}
 
        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
          <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-sm flex flex-col items-center col-span-2 md:col-span-4">
