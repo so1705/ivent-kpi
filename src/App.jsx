@@ -256,36 +256,38 @@ const CustomChart = ({ data, color, type = 'area' }) => {
   const areaPoints = `${points} 100,100 0,100`;
 
   return (
-    <div className="w-full h-full relative flex flex-col">
+    <div className="w-full h-full relative flex flex-col pl-4 pb-2">
+      <div className="absolute -left-2 top-1/2 -translate-y-1/2 -rotate-90 text-[10px] font-bold text-slate-400 tracking-widest">件数</div>
       <div className="flex-1 relative flex">
-        <div className="w-8 flex flex-col justify-between text-[9px] font-bold text-slate-400 pb-2 pr-2 text-right">
+        <div className="w-6 flex flex-col justify-between text-[10px] font-bold text-slate-400 pb-1 pr-2 text-right">
           <span>{max}</span>
           <span>{Math.round(max / 2)}</span>
           <span>0</span>
         </div>
-        <div className="flex-1 relative pb-2">
-          <div className="absolute inset-x-0 top-0 bottom-2 border-b-2 border-l-2 border-slate-200 grid grid-cols-5">
-            {[...Array(5)].map((_, i) => <div key={i} className="border-r border-slate-100 opacity-50" />)}
+        <div className="flex-1 relative border-b-2 border-l-2 border-slate-200">
+          <div className="absolute inset-0 flex justify-between">
+            {[...Array(5)].map((_, i) => <div key={i} className="w-px h-full bg-slate-100 opacity-50" />)}
           </div>
-          <svg viewBox="0 -2 100 104" preserveAspectRatio="none" className="w-full h-full overflow-visible relative z-10 pb-2">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full absolute inset-0 z-10 overflow-visible">
             {type === 'area' && <polygon fill={`${color}15`} points={areaPoints} />}
-            <polyline fill="none" stroke={color} strokeWidth={type === 'line' ? "3" : "2"} strokeLinejoin="round" points={points} className={type === 'line' ? "drop-shadow-md" : ""} />
+            <polyline fill="none" stroke={color} strokeWidth={type === 'line' ? "3" : "2"} strokeLinejoin="round" points={points} vectorEffect="non-scaling-stroke" />
             {data.map((d, i) => (
-              <circle key={i} cx={(i / len) * 100} cy={100 - (d.value / max) * 100} r="3" fill="white" stroke={color} strokeWidth="2" className="transition-all hover:r-4 cursor-pointer" />
+              <circle key={i} cx={(i / len) * 100} cy={100 - (d.value / max) * 100} r="1.5" fill="white" stroke={color} strokeWidth="1" vectorEffect="non-scaling-stroke" />
             ))}
           </svg>
         </div>
       </div>
-      <div className="ml-8 mt-1 flex justify-between relative px-2">
+      <div className="ml-6 mt-2 relative h-4">
         {data.map((d, i) => {
            const isShow = data.length <= 7 || i === 0 || i === data.length - 1 || i % Math.ceil(data.length/5) === 0;
            return (
-             <span key={i} className={`text-[8px] font-black uppercase whitespace-nowrap absolute transform -translate-x-1/2 ${i===data.length-1?'text-blue-600':'text-slate-400'}`} style={{ left: `${(i/len)*100}%`, opacity: isShow ? 1 : 0 }}>
+             <span key={i} className={`text-[9px] font-bold uppercase whitespace-nowrap absolute transform -translate-x-1/2 ${i===data.length-1?'text-blue-600':'text-slate-400'}`} style={{ left: `${(i/len)*100}%`, opacity: isShow ? 1 : 0 }}>
                {d.day}
              </span>
            );
         })}
       </div>
+      <div className="text-center text-[10px] font-bold text-slate-400 tracking-widest mt-1">日付</div>
     </div>
   );
 };

@@ -1,0 +1,2420 @@
+
+/**
+ * ============================================================================
+ * 【BeMeキャリア 業務自動化システム v2.11.1 完全版 / target checkbox + row fallback + no-gray + auto-uncheck】
+ *
+ * この版の前提:
+ *   - 設定シートB3には info の primary calendar ID（例: info@bemecareer.com）を入れる
+ *   - アポインターには info primary calendar への「予定の変更」権限を付与する
+ *   - Calendar API の sendUpdates は "all" を使用し、正式な予定招待も送る
+ *
+ * v2.6の主な追加:
+ *   - 企業マスターに自動採番の企業IDを追加し、フィルタ中でもズレずに記録できるよう修正
+ *   - アクティブ案件に案件IDを追加し、各フォーム更新のズレを防止
+ *   - 設定シートにイベントステータス候補マスターを自動作成し、UIとプルダウンの参照元を統一
+ *   - テレアポ記録のメモ/次回トーク要点を追記蓄積に修正
+ *   - 既存データに対しても不足列・ID・設定候補を自動補完
+ *
+ * 旧版から継続する主な機能:
+ *   - テレアポ記録フォーム内で、アポ獲得者 / 商談担当者 / 担当者名 / メールを入力可能
+ *   - テレアポ結果とステータスを完全連動
+ *   - 資料送付予定A/B/C・アポ確定は、企業マスターからアクティブ案件へ自動反映
+ *   - アポセットアップもフォーム化し、セル入力を最小化
+ *   - 商談・後追い更新フォームを強化し、6/27・8/29・11月イベントの可視化を追加
+ *   - 次回 / 中間 / 最終アプローチ日を info カレンダーへ自動登録・更新
+ *   - 既存のアクティブ案件シートに不足列があれば自動で追加
+ *
+ * このファイル全体をGASエディタにコピペしてください(全置換)。
+ * ============================================================================
+ */
+
+const CONFIG = {
+  SS_MASTER: '企業マスター',
+  SS_ACTIVE: 'アクティブ案件',
+  SS_SETTINGS: '設定',
+
+  M_TARGET: 1,
+  M_STATUS: 2, M_NEXT_DATE: 3, M_APPOINTER: 4, M_MEETING_REP: 5,
+  M_COMPANY: 6, M_TEL: 7, M_INDUSTRY: 8, M_MEMO: 9,
+  M_EMAIL: 10, M_STAFF: 11, M_CALL_COUNT: 12, M_LAST_CALL: 13,
+  M_HISTORY: 14, M_TALK_POINT: 15, M_TRANSFER: 16, M_CHECKBOX: 17, M_COMPANY_ID: 18,
+
+  A_TARGET: 1,
+  A_KIND: 2,
+  A_NEXT_DATE: 3,
+  A_NEXT_KIND: 4,
+  A_PRIORITY: 5,
+  A_COMPANY: 6,
+  A_STAFF: 7,
+  A_TEL: 8,
+  A_EMAIL: 9,
+  A_APPOINTER: 10,
+  A_MEETING_REP: 11,
+  A_DOC_RANK: 12,
+  A_DOC_DATE: 13,
+  A_DOC_SENT: 14,
+  A_MEET_TIME: 15,
+  A_MEET_URL: 16,
+  A_MAIL_SENT: 17,
+  A_MEET_DONE: 18,
+  A_MEET_MEMO: 19,
+  A_ACTION_COUNT: 20,
+  A_LAST_ACTION: 21,
+  A_LAST_RESULT: 22,
+  A_HISTORY: 23,
+  A_JUNE_STATUS: 24,
+  A_AUG_STATUS: 25,
+  A_NOV_STATUS: 26,
+  A_NEXT_MONTH: 27,
+  A_NEXT_APPROACH_DATE: 28,
+  A_NEXT_METHOD: 29,
+  A_NEXT_CONTENT: 30,
+  A_MID_DATE: 31,
+  A_MID_METHOD: 32,
+  A_MID_CONTENT: 33,
+  A_FINAL_DATE: 34,
+  A_FINAL_METHOD: 35,
+  A_FINAL_CONTENT: 36,
+  A_WON: 37,
+  A_LOST_DATE: 38,
+  A_LOST_REASON: 39,
+  A_NOTE: 40,
+  A_NEXT_CAL_ID: 41,
+  A_MID_CAL_ID: 42,
+  A_FINAL_CAL_ID: 43,
+  A_RECORD_ID: 44,
+
+  S_CC_EMAIL_CELL: 'B2',
+  S_INFO_CALENDAR_ID_CELL: 'B3',
+  S_EVENT_STATUS_START_ROW: 31,
+  S_EVENT_STATUS_COL: 1,
+
+  // CONFIG オブジェクト内に追加
+FIREBASE_PROJECT_ID: 'ivent-kpi',
+FIREBASE_API_KEY: 'AIzaSyBnvOnuKhldjHQGGpKSpI4TGo4a74_eaj0',
+
+};
+
+const MY_EMAIL = Session.getActiveUser().getEmail();
+
+const STATUS_OPTIONS = ['新規', '担当者不在', '折り返し', '再架電🔥', '再架電😍',
+  '資料送付予定A', '資料送付予定B', '資料送付予定C', 'アポ確定',
+  '受付拒否', '担当者拒否', '不通', '失注', '営業時間外'];
+const MEMBER_OPTIONS = ['森平', '山本和葉', '山本乙羽', '新谷', '大嵜', '米田', '小嶋', '嶋田'];
+const INDUSTRY_OPTIONS = ['IT・通信', '金融・保険', '商社・卸売', '小売・流通',
+  '製造・メーカー', '建設・不動産', '運輸・物流', 'サービス業',
+  '医療・福祉・介護', '教育・学習支援', '広告・マスコミ', '外食・飲食',
+  '人材・コンサル', '公益・インフラ', 'その他'];
+const KIND_OPTIONS = ['資料送付', 'アポ確定', '商談済', 'クローズ'];
+const NEXT_KIND_OPTIONS = ['資料後追い', '中間フォロー', '最終フォロー', '商談後フォロー', 'Meet準備', 'その他'];
+const PRIORITY_OPTIONS = ['🔥高', '⭐中', '普通'];
+const DOC_RANK_OPTIONS = ['', '資料送付予定A', '資料送付予定B', '資料送付予定C'];
+const RESULT_OPTIONS = ['不在', '折り返し依頼', 'NG', 'ポジティブ', '資料再送希望', '返信あり', '返信なし', 'アポ確定'];
+const LOST_REASON_OPTIONS = ['', '予算不足', 'ニーズ不一致', 'タイミング不適', '競合採用', '連絡不通', 'その他'];
+const EVENT_STATUS_OPTIONS = ['', '検討中', '見送り', '出展決定'];
+const APPROACH_METHOD_OPTIONS = ['', '電話', 'メール', 'LINE', '再商談', 'その他'];
+const EVENT_MONTH_OPTIONS = ['', '6月', '8月', '11月'];
+const OUTCOME_MODE_OPTIONS = ['通常更新', '出展決定', '失注'];
+
+const MASTER_HEADERS = [
+  '対象',
+  'ステータス', '次回架電予定日', 'アポ獲得者', '商談担当者', '会社名',
+  '電話番号', '業種', 'メモ', 'メールアドレス', '担当者名',
+  '架電回数', '前回架電日', '履歴ログ', '次回トーク要点', '転送先', 'チェックボックス', '企業ID'
+];
+
+const ACTIVE_HEADERS = [
+  '対象',
+  '案件種別', '次回アクション日', '次回アクション種別', '優先度', '会社名',
+  '担当者名', '電話番号', 'メールアドレス', 'アポ獲得者', '商談担当者',
+  '資料ランク', '資料送付日', '資料送付済み', '商談日時', 'Meet URL',
+  'メール送信済', '商談実施済', '商談メモ', 'アクション回数', '前回アクション日',
+  '前回結果', '履歴ログ', '6/27イベント', '8/29イベント', '11月イベント',
+  '次回アプローチ月', '次回アプローチ日', '次回アプローチ方法', '次回内容',
+  '中間アプローチ日', '中間方法', '中間内容', '最終決定アプローチ日', '最終方法', '最終決定内容',
+  '出展決定', '失注日', '失注理由', '備考', '次回カレンダーID', '中間カレンダーID', '最終カレンダーID', '案件ID'
+];
+
+function onOpen() {
+  try { ensureSettingsSheetStructure_(); ensureMasterSheetStructure_(); ensureActiveSheetStructure_(); } catch (e) { console.error(e); }
+  SpreadsheetApp.getUi().createMenu('🚀 業務自動化')
+    .addItem('📞 テレアポ記録(企業マスター用)', 'recordTelCall')
+    .addSeparator()
+    .addItem('📧 資料送付メール作成(アクティブ案件用)', 'createMaterialMail')
+    .addItem('🗓️ アポセットアップ(アクティブ案件用)', 'setupAppointment')
+    .addItem('📞 資料送付後追い(アクティブ案件用)', 'recordFollowup')
+    .addItem('📝 商談更新(アクティブ案件用)', 'recordMeetingOutcome')
+    .addSeparator()
+    .addItem('🔑 初回権限承認(全メンバー初回のみ)', 'checkPermissions')
+    .addSeparator()
+    .addItem('🧱 ID/隠し列セットアップ', 'setupIdColumnsAndRepair_')
+    .addItem('🔄 メンバー情報をアプリに同期', 'syncMembersToFirestore')
+    .addToUi();
+}
+
+
+
+function setupIdColumnsAndRepair_() {
+  const ui = SpreadsheetApp.getUi();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  ensureSettingsSheetStructure_();
+  ensureMasterSheetStructure_();
+  ensureActiveSheetStructure_();
+  const master = ss.getSheetByName(CONFIG.SS_MASTER);
+  const active = ss.getSheetByName(CONFIG.SS_ACTIVE);
+  const masterLast = Math.max(master ? master.getLastRow() : 1, 2);
+  const activeLast = Math.max(active ? active.getLastRow() : 1, 2);
+  const masterIds = master && masterLast > 1 ? master.getRange(2, CONFIG.M_COMPANY_ID, masterLast - 1, 1).getValues().flat().filter(v => String(v || '').trim()).length : 0;
+  const activeIds = active && activeLast > 1 ? active.getRange(2, CONFIG.A_RECORD_ID, activeLast - 1, 1).getValues().flat().filter(v => String(v || '').trim()).length : 0;
+  SpreadsheetApp.flush();
+  ui.alert(
+    '✅ ID/隠し列セットアップ完了',
+    `企業マスター: R列「企業ID」を自動作成・補完しました（${masterIds}件）\nアクティブ案件: AR列「案件ID」を自動作成・補完しました（${activeIds}件）\n\n列は自動で非表示にしています。確認したい場合は列の再表示で R / AR を開いてください。`,
+    ui.ButtonSet.OK
+  );
+}
+
+function getStableCurrentCell_(sheet) {
+  SpreadsheetApp.flush();
+  Utilities.sleep(120);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const selection = ss.getSelection();
+  let cell = null;
+  try {
+    if (selection && selection.getCurrentCell && selection.getCurrentCell()) {
+      cell = selection.getCurrentCell();
+    }
+  } catch (e) {}
+  if (!cell) {
+    try { cell = ss.getCurrentCell(); } catch (e) {}
+  }
+  if (!cell && sheet.getActiveCell) {
+    try { cell = sheet.getActiveCell(); } catch (e) {}
+  }
+  if (!cell && selection && selection.getActiveRange && selection.getActiveRange()) {
+    try { cell = selection.getActiveRange().getCell(1, 1); } catch (e) {}
+  }
+  if (!cell) return null;
+  if (cell.getSheet().getName() !== sheet.getName()) return null;
+  return cell;
+}
+
+
+function getStableCurrentRow_(sheet) {
+  const cell = getStableCurrentCell_(sheet);
+  return cell ? cell.getRow() : -1;
+}
+
+const SELECTION_CTX_KEY = 'MASTER_COMPANY_SELECTION_CTX';
+
+function onSelectionChange(e) {
+  try {
+    if (!e || !e.range) return;
+    const range = e.range;
+    const sheet = range.getSheet();
+    if (!sheet || sheet.getName() !== CONFIG.SS_MASTER) return;
+    if (range.getColumn() !== CONFIG.M_COMPANY) return;
+    if (range.getNumRows() !== 1 || range.getNumColumns() !== 1) return;
+
+    ensureMasterSheetStructure_();
+    const row = range.getRow();
+    if (row <= 1) return;
+
+    const company = String(range.getDisplayValue() || range.getValue() || '').trim();
+    if (!company) return;
+
+    const idCell = sheet.getRange(row, CONFIG.M_COMPANY_ID);
+    let companyId = String(idCell.getValue() || '').trim();
+    if (!companyId) {
+      companyId = generateUniqueId_('CMP');
+      idCell.setValue(companyId);
+    }
+
+    const payload = {
+      sheetName: sheet.getName(),
+      row: row,
+      column: range.getColumn(),
+      company: company,
+      companyId: companyId,
+      at: Date.now()
+    };
+    PropertiesService.getUserProperties().setProperty(SELECTION_CTX_KEY, JSON.stringify(payload));
+  } catch (err) {
+    console.error('onSelectionChange error: ' + err.message);
+  }
+}
+
+function getStoredMasterSelectionContext_() {
+  try {
+    const raw = PropertiesService.getUserProperties().getProperty(SELECTION_CTX_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || parsed.sheetName !== CONFIG.SS_MASTER) return null;
+    if (!parsed.row || !parsed.company) return null;
+    if (Date.now() - Number(parsed.at || 0) > 1000 * 60 * 30) return null;
+    return parsed;
+  } catch (err) {
+    return null;
+  }
+}
+
+function clearStoredMasterSelectionContext_() {
+  try { PropertiesService.getUserProperties().deleteProperty(SELECTION_CTX_KEY); } catch (err) {}
+}
+
+function ensureMasterIdColumn_(sheet) {
+  // 旧呼び出し互換。必要列を用意し、既存IDを補完する。
+  ensureMasterSheetStructure_();
+  if (sheet && sheet.getName && sheet.getName() === CONFIG.SS_MASTER) {
+    if (sheet.getMaxColumns() >= CONFIG.M_COMPANY_ID) sheet.hideColumns(CONFIG.M_COMPANY_ID);
+    backfillMasterCompanyIds_(sheet);
+    return;
+  }
+  const master = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SS_MASTER);
+  if (master) {
+    if (master.getMaxColumns() >= CONFIG.M_COMPANY_ID) master.hideColumns(CONFIG.M_COMPANY_ID);
+    backfillMasterCompanyIds_(master);
+  }
+}
+
+function getSelectedMasterCompanyContext_(sheet) {
+  ensureMasterIdColumn_(sheet);
+
+  const stored = getStoredMasterSelectionContext_();
+  let selectedName = '';
+  let currentRow = -1;
+  let hintedId = '';
+
+  if (stored) {
+    selectedName = String(stored.company || '').trim();
+    currentRow = Number(stored.row || -1);
+    hintedId = String(stored.companyId || '').trim();
+  } else {
+    const cell = getStableCurrentCell_(sheet);
+    if (!cell) return { ok: false, message: '会社名セル（E列）をクリックしてから実行してください。' };
+    if (cell.getColumn() !== CONFIG.M_COMPANY) {
+      return { ok: false, message: '企業マスターでは「会社名」セル（E列）をクリックしてから実行してください。' };
+    }
+    selectedName = String(cell.getDisplayValue() || cell.getValue() || '').trim();
+    currentRow = cell.getRow();
+    hintedId = String(sheet.getRange(currentRow, CONFIG.M_COMPANY_ID).getValue() || '').trim();
+  }
+
+  if (!selectedName) return { ok: false, message: '会社名セルが空です。会社名が入っているセルを選んでください。' };
+
+  const lastRow = Math.max(sheet.getLastRow(), 2);
+  if (lastRow < 2) return { ok: false, message: '企業マスターにデータがありません。' };
+
+  const companyVals = sheet.getRange(2, CONFIG.M_COMPANY, lastRow - 1, 1).getDisplayValues();
+  const idVals = sheet.getRange(2, CONFIG.M_COMPANY_ID, lastRow - 1, 1).getValues();
+  const candidates = [];
+  for (let i = 0; i < companyVals.length; i++) {
+    const name = String(companyVals[i][0] || '').trim();
+    if (name === selectedName) {
+      let id = String(idVals[i][0] || '').trim();
+      const row = i + 2;
+      if (!id) {
+        id = generateUniqueId_('CMP');
+        sheet.getRange(row, CONFIG.M_COMPANY_ID).setValue(id);
+      }
+      candidates.push({ row: row, company: name, companyId: id });
+    }
+  }
+
+  if (candidates.length === 0) {
+    return { ok: false, message: `会社名「${selectedName}」に一致する行が見つかりません。` };
+  }
+
+  if (hintedId) {
+    const exactById = candidates.find(c => c.companyId === hintedId);
+    if (exactById) return { ok: true, row: exactById.row, company: exactById.company, companyId: exactById.companyId };
+  }
+
+  const exactByRow = candidates.find(c => c.row === currentRow);
+  if (exactByRow) return { ok: true, row: exactByRow.row, company: exactByRow.company, companyId: exactByRow.companyId };
+
+  if (candidates.length === 1) return { ok: true, row: candidates[0].row, company: candidates[0].company, companyId: candidates[0].companyId };
+
+  return {
+    ok: false,
+    message: `会社名「${selectedName}」が複数行あります。会社名セルを押し直してから実行するか、重複行を整理してください。候補行: ${candidates.map(c => c.row).join(', ')}`
+  };
+}
+
+
+
+function getMasterCompanyCandidatesForDialog_(sheet) {
+  ensureMasterIdColumn_(sheet);
+  const lastRow = Math.max(sheet.getLastRow(), 2);
+  if (lastRow < 2) return [];
+
+  const numRows = lastRow - 1;
+  const companies = sheet.getRange(2, CONFIG.M_COMPANY, numRows, 1).getDisplayValues();
+  const ids = sheet.getRange(2, CONFIG.M_COMPANY_ID, numRows, 1).getValues();
+  const tels = sheet.getRange(2, CONFIG.M_TEL, numRows, 1).getDisplayValues();
+  const staffs = sheet.getRange(2, CONFIG.M_STAFF, numRows, 1).getDisplayValues();
+  const emails = sheet.getRange(2, CONFIG.M_EMAIL, numRows, 1).getDisplayValues();
+  const appointers = sheet.getRange(2, CONFIG.M_APPOINTER, numRows, 1).getDisplayValues();
+  const meetingReps = sheet.getRange(2, CONFIG.M_MEETING_REP, numRows, 1).getDisplayValues();
+
+  const candidates = [];
+  for (let i = 0; i < numRows; i++) {
+    const row = i + 2;
+    const company = String(companies[i][0] || '').trim();
+    if (!company) continue;
+    if (sheet.isRowHiddenByFilter && sheet.isRowHiddenByFilter(row)) continue;
+    if (sheet.isRowHiddenByUser && sheet.isRowHiddenByUser(row)) continue;
+
+    let companyId = String(ids[i][0] || '').trim();
+    if (!companyId) {
+      companyId = generateUniqueId_('CMP');
+      sheet.getRange(row, CONFIG.M_COMPANY_ID).setValue(companyId);
+    }
+
+    candidates.push({
+      row: row,
+      companyId: companyId,
+      company: company,
+      tel: String(tels[i][0] || '').trim(),
+      staff: String(staffs[i][0] || '').trim(),
+      email: String(emails[i][0] || '').trim(),
+      appointer: String(appointers[i][0] || '').trim(),
+      meetingRep: String(meetingReps[i][0] || '').trim()
+    });
+  }
+  return candidates;
+}
+
+function getPreferredMasterCandidateId_(sheet, candidates) {
+  if (!candidates || !candidates.length) return '';
+  const current = getStableCurrentCell_(sheet);
+  if (current && current.getSheet().getName() === sheet.getName()) {
+    const row = current.getRow();
+    const hit = candidates.find(c => c.row === row);
+    if (hit) return hit.companyId;
+  }
+  const stored = getStoredMasterSelectionContext_();
+  if (stored && stored.companyId) {
+    const hit = candidates.find(c => c.companyId === stored.companyId);
+    if (hit) return hit.companyId;
+  }
+  return String(candidates[0].companyId || '');
+}
+
+function initialSetup() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.alert('🛠️ 初回セットアップ',
+    'シート3枚を全自動で構築します。既存の同名シートは上書きされます。\n本当に実行しますか?',
+    ui.ButtonSet.YES_NO);
+  if (response !== ui.Button.YES) return;
+
+  try {
+    setupMasterSheet();
+    setupActiveSheet();
+    setupSettingsSheet();
+    ui.alert('✅ セットアップ完了',
+      'シート3枚が構築されました。\n\n次:\n1. 設定シートで実データ差し替え\n2. 「🔑初回権限承認」を実行\n3. 企業マスターから運用開始',
+      ui.ButtonSet.OK);
+  } catch(e) {
+    ui.alert('❌ エラー', e.message + '\n' + e.stack, ui.ButtonSet.OK);
+  }
+}
+
+function upgradeActiveSheetStructure() {
+  ensureActiveSheetStructure_();
+  SpreadsheetApp.getUi().alert('✅ 拡張列の確認・追加が完了しました。', SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+function setupMasterSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(CONFIG.SS_MASTER);
+  if (sheet) ss.deleteSheet(sheet);
+  sheet = ss.insertSheet(CONFIG.SS_MASTER);
+
+  sheet.getRange(1, 1, 1, MASTER_HEADERS.length).setValues([MASTER_HEADERS]);
+  sheet.getRange(1, 1, 1, MASTER_HEADERS.length)
+    .setBackground('#1a73e8').setFontColor('#ffffff')
+    .setFontWeight('bold').setHorizontalAlignment('center');
+  sheet.setFrozenRows(1);
+
+  const widths = [46,110, 120, 100, 100, 220, 130, 120, 220, 220, 120, 80, 110, 300, 280, 220, 110, 120];
+  widths.forEach((w, i) => sheet.setColumnWidth(i + 1, w));
+
+  const dataRows = 1000;
+  const startRow = 2;
+  const endRow = startRow + dataRows - 1;
+
+  sheet.getRange(startRow, CONFIG.M_TARGET, dataRows, 1).insertCheckboxes();
+  setDropdown(sheet, CONFIG.M_STATUS, startRow, endRow, STATUS_OPTIONS);
+  setDropdown(sheet, CONFIG.M_APPOINTER, startRow, endRow, MEMBER_OPTIONS);
+  setDropdown(sheet, CONFIG.M_MEETING_REP, startRow, endRow, [''].concat(MEMBER_OPTIONS));
+  setDropdown(sheet, CONFIG.M_INDUSTRY, startRow, endRow, [''].concat(INDUSTRY_OPTIONS));
+  sheet.getRange(startRow, CONFIG.M_CHECKBOX, dataRows, 1).insertCheckboxes();
+
+  const rules = [];
+  rules.push(SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied('=AND($C2<>"", $C2<TODAY())')
+    .setBackground('#f8bbd0')
+    .setRanges([sheet.getRange(`B${startRow}:B${endRow}`)]).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied('=$C2=TODAY()')
+    .setBackground('#ef5350').setFontColor('#ffffff')
+    .setRanges([sheet.getRange(`B${startRow}:B${endRow}`)]).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied('=$C2=TODAY()+1')
+    .setBackground('#fff59d')
+    .setRanges([sheet.getRange(`B${startRow}:B${endRow}`)]).build());
+  sheet.setConditionalFormatRules(rules);
+  sheet.hideColumns(CONFIG.M_COMPANY_ID);
+  backfillMasterCompanyIds_(sheet);
+}
+
+function setupActiveSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(CONFIG.SS_ACTIVE);
+  if (sheet) ss.deleteSheet(sheet);
+  sheet = ss.insertSheet(CONFIG.SS_ACTIVE);
+  sheet.getRange(1, 1, 1, ACTIVE_HEADERS.length).setValues([ACTIVE_HEADERS]);
+  applyActiveSheetFormatting_(sheet);
+}
+
+function ensureActiveSheetStructure_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(CONFIG.SS_ACTIVE);
+  if (!sheet) return;
+  if (String(sheet.getRange(1, 1).getValue() || '').trim() !== '対象') {
+    sheet.insertColumnBefore(1);
+  }
+  const lastCol = sheet.getLastColumn();
+  if (lastCol < ACTIVE_HEADERS.length) {
+    sheet.insertColumnsAfter(lastCol, ACTIVE_HEADERS.length - lastCol);
+    sheet.getRange(1, lastCol + 1, 1, ACTIVE_HEADERS.length - lastCol)
+      .setValues([ACTIVE_HEADERS.slice(lastCol)]);
+  }
+  sheet.getRange(1, 1, 1, ACTIVE_HEADERS.length).setValues([ACTIVE_HEADERS]);
+  applyActiveSheetFormatting_(sheet);
+}
+
+function applyActiveSheetFormatting_(sheet) {
+  const widths = [46,90,120,130,85,220,120,130,220,100,100,130,100,90,150,220,100,100,300,80,110,120,320,110,110,110,110,135,120,220,135,120,220,150,120,220,90,100,130,220,120,120,120,120];
+  sheet.getRange(1, 1, 1, ACTIVE_HEADERS.length).setValues([ACTIVE_HEADERS]);
+  sheet.getRange(1, 1, 1, ACTIVE_HEADERS.length).setFontWeight('bold').setHorizontalAlignment('center');
+  sheet.getRange(1, 1, 1, 4).setBackground('#bbdefb');
+  sheet.getRange(1, 5, 1, 6).setBackground('#ffffff');
+  sheet.getRange(1, 11, 1, 5).setBackground('#c8e6c9');
+  sheet.getRange(1, 16, 1, 7).setBackground('#fff9c4');
+  sheet.getRange(1, 23, 1, 13).setBackground('#ffe0b2');
+  sheet.getRange(1, 36, 1, 7).setBackground('#f8bbd0');
+  widths.forEach((w, i) => sheet.setColumnWidth(i + 1, w));
+  sheet.setFrozenRows(1);
+
+  const dataRows = Math.max(1000, sheet.getMaxRows() - 1);
+  const startRow = 2;
+  const endRow = startRow + dataRows - 1;
+
+  sheet.getRange(startRow, CONFIG.A_TARGET, dataRows, 1).insertCheckboxes();
+  setDropdown(sheet, CONFIG.A_KIND, startRow, endRow, KIND_OPTIONS);
+  setDropdown(sheet, CONFIG.A_NEXT_KIND, startRow, endRow, NEXT_KIND_OPTIONS);
+  setDropdown(sheet, CONFIG.A_PRIORITY, startRow, endRow, PRIORITY_OPTIONS);
+  setDropdown(sheet, CONFIG.A_APPOINTER, startRow, endRow, [''].concat(MEMBER_OPTIONS));
+  setDropdown(sheet, CONFIG.A_MEETING_REP, startRow, endRow, [''].concat(MEMBER_OPTIONS));
+  setDropdown(sheet, CONFIG.A_DOC_RANK, startRow, endRow, DOC_RANK_OPTIONS);
+  setDropdown(sheet, CONFIG.A_LAST_RESULT, startRow, endRow, [''].concat(RESULT_OPTIONS));
+  setDropdown(sheet, CONFIG.A_LOST_REASON, startRow, endRow, LOST_REASON_OPTIONS);
+  const settings = getSettings();
+  const eventStatusOptions = settings.eventStatusOptions && settings.eventStatusOptions.length ? settings.eventStatusOptions : EVENT_STATUS_OPTIONS;
+  setDropdown(sheet, CONFIG.A_JUNE_STATUS, startRow, endRow, eventStatusOptions);
+  setDropdown(sheet, CONFIG.A_AUG_STATUS, startRow, endRow, eventStatusOptions);
+  setDropdown(sheet, CONFIG.A_NOV_STATUS, startRow, endRow, eventStatusOptions);
+  setDropdown(sheet, CONFIG.A_NEXT_MONTH, startRow, endRow, EVENT_MONTH_OPTIONS);
+  setDropdown(sheet, CONFIG.A_NEXT_METHOD, startRow, endRow, APPROACH_METHOD_OPTIONS);
+  setDropdown(sheet, CONFIG.A_MID_METHOD, startRow, endRow, APPROACH_METHOD_OPTIONS);
+  setDropdown(sheet, CONFIG.A_FINAL_METHOD, startRow, endRow, APPROACH_METHOD_OPTIONS);
+
+  sheet.getRange(startRow, CONFIG.A_DOC_SENT, dataRows, 1).insertCheckboxes();
+  sheet.getRange(startRow, CONFIG.A_MAIL_SENT, dataRows, 1).insertCheckboxes();
+  sheet.getRange(startRow, CONFIG.A_MEET_DONE, dataRows, 1).insertCheckboxes();
+  sheet.getRange(startRow, CONFIG.A_WON, dataRows, 1).insertCheckboxes();
+
+  const allRange = `A${startRow}:${columnNumberToLetter(ACTIVE_HEADERS.length)}${endRow}`;
+  const rules = [];
+  rules.push(SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied('=AND($C2<>"", $C2<TODAY())')
+    .setBackground('#f8bbd0')
+    .setRanges([sheet.getRange(`B${startRow}:B${endRow}`)]).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied('=$C2=TODAY()')
+    .setBackground('#ef5350').setFontColor('#ffffff')
+    .setRanges([sheet.getRange(`B${startRow}:B${endRow}`)]).build());
+  rules.push(SpreadsheetApp.newConditionalFormatRule()
+    .whenFormulaSatisfied('=$C2=TODAY()+1')
+    .setBackground('#fff59d')
+    .setRanges([sheet.getRange(`B${startRow}:B${endRow}`)]).build());
+  sheet.setConditionalFormatRules(rules);
+  if (sheet.getMaxColumns() >= CONFIG.A_RECORD_ID) {
+    sheet.hideColumns(CONFIG.A_RECORD_ID);
+  }
+  backfillActiveRecordIds_(sheet);
+}
+
+function setupSettingsSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(CONFIG.SS_SETTINGS);
+  if (sheet) ss.deleteSheet(sheet);
+  sheet = ss.insertSheet(CONFIG.SS_SETTINGS);
+
+  sheet.getRange('A1').setValue('【共通メール/カレンダー設定】')
+    .setBackground('#1a73e8').setFontColor('#ffffff').setFontWeight('bold');
+  sheet.getRange('A2').setValue('CC送信先:');
+  sheet.getRange('B2').setValue('info@bemecareer.com');
+  sheet.getRange('A3').setValue('予定作成先カレンダーID:');
+  sheet.getRange('B3').setValue('info@bemecareer.com');
+  sheet.getRange('A2:B3').setBackground('#e3f2fd');
+
+  sheet.getRange('A4').setValue('【メンバーデータ】')
+    .setBackground('#34a853').setFontColor('#ffffff').setFontWeight('bold');
+  const memberHeaders = ['名前', '大学', 'フルネーム', 'ふりがな', 'メールアドレス'];
+  sheet.getRange('A5:E5').setValues([memberHeaders]).setFontWeight('bold').setBackground('#c8e6c9');
+  const memberData = [
+    ['森平', '立命館大学', '森平 心', 'もりひら しん', 'morihira.biz@gmail.com'],
+    ['山本和葉', '関西大学', '山本 和葉', 'やまもと かずは', 'yamamoto.kazuha531@gmail.com'],
+    ['山本乙羽', '関西学院大学', '山本 乙羽', 'やまもと おとは', 'yamamoto.gdevent@gmail.com'],
+    ['新谷', '龍谷大学', '新谷 壮太郎', 'しんがい そうたろう', 'sotaro50017@gmail.com'],
+    ['大嵜', '京都橘大学', '大嵜 翔舞', 'おおざき しょうま', 'ここに実アドレスを入れる'],
+    ['米田', '立命館大学', '米田 陽奈', 'よねだ はるな', 'ここに実アドレスを入れる'],
+    ['小嶋', '京都産業大学', '小嶋 来望', 'こじま くるみ', 'ここに実アドレスを入れる'],
+    ['嶋田', '立命館大学', '嶋田 稜也', 'しまだ りょうや', 'ここに実アドレスを入れる'],
+  ];
+  sheet.getRange(6, 1, memberData.length, 5).setValues(memberData);
+
+  sheet.getRange('A25').setValue('【資料URL】')
+    .setBackground('#fbbc04').setFontColor('#ffffff').setFontWeight('bold');
+  sheet.getRange('A26:B26').setValues([['ランク', 'URL']]).setFontWeight('bold').setBackground('#fff9c4');
+  const urlData = [
+    ['資料送付予定A', 'https://example.com/document_A'],
+    ['資料送付予定B', 'https://example.com/document_B'],
+    ['資料送付予定C', 'https://example.com/document_C'],
+  ];
+  sheet.getRange(27, 1, urlData.length, 2).setValues(urlData);
+
+
+  sheet.getRange('A31').setValue('【イベントステータス候補】')
+    .setBackground('#7b1fa2').setFontColor('#ffffff').setFontWeight('bold');
+  sheet.getRange('A32').setValue('候補').setFontWeight('bold').setBackground('#ede7f6');
+  const statusOptionData = [['検討中'], ['見送り'], ['出展決定']];
+  sheet.getRange(33, 1, statusOptionData.length, 1).setValues(statusOptionData);
+
+  sheet.setColumnWidth(1, 200);
+  sheet.setColumnWidth(2, 260);
+  sheet.setColumnWidth(3, 170);
+  sheet.setColumnWidth(4, 200);
+  sheet.setColumnWidth(5, 280);
+}
+
+
+function ensureSettingsSheetStructure_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(CONFIG.SS_SETTINGS);
+  if (!sheet) return;
+  if (!sheet.getRange('A1').getValue()) {
+    setupSettingsSheet();
+    return;
+  }
+  if (!sheet.getRange('A31').getValue()) {
+    sheet.getRange('A31').setValue('【イベントステータス候補】')
+      .setBackground('#7b1fa2').setFontColor('#ffffff').setFontWeight('bold');
+    sheet.getRange('A32').setValue('候補').setFontWeight('bold').setBackground('#ede7f6');
+    if (!sheet.getRange('A33').getValue()) {
+      sheet.getRange('A33:A35').setValues([['検討中'], ['見送り'], ['出展決定']]);
+    }
+  }
+}
+
+function ensureMasterSheetStructure_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(CONFIG.SS_MASTER);
+  if (!sheet) return;
+  if (String(sheet.getRange(1, 1).getValue() || '').trim() !== '対象') {
+    sheet.insertColumnBefore(1);
+  }
+  const lastCol = sheet.getLastColumn();
+  if (lastCol < MASTER_HEADERS.length) {
+    sheet.insertColumnsAfter(lastCol, MASTER_HEADERS.length - lastCol);
+  }
+  sheet.getRange(1, 1, 1, MASTER_HEADERS.length).setValues([MASTER_HEADERS]);
+  if (sheet.getMaxColumns() >= CONFIG.M_COMPANY_ID) sheet.hideColumns(CONFIG.M_COMPANY_ID);
+  backfillMasterCompanyIds_(sheet);
+}
+
+function backfillMasterCompanyIds_(sheet) {
+  const lastRow = Math.max(sheet.getLastRow(), 2);
+  if (lastRow < 2) return;
+  const companyVals = sheet.getRange(2, CONFIG.M_COMPANY, lastRow - 1, 1).getValues();
+  const idVals = sheet.getRange(2, CONFIG.M_COMPANY_ID, lastRow - 1, 1).getValues();
+  let changed = false;
+  const seen = {};
+  for (let i = 0; i < companyVals.length; i++) {
+    const company = String(companyVals[i][0] || '').trim();
+    let id = String(idVals[i][0] || '').trim();
+    if (!company) continue;
+    if (!id || seen[id]) {
+      id = generateUniqueId_('CMP');
+      idVals[i][0] = id;
+      changed = true;
+    }
+    seen[id] = true;
+  }
+  if (changed) sheet.getRange(2, CONFIG.M_COMPANY_ID, lastRow - 1, 1).setValues(idVals);
+}
+
+function backfillActiveRecordIds_(sheet) {
+  const lastRow = Math.max(sheet.getLastRow(), 2);
+  if (lastRow < 2) return;
+  const companyVals = sheet.getRange(2, CONFIG.A_COMPANY, lastRow - 1, 1).getValues();
+  const idVals = sheet.getRange(2, CONFIG.A_RECORD_ID, lastRow - 1, 1).getValues();
+  let changed = false;
+  const seen = {};
+  for (let i = 0; i < companyVals.length; i++) {
+    const company = String(companyVals[i][0] || '').trim();
+    let id = String(idVals[i][0] || '').trim();
+    if (!company) continue;
+    if (!id || seen[id]) {
+      id = generateUniqueId_('ACT');
+      idVals[i][0] = id;
+      changed = true;
+    }
+    seen[id] = true;
+  }
+  if (changed) sheet.getRange(2, CONFIG.A_RECORD_ID, lastRow - 1, 1).setValues(idVals);
+}
+
+function generateUniqueId_(prefix) {
+  return `${prefix}-${Utilities.getUuid().slice(0, 8)}`;
+}
+
+function findRowById_(sheet, id, colIndex) {
+  const targetId = String(id || '').trim();
+  if (!targetId) return 0;
+  const lastRow = Math.max(sheet.getLastRow(), 2);
+  if (lastRow < 2) return 0;
+  const values = sheet.getRange(2, colIndex, lastRow - 1, 1).getValues();
+  for (let i = 0; i < values.length; i++) {
+    if (String(values[i][0] || '').trim() === targetId) return i + 2;
+  }
+  return 0;
+}
+
+function resolveMasterRow_(sheet, payload) {
+  const rowHint = Number(payload.rowHint || 0);
+  const companyId = String(payload.companyId || '').trim();
+  const companyName = String(payload.companyName || '').trim();
+  if (rowHint > 1 && rowHint <= sheet.getMaxRows()) {
+    const hintId = String(sheet.getRange(rowHint, CONFIG.M_COMPANY_ID).getValue() || '').trim();
+    const hintCompany = String(sheet.getRange(rowHint, CONFIG.M_COMPANY).getValue() || '').trim();
+    if ((!companyId || hintId === companyId) && (!companyName || hintCompany === companyName)) return rowHint;
+  }
+  if (companyId) {
+    const byId = findRowById_(sheet, companyId, CONFIG.M_COMPANY_ID);
+    if (byId) return byId;
+  }
+  if (companyName) {
+    const lastRow = Math.max(sheet.getLastRow(), 2);
+    const companies = sheet.getRange(2, CONFIG.M_COMPANY, lastRow - 1, 1).getValues();
+    for (let i = 0; i < companies.length; i++) {
+      if (String(companies[i][0] || '').trim() === companyName) return i + 2;
+    }
+  }
+  return 0;
+}
+
+function resolveActiveRow_(sheet, payload) {
+  const rowHint = Number(payload.rowHint || 0);
+  const recordId = String(payload.recordId || '').trim();
+  const companyName = String(payload.companyName || '').trim();
+  if (rowHint > 1 && rowHint <= sheet.getMaxRows()) {
+    const hintId = String(sheet.getRange(rowHint, CONFIG.A_RECORD_ID).getValue() || '').trim();
+    const hintCompany = String(sheet.getRange(rowHint, CONFIG.A_COMPANY).getValue() || '').trim();
+    if ((!recordId || hintId === recordId) && (!companyName || hintCompany === companyName)) return rowHint;
+  }
+  if (recordId) {
+    const byId = findRowById_(sheet, recordId, CONFIG.A_RECORD_ID);
+    if (byId) return byId;
+  }
+  if (companyName) {
+    const lastRow = Math.max(sheet.getLastRow(), 2);
+    const companies = sheet.getRange(2, CONFIG.A_COMPANY, lastRow - 1, 1).getValues();
+    for (let i = 0; i < companies.length; i++) {
+      if (String(companies[i][0] || '').trim() === companyName) return i + 2;
+    }
+  }
+  return 0;
+}
+
+function withSubmissionGuard_(guardKey, ttlSeconds, callback) {
+  const cache = CacheService.getScriptCache();
+  const existing = cache.get(guardKey);
+  if (existing) return '反映中、または直前の同じ操作をスキップしました。';
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    if (cache.get(guardKey)) return '反映中、または直前の同じ操作をスキップしました。';
+    cache.put(guardKey, '1', ttlSeconds || 12);
+    const result = callback();
+    return result;
+  } catch (err) {
+    cache.remove(guardKey);
+    throw err;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function getMasterEventStatusOptions_() {
+  const settings = getSettings();
+  return settings.eventStatusOptions && settings.eventStatusOptions.length ? settings.eventStatusOptions : EVENT_STATUS_OPTIONS;
+}
+
+
+function setDropdown(sheet, col, startRow, endRow, options) {
+  const range = sheet.getRange(startRow, col, endRow - startRow + 1, 1);
+  const rule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(options, true)
+    .setAllowInvalid(false)
+    .build();
+  range.setDataValidation(rule);
+}
+
+function resetActiveSheet() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.alert('🧹 アクティブ案件をリセット',
+    'アクティブ案件シートのデータを全削除します(2行目以降)。\nプルダウン・チェックボックス・条件付き書式は残ります。\n\n本当に実行しますか?',
+    ui.ButtonSet.YES_NO);
+  if (response !== ui.Button.YES) return;
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SS_ACTIVE);
+  if (!sheet) { ui.alert('アクティブ案件シートが見つかりません'); return; }
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).clearContent();
+    applyActiveSheetFormatting_(sheet);
+  }
+  ui.alert('✅ リセット完了', 'アクティブ案件のデータが削除されました。', ui.ButtonSet.OK);
+}
+
+function getSettings() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(CONFIG.SS_SETTINGS);
+  if (!sheet) throw new Error('設定シートが見つかりません。');
+
+  const ccEmail = sheet.getRange(CONFIG.S_CC_EMAIL_CELL).getValue() || '';
+  const infoCalendarId = sheet.getRange(CONFIG.S_INFO_CALENDAR_ID_CELL).getValue() || '';
+  const memberRange = sheet.getRange('A6:E20').getValues();
+  const members = {};
+  memberRange.forEach(row => {
+    if (row[0]) {
+      members[row[0]] = {
+        uni: row[1] || '',
+        full: row[2] || row[0],
+        kana: row[3] || '',
+        email: row[4] || ''
+      };
+    }
+  });
+  const urlRange = sheet.getRange('A27:B30').getValues();
+  const materialUrls = {};
+  urlRange.forEach(row => { if (row[0]) materialUrls[row[0]] = row[1] || ''; });
+  const eventStatusOptions = sheet.getRange('A33:A80').getValues().flat().map(v => String(v || '').trim()).filter(Boolean);
+  return { ccEmail, infoCalendarId, members, materialUrls, eventStatusOptions: eventStatusOptions.length ? [''].concat(eventStatusOptions) : EVENT_STATUS_OPTIONS };
+}
+
+function guessMemberNameByEmail_(email, members) {
+  const normalized = String(email || '').trim().toLowerCase();
+  for (const name in members) {
+    if (String(members[name].email || '').trim().toLowerCase() === normalized) return name;
+  }
+  return '';
+}
+
+
+
+function getCheckedRowsByTarget_(sheet, targetCol, companyCol) {
+  const lastRow = Math.max(sheet.getLastRow(), 2);
+  if (lastRow < 2) return [];
+  const checks = sheet.getRange(2, targetCol, lastRow - 1, 1).getValues();
+  const companies = sheet.getRange(2, companyCol, lastRow - 1, 1).getDisplayValues();
+  const rows = [];
+  for (let i = 0; i < checks.length; i++) {
+    const row = i + 2;
+    if (!companies[i][0]) continue;
+    if (checks[i][0] === true) rows.push(row);
+  }
+  return rows;
+}
+
+function clearTargetCheckbox_(sheet, row, targetCol) {
+  try { if (row > 1) sheet.getRange(row, targetCol).setValue(false); } catch (e) {}
+}
+
+function getCheckedMasterCandidates_(sheet) {
+  ensureMasterSheetStructure_();
+  const rows = getCheckedRowsByTarget_(sheet, CONFIG.M_TARGET, CONFIG.M_COMPANY);
+  return rows.map(row => {
+    let companyId = String(sheet.getRange(row, CONFIG.M_COMPANY_ID).getValue() || '').trim();
+    if (!companyId) {
+      companyId = generateUniqueId_('CMP');
+      sheet.getRange(row, CONFIG.M_COMPANY_ID).setValue(companyId);
+    }
+    return {
+      row,
+      companyId,
+      company: String(sheet.getRange(row, CONFIG.M_COMPANY).getDisplayValue() || '').trim(),
+      tel: String(sheet.getRange(row, CONFIG.M_TEL).getDisplayValue() || '').trim(),
+      staff: String(sheet.getRange(row, CONFIG.M_STAFF).getDisplayValue() || '').trim(),
+      email: String(sheet.getRange(row, CONFIG.M_EMAIL).getDisplayValue() || '').trim(),
+      appointer: String(sheet.getRange(row, CONFIG.M_APPOINTER).getDisplayValue() || '').trim(),
+      meetingRep: String(sheet.getRange(row, CONFIG.M_MEETING_REP).getDisplayValue() || '').trim()
+    };
+  }).filter(c => c.company);
+}
+
+function resolveMasterContextFast_(sheet) {
+  const checked = getCheckedMasterCandidates_(sheet);
+  if (checked.length === 1) return { mode: 'single', candidates: checked, selectedCompanyId: checked[0].companyId };
+  if (checked.length > 1) {
+    const currentRow = getStableCurrentRow_(sheet);
+    const exact = checked.find(c => c.row === currentRow);
+    return { mode: 'multiple', candidates: checked, selectedCompanyId: exact ? exact.companyId : checked[0].companyId };
+  }
+  const row = getStableCurrentRow_(sheet);
+  if (row <= 1) return { mode: 'error', message: '対象チェックを入れるか、対象行のセルを選択してから実行してください。' };
+  const company = String(sheet.getRange(row, CONFIG.M_COMPANY).getDisplayValue() || '').trim();
+  if (!company) return { mode: 'error', message: '対象行の会社名が空です。' };
+  let companyId = String(sheet.getRange(row, CONFIG.M_COMPANY_ID).getValue() || '').trim();
+  if (!companyId) {
+    companyId = generateUniqueId_('CMP');
+    sheet.getRange(row, CONFIG.M_COMPANY_ID).setValue(companyId);
+  }
+  return {
+    mode: 'single',
+    candidates: [{
+      row,
+      companyId,
+      company,
+      tel: String(sheet.getRange(row, CONFIG.M_TEL).getDisplayValue() || '').trim(),
+      staff: String(sheet.getRange(row, CONFIG.M_STAFF).getDisplayValue() || '').trim(),
+      email: String(sheet.getRange(row, CONFIG.M_EMAIL).getDisplayValue() || '').trim(),
+      appointer: String(sheet.getRange(row, CONFIG.M_APPOINTER).getDisplayValue() || '').trim(),
+      meetingRep: String(sheet.getRange(row, CONFIG.M_MEETING_REP).getDisplayValue() || '').trim()
+    }],
+    selectedCompanyId: companyId
+  };
+}
+
+function getActiveCheckedCandidates_(sheet) {
+  ensureActiveSheetStructure_();
+  const rows = getCheckedRowsByTarget_(sheet, CONFIG.A_TARGET, CONFIG.A_COMPANY);
+  return rows.map(row => {
+    let recordId = String(sheet.getRange(row, CONFIG.A_RECORD_ID).getValue() || '').trim();
+    if (!recordId) {
+      recordId = generateUniqueId_('ACT');
+      sheet.getRange(row, CONFIG.A_RECORD_ID).setValue(recordId);
+    }
+    return {
+      row,
+      recordId,
+      company: String(sheet.getRange(row, CONFIG.A_COMPANY).getDisplayValue() || '').trim(),
+      staff: String(sheet.getRange(row, CONFIG.A_STAFF).getDisplayValue() || '').trim(),
+      email: String(sheet.getRange(row, CONFIG.A_EMAIL).getDisplayValue() || '').trim()
+    };
+  }).filter(c => c.company);
+}
+
+function resolveActiveTargetContext_(sheet) {
+  const checked = getActiveCheckedCandidates_(sheet);
+  if (checked.length === 1) return { mode: 'single', row: checked[0].row, recordId: checked[0].recordId, candidates: checked };
+  if (checked.length > 1) {
+    const currentRow = getStableCurrentRow_(sheet);
+    const exact = checked.find(c => c.row === currentRow);
+    if (exact) return { mode: 'single', row: exact.row, recordId: exact.recordId, candidates: checked };
+    return { mode: 'choose', candidates: checked };
+  }
+  const row = getStableCurrentRow_(sheet);
+  if (row <= 1) return { mode: 'error', message: '対象チェックを入れるか、対象行のセルを選択してから実行してください。' };
+  const company = String(sheet.getRange(row, CONFIG.A_COMPANY).getDisplayValue() || '').trim();
+  if (!company) return { mode: 'error', message: '対象行の会社名が空です。' };
+  let recordId = String(sheet.getRange(row, CONFIG.A_RECORD_ID).getValue() || '').trim();
+  if (!recordId) {
+    recordId = generateUniqueId_('ACT');
+    sheet.getRange(row, CONFIG.A_RECORD_ID).setValue(recordId);
+  }
+  return { mode: 'single', row, recordId, candidates: [{row, recordId, company}] };
+}
+
+function buildTargetChooserHtml_(title, actionFn, candidates) {
+  const opts = candidates.map(c => `<option value="${escapeHtml(c.recordId)}">${escapeHtml(c.company)} (row ${c.row}${c.staff ? ' / ' + c.staff : ''}${c.email ? ' / ' + c.email : ''})</option>`).join('');
+  return `
+  <html><head><base target="_top"><style>
+    body{font-family:Arial,sans-serif;padding:16px}label{display:block;font-size:13px;margin:8px 0 6px}
+    select{width:100%;box-sizing:border-box;padding:8px;border:1px solid #dadce0;border-radius:8px}
+    .footer{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}.btn{padding:10px 16px;border:none;border-radius:8px;cursor:pointer}.primary{background:#1a73e8;color:#fff}.secondary{background:#f1f3f4}
+  </style></head><body>
+    <h2>${escapeHtml(title)}</h2>
+    <p>チェックが複数入っています。対象案件を1件選んでください。</p>
+    <label>対象案件</label>
+    <select id="recordId">${opts}</select>
+    <div class="footer">
+      <button class="btn secondary" onclick="google.script.host.close()">キャンセル</button>
+      <button class="btn primary" onclick="go()">この案件で続ける</button>
+    </div>
+    <script>
+      function go(){
+        const recordId=document.getElementById('recordId').value;
+        google.script.run.withSuccessHandler(()=>google.script.host.close())[${actionFn}](recordId);
+      }
+    </script>
+  </body></html>`;
+}
+
+
+function checkPermissions() {
+  const ui = SpreadsheetApp.getUi();
+  try {
+    GmailApp.getInboxUnreadCount();
+    CalendarApp.getDefaultCalendar().getName();
+    Calendar.CalendarList.list({ maxResults: 1 });
+    ui.alert('✅ 権限確認OK',
+      'Gmail・カレンダーへのアクセスが承認されています。\n\n現在のアカウント: ' + MY_EMAIL,
+      ui.ButtonSet.OK);
+  } catch(e) {
+    ui.alert('⚠️ 権限の承認が必要です',
+      '1. このメニューをもう一度クリック\n2. 承認ダイアログで「許可」\n3. 「このアプリは確認されていません」→「詳細」→「(安全でないページ)に移動」\n4. アクセス許可\n\nエラー: ' + e.message,
+      ui.ButtonSet.OK);
+  }
+}
+
+function ensurePermissions() {
+  try {
+    GmailApp.getInboxUnreadCount();
+    Calendar.CalendarList.list({ maxResults: 1 });
+    return true;
+  } catch(e) {
+    SpreadsheetApp.getUi().alert('⚠️ 権限未承認',
+      '先に「🔑 初回権限承認」メニューを実行してください。\n\nエラー: ' + e.message,
+      SpreadsheetApp.getUi().ButtonSet.OK);
+    return false;
+  }
+}
+
+function recordTelCall() {
+  const ui = SpreadsheetApp.getUi();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  if (sheet.getName() !== CONFIG.SS_MASTER) {
+    ui.alert('「企業マスター」シートで実行してください。'); return;
+  }
+
+  const settings = getSettings();
+  const ctx = resolveMasterContextFast_(sheet);
+  if (ctx.mode === 'error') {
+    ui.alert(ctx.message || '対象企業を特定できませんでした。');
+    return;
+  }
+
+  const html = HtmlService.createHtmlOutput(buildTelCallDialogHtml({
+    candidates: ctx.candidates,
+    selectedCompanyId: ctx.selectedCompanyId,
+    members: MEMBER_OPTIONS,
+    fallbackAppointer: guessMemberNameByEmail_(MY_EMAIL, settings.members) || '',
+  })).setWidth(760).setHeight(820);
+  ui.showModalDialog(html, '📞 テレアポ記録');
+}
+
+function buildTelCallDialogHtml(data) {
+  const options = [
+    { status: '担当者不在', result: '不在', label: '担当者不在' },
+    { status: '折り返し', result: '折り返し依頼', label: '折り返し' },
+    { status: '再架電🔥', result: 'ポジティブ', label: '再架電🔥' },
+    { status: '再架電😍', result: 'ポジティブ', label: '再架電😍' },
+    { status: '資料送付予定A', result: '資料送付希望', label: '資料送付A' },
+    { status: '資料送付予定B', result: '資料送付希望', label: '資料送付B' },
+    { status: '資料送付予定C', result: '資料送付希望', label: '資料送付C' },
+    { status: 'アポ確定', result: 'アポ確定', label: 'アポ確定' },
+    { status: '受付拒否', result: 'NG', label: '受付拒否' },
+    { status: '担当者拒否', result: 'NG', label: '担当者拒否' },
+    { status: '不通', result: '不通', label: '不通' },
+    { status: '営業時間外', result: '営業時間外', label: '営業時間外' },
+  ];
+  const buttonsHtml = options.map(opt => `
+    <button type="button" class="option-btn" data-status="${escapeHtml(opt.status)}" data-result="${escapeHtml(opt.result)}">${escapeHtml(opt.label)}</button>
+  `).join('');
+
+  const candidates = Array.isArray(data.candidates) ? data.candidates : [];
+  const selectedCompanyId = String(data.selectedCompanyId || (candidates[0] ? candidates[0].companyId : '') || '');
+  const fallbackAppointer = String(data.fallbackAppointer || '');
+  const candidateOptions = candidates.map(c => {
+    const tel = c.tel ? ` / ${c.tel}` : '';
+    const rowInfo = `row ${c.row}`;
+    const selected = c.companyId === selectedCompanyId ? 'selected' : '';
+    return `<option value="${escapeHtml(c.companyId)}" ${selected}>${escapeHtml(c.company)} (${escapeHtml(rowInfo + tel)})</option>`;
+  }).join('');
+
+  const memberOptionsBase = ['<option value=""></option>'].concat(data.members.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`)).join('');
+  const candidatesJson = JSON.stringify(candidates).replace(/</g, '\u003c');
+
+  return `
+  <html>
+  <head>
+    <base target="_top">
+    <style>
+      body { font-family: Arial, sans-serif; padding: 16px; }
+      h2 { margin: 0 0 8px; font-size: 18px; }
+      .sub { color: #555; margin-bottom: 12px; font-size: 13px; }
+      .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0 16px; }
+      .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      .option-btn { border: 1px solid #dadce0; background: #fff; border-radius: 10px; padding: 10px 8px; cursor: pointer; font-size: 13px; }
+      .option-btn.active { background: #e8f0fe; border-color: #1a73e8; color: #1a73e8; font-weight: bold; }
+      label { display: block; font-size: 13px; margin: 10px 0 6px; }
+      input, textarea, select { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #dadce0; border-radius: 8px; }
+      textarea { min-height: 90px; resize: vertical; }
+      .row { margin-bottom: 10px; }
+      .footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+      .btn { padding: 10px 16px; border-radius: 8px; border: none; cursor: pointer; }
+      .btn-primary { background: #1a73e8; color: #fff; }
+      .btn-secondary { background: #f1f3f4; }
+      .summary { background: #f8f9fa; border-radius: 8px; padding: 10px; font-size: 13px; }
+      .small { color:#666; font-size:12px; margin-top:4px; }
+      .company-card { background:#f8f9fa; border:1px solid #e0e0e0; border-radius:10px; padding:10px; margin-bottom:12px; }
+    </style>
+  </head>
+  <body>
+    <h2>📞 テレアポ記録</h2>
+    <div class="summary">フィルター中のズレを避けるため、この画面で対象企業を選んでから記録します。表示候補は、現在見えている企業一覧です。</div>
+
+    <div class="row">
+      <label>0. 対象企業</label>
+      <input id="companySearch" type="text" placeholder="会社名・電話番号で絞り込み" />
+      <select id="companySelect" size="8" style="margin-top:8px;">${candidateOptions}</select>
+      <div id="companyMeta" class="small"></div>
+    </div>
+
+    <label>1. 架電結果 / ステータス</label>
+    <div class="grid">${buttonsHtml}</div>
+
+    <div class="grid-2">
+      <div class="row">
+        <label>2. アポ獲得者</label>
+        <select id="appointer">${memberOptionsBase}</select>
+      </div>
+      <div class="row">
+        <label>3. 商談担当者（空欄でも可）</label>
+        <select id="meetingRep">${memberOptionsBase}</select>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="row">
+        <label>4. 担当者名（空欄でも可）</label>
+        <input id="staffName" type="text" placeholder="例: 田中様" />
+      </div>
+      <div class="row">
+        <label>5. メールアドレス（空欄でも可）</label>
+        <input id="email" type="text" placeholder="例: tanaka@example.com" />
+      </div>
+    </div>
+
+    <div class="row">
+      <label>6. 次回架電予定日（空欄でスキップ）</label>
+      <input id="nextDate" type="text" placeholder="例: 4/20 または 2026/04/20" />
+    </div>
+
+    <div class="row">
+      <label>7. メモ / 次回トーク要点（空欄でスキップ）</label>
+      <textarea id="memo" placeholder="例: 来週火曜の午後に再架電 / 価格感気にしていた"></textarea>
+    </div>
+
+    <input type="hidden" id="companyId" value="" />
+    <input type="hidden" id="companyName" value="" />
+    <input type="hidden" id="rowHint" value="" />
+    <input type="hidden" id="status" value="" />
+    <input type="hidden" id="result" value="" />
+    <div id="savingMsg" style="display:none;margin:8px 0 0;color:#1a73e8;font-size:12px;">反映中です。閉じずにそのままお待ちください…</div>
+
+    <div class="footer">
+      <button id="cancelBtn" class="btn btn-secondary" onclick="google.script.host.close()">キャンセル</button>
+      <button id="submitBtn" class="btn btn-primary" onclick="submitForm()">記録する</button>
+    </div>
+
+    <script>
+      const candidates = ${candidatesJson};
+      const candidateMap = {};
+      candidates.forEach(c => { candidateMap[c.companyId] = c; });
+
+      function setSubmitting(flag){
+        const submitBtn = document.getElementById('submitBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const savingMsg = document.getElementById('savingMsg');
+        submitBtn.disabled = flag;
+        cancelBtn.disabled = flag;
+        submitBtn.textContent = flag ? '反映中…' : '記録する';
+        savingMsg.style.display = flag ? 'block' : 'none';
+      }
+
+      function updateCompanySelection(resetBlankValues=false) {
+        const select = document.getElementById('companySelect');
+        const companyId = select.value || '';
+        const c = candidateMap[companyId];
+        if (!c) return;
+        document.getElementById('companyId').value = c.companyId || '';
+        document.getElementById('companyName').value = c.company || '';
+        document.getElementById('rowHint').value = String(c.row || '');
+        document.getElementById('companyMeta').textContent = '選択中: ' + c.company + (c.tel ? ' / ' + c.tel : '') + ' / row ' + c.row;
+        if (resetBlankValues || !document.getElementById('staffName').value) document.getElementById('staffName').value = c.staff || '';
+        if (resetBlankValues || !document.getElementById('email').value) document.getElementById('email').value = c.email || '';
+        const appointer = document.getElementById('appointer');
+        const meetingRep = document.getElementById('meetingRep');
+        appointer.value = c.appointer || '${escapeHtml(fallbackAppointer)}' || '';
+        meetingRep.value = c.meetingRep || '';
+      }
+
+      document.getElementById('companySelect').addEventListener('change', () => updateCompanySelection(true));
+      document.getElementById('companySearch').addEventListener('input', (e) => {
+        const q = (e.target.value || '').toLowerCase().trim();
+        const select = document.getElementById('companySelect');
+        const currentValue = select.value;
+        select.innerHTML = '';
+        candidates.forEach(c => {
+          const hay = [c.company, c.tel, c.staff, c.email].join(' ').toLowerCase();
+          if (q && !hay.includes(q)) return;
+          const opt = document.createElement('option');
+          opt.value = c.companyId;
+          opt.textContent = c.company + ' (row ' + c.row + (c.tel ? ' / ' + c.tel : '') + ')';
+          if (c.companyId === currentValue) opt.selected = true;
+          select.appendChild(opt);
+        });
+        if (!select.value && select.options.length) select.selectedIndex = 0;
+        updateCompanySelection(false);
+      });
+
+      document.querySelectorAll('.option-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.option-btn').forEach(x => x.classList.remove('active'));
+          btn.classList.add('active');
+          document.getElementById('status').value = btn.dataset.status || '';
+          document.getElementById('result').value = btn.dataset.result || '';
+        });
+      });
+
+      function submitForm() {
+        const payload = {
+          companyId: document.getElementById('companyId').value,
+          companyName: document.getElementById('companyName').value,
+          rowHint: document.getElementById('rowHint').value,
+          status: document.getElementById('status').value,
+          result: document.getElementById('result').value,
+          nextDateInput: document.getElementById('nextDate').value.trim(),
+          memoInput: document.getElementById('memo').value.trim(),
+          appointer: document.getElementById('appointer').value,
+          meetingRep: document.getElementById('meetingRep').value,
+          staffName: document.getElementById('staffName').value.trim(),
+          email: document.getElementById('email').value.trim(),
+        };
+        if (!payload.companyId) {
+          alert('対象企業を選択してください。');
+          return;
+        }
+        if (!payload.status || !payload.result) {
+          alert('最初に架電結果ボタンを選んでください。');
+          return;
+        }
+        if (!payload.appointer) {
+          alert('アポ獲得者を選んでください。');
+          return;
+        }
+        setSubmitting(true);
+        google.script.run
+          .withSuccessHandler(msg => { if (msg) alert(msg); google.script.host.close(); })
+          .withFailureHandler(err => { setSubmitting(false); alert(err.message || err); })
+          .submitTelCallRecord(payload);
+      }
+
+      if (document.getElementById('companySelect').options.length) {
+        document.getElementById('companySelect').value = '${escapeHtml(selectedCompanyId)}' || document.getElementById('companySelect').options[0].value;
+        if (!document.getElementById('companySelect').value && document.getElementById('companySelect').options.length) {
+          document.getElementById('companySelect').selectedIndex = 0;
+        }
+        updateCompanySelection(true);
+      }
+    </script>
+  </body>
+  </html>`;
+}
+
+function submitTelCallRecord(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(CONFIG.SS_MASTER);
+  ensureMasterSheetStructure_();
+  ensureActiveSheetStructure_();
+  const companyId = String(payload.companyId || '').trim();
+  const companyName = String(payload.companyName || '').trim();
+  const row = resolveMasterRow_(sheet, payload);
+  if (!sheet || !row || row <= 1) throw new Error('企業マスターの対象行が見つかりません。フィルター中でも企業IDで記録できるよう修正済みですが、対象データを確認してください。');
+
+  const result = String(payload.result || '').trim();
+  const status = String(payload.status || '').trim();
+  const memoInput = String(payload.memoInput || '').trim();
+  const nextDateInput = String(payload.nextDateInput || '').trim();
+  const appointer = String(payload.appointer || '').trim();
+  const meetingRep = String(payload.meetingRep || '').trim();
+  const staffName = String(payload.staffName || '').trim();
+  const email = String(payload.email || '').trim();
+  if (!result || !status) throw new Error('結果またはステータスが空です。');
+  if (!appointer) throw new Error('アポ獲得者を選んでください。');
+
+  const guardKey = `TEL:${companyId || companyName}:${status}:${result}:${memoInput}:${nextDateInput}`;
+  return withSubmissionGuard_(guardKey, 15, () => {
+  let nextDate = null;
+  if (nextDateInput) {
+    nextDate = parseFlexibleDateTime(nextDateInput);
+    if (!nextDate) throw new Error('次回架電予定日の形式が正しくありません。');
+  }
+
+  const today = new Date();
+  const todayStr = Utilities.formatDate(today, 'Asia/Tokyo', 'M/d');
+  const currentCount = Number(sheet.getRange(row, CONFIG.M_CALL_COUNT).getValue()) || 0;
+
+  sheet.getRange(row, CONFIG.M_STATUS).setValue(status);
+  sheet.getRange(row, CONFIG.M_APPOINTER).setValue(appointer);
+  sheet.getRange(row, CONFIG.M_MEETING_REP).setValue(meetingRep || '');
+  if (staffName) sheet.getRange(row, CONFIG.M_STAFF).setValue(staffName);
+  if (email) sheet.getRange(row, CONFIG.M_EMAIL).setValue(email);
+  if (memoInput) appendMultilineCell_(sheet.getRange(row, CONFIG.M_MEMO), `[${todayStr} ${appointer}/${status}] ${memoInput}`);
+  sheet.getRange(row, CONFIG.M_CALL_COUNT).setValue(currentCount + 1);
+  sheet.getRange(row, CONFIG.M_LAST_CALL).setValue(today);
+  if (nextDate) sheet.getRange(row, CONFIG.M_NEXT_DATE).setValue(nextDate);
+
+  const industry = sheet.getRange(row, CONFIG.M_INDUSTRY).getValue() || '未設定';
+  syncToFirestore_(appointer, status, industry);
+
+  const historyCell = sheet.getRange(row, CONFIG.M_HISTORY);
+  const existingHistory = historyCell.getValue();
+  const numberPrefix = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩'][currentCount] || `(${currentCount + 1})`;
+  const memoSuffix = memoInput ? ` [${memoInput}]` : '';
+  const newEntry = `${numberPrefix}${todayStr} ${appointer}:${result}${memoSuffix}`;
+  historyCell.setValue(existingHistory ? existingHistory + '\n' + newEntry : newEntry);
+
+  if (memoInput) {
+    const talkPointCell = sheet.getRange(row, CONFIG.M_TALK_POINT);
+    const existingTalkPoint = talkPointCell.getValue();
+    const talkPointEntry = `[${todayStr} ${appointer}/${status}] ${memoInput}`;
+    talkPointCell.setValue(existingTalkPoint ? existingTalkPoint + '\n' + talkPointEntry : talkPointEntry);
+  }
+
+  let message = `記録完了 (${status} / 累計${currentCount + 1}回目)`;
+  if (isTransferStatus_(status)) {
+    const activeRow = upsertToActiveFromMaster_(row, status);
+    sheet.getRange(row, CONFIG.M_CHECKBOX).setValue(true);
+    sheet.getRange(row, CONFIG.M_TRANSFER).setValue(`自動反映済 (アクティブ${activeRow}行目)`);
+    message += `\nアクティブ案件へ自動反映しました。`;
+  }
+
+  clearTargetCheckbox_(sheet, row, CONFIG.M_TARGET);
+  SpreadsheetApp.getActiveSpreadsheet().toast(message, '📞 テレアポ記録', 4);
+  return message;
+  });
+}
+
+function isTransferStatus_(status) {
+  return ['資料送付予定A','資料送付予定B','資料送付予定C','アポ確定'].indexOf(String(status || '')) >= 0;
+}
+
+function createMaterialMail() {
+  const ui = SpreadsheetApp.getUi();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  if (sheet.getName() !== CONFIG.SS_ACTIVE) {
+    ui.alert('「アクティブ案件」シートで実行してください。'); return;
+  }
+  if (!ensurePermissions()) return;
+  ensureActiveSheetStructure_();
+  const ctx = resolveActiveTargetContext_(sheet);
+  if (ctx.mode === 'error') { ui.alert(ctx.message || '対象案件を特定できませんでした。'); return; }
+  if (ctx.mode === 'choose') {
+    const html = HtmlService.createHtmlOutput(buildTargetChooserHtml_('📧 資料送付メール作成', 'openMaterialMailDialogByRecordId_', ctx.candidates)).setWidth(640).setHeight(320);
+    ui.showModalDialog(html, '対象案件を選択');
+    return;
+  }
+  openMaterialMailDialogByRecordId_(ctx.recordId);
+}
+
+function openMaterialMailDialogByRecordId_(recordId) {
+  const ui = SpreadsheetApp.getUi();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SS_ACTIVE);
+  if (!sheet) return;
+  ensureActiveSheetStructure_();
+  const row = findRowById_(sheet, recordId, CONFIG.A_RECORD_ID);
+  if (!row) { ui.alert('対象案件が見つかりません。'); return; }
+
+  const settings = getSettings();
+  let rid = String(sheet.getRange(row, CONFIG.A_RECORD_ID).getValue() || '').trim();
+  if (!rid) { rid = generateUniqueId_('ACT'); sheet.getRange(row, CONFIG.A_RECORD_ID).setValue(rid); }
+  const company = sheet.getRange(row, CONFIG.A_COMPANY).getValue() || '(会社名未入力)';
+  const staff = sheet.getRange(row, CONFIG.A_STAFF).getValue() || '';
+  const email = sheet.getRange(row, CONFIG.A_EMAIL).getValue() || '';
+  const appointer = sheet.getRange(row, CONFIG.A_APPOINTER).getValue() || guessMemberNameByEmail_(MY_EMAIL, settings.members) || '';
+  const docRank = sheet.getRange(row, CONFIG.A_DOC_RANK).getValue() || '資料送付予定A';
+  const memberOptions = MEMBER_OPTIONS;
+  const rankOptions = DOC_RANK_OPTIONS.filter(Boolean);
+  const html = HtmlService.createHtmlOutput(buildMaterialMailDialogHtml({ row, recordId: rid, company, staff, email, appointer, docRank, memberOptions, rankOptions }))
+    .setWidth(680).setHeight(620);
+  ui.showModalDialog(html, '📧 資料送付メール作成');
+}
+
+function buildMaterialMailDialogHtml(data) {
+  const appointerOptions = ['<option value=""></option>'].concat(data.memberOptions.map(name => `<option value="${escapeHtml(name)}" ${name===data.appointer?'selected':''}>${escapeHtml(name)}</option>`)).join('');
+  const rankOptions = data.rankOptions.map(name => `<option value="${escapeHtml(name)}" ${name===data.docRank?'selected':''}>${escapeHtml(name)}</option>`).join('');
+  return `
+  <html><head><base target="_top"><style>
+  body{font-family:Arial,sans-serif;padding:16px}.row{margin-bottom:10px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}label{display:block;font-size:13px;margin:8px 0 6px}input,select,textarea{width:100%;box-sizing:border-box;padding:8px;border:1px solid #dadce0;border-radius:8px}textarea{min-height:120px} .footer{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}.btn{padding:10px 16px;border:none;border-radius:8px;cursor:pointer}.primary{background:#1a73e8;color:#fff}.secondary{background:#f1f3f4}
+  </style></head><body>
+  <h2>📧 資料送付メール作成</h2>
+  <div class="row"><label>会社名</label><input value="${escapeHtml(data.company)}" disabled></div>
+  <div class="grid2">
+    <div class="row"><label>担当者名</label><input id="staff" value="${escapeHtml(data.staff)}" placeholder="田中様"></div>
+    <div class="row"><label>メールアドレス</label><input id="email" value="${escapeHtml(data.email)}" placeholder="tanaka@example.com"></div>
+  </div>
+  <div class="grid2">
+    <div class="row"><label>アポ獲得者</label><select id="appointer">${appointerOptions}</select></div>
+    <div class="row"><label>資料ランク</label><select id="docRank">${rankOptions}</select></div>
+  </div>
+  <input type="hidden" id="rowHint" value="${escapeHtml(String(data.row || ''))}">
+  <input type="hidden" id="companyName" value="${escapeHtml(data.company)}">
+  <div id="savingMsg" style="display:none;margin:8px 0 0;color:#1a73e8;font-size:12px;">反映中です。閉じずにそのままお待ちください…</div>
+  <div class="footer"><button id="cancelBtn" class="btn secondary" onclick="google.script.host.close()">キャンセル</button><button id="submitBtn" class="btn primary" onclick="submitForm()">下書きを作成</button></div>
+  <script>
+  function setSubmitting(flag){const submitBtn=document.getElementById('submitBtn');const cancelBtn=document.getElementById('cancelBtn');const savingMsg=document.getElementById('savingMsg');submitBtn.disabled=flag;cancelBtn.disabled=flag;submitBtn.textContent=flag?'反映中…':'下書きを作成';savingMsg.style.display=flag?'block':'none';}
+  function submitForm(){
+    const payload={recordId:'${escapeHtml(data.recordId)}',rowHint:document.getElementById('rowHint').value,companyName:document.getElementById('companyName').value,staff:document.getElementById('staff').value.trim(),email:document.getElementById('email').value.trim(),appointer:document.getElementById('appointer').value,docRank:document.getElementById('docRank').value};
+    if(!payload.staff||!payload.email||!payload.appointer||!payload.docRank){alert('担当者名・メールアドレス・アポ獲得者・資料ランクは必須です。');return;}
+    setSubmitting(true);
+    google.script.run.withSuccessHandler(msg=>{if(msg)alert(msg);google.script.host.close();}).withFailureHandler(err=>{setSubmitting(false);alert(err.message||err)}).submitMaterialMailRecord(payload);
+  }
+  </script></body></html>`;
+}
+
+function submitMaterialMailRecord(payload) {
+  if (!ensurePermissions()) throw new Error('権限承認が必要です。');
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SS_ACTIVE);
+  ensureActiveSheetStructure_();
+  const row = resolveActiveRow_(sheet, payload);
+  if (!sheet || row <= 1) throw new Error('アクティブ案件の対象行が見つかりません。');
+  const settings = getSettings();
+  const company = sheet.getRange(row, CONFIG.A_COMPANY).getValue();
+  const email = String(payload.email || '').trim();
+  const staffName = String(payload.staff || '').trim();
+  const appointer = String(payload.appointer || '').trim();
+  const rank = String(payload.docRank || '').trim();
+  if (!company || !email || !staffName || !appointer || !rank) throw new Error('必須項目が不足しています。');
+  const guardKey = `MAT:${payload.recordId || company}:${email}:${rank}:${appointer}`;
+  return withSubmissionGuard_(guardKey, 15, () => {
+
+  sheet.getRange(row, CONFIG.A_STAFF).setValue(staffName);
+  sheet.getRange(row, CONFIG.A_EMAIL).setValue(email);
+  sheet.getRange(row, CONFIG.A_APPOINTER).setValue(appointer);
+  sheet.getRange(row, CONFIG.A_DOC_RANK).setValue(rank);
+
+  const myData = settings.members[appointer] || { full: appointer, uni: '' };
+  const url = settings.materialUrls[rank] || '(資料URL未設定)';
+  const myLastName = myData.full.split(/[ 　]/)[0];
+  const body = `${company}\n${staffName}様\n\nお世話になっております。\nBeMeキャリアの${myLastName}でございます。\n\n先ほどはお電話にてお話しさせていただき、誠にありがとうございました。\n\n以下の点においてお力添えできるのではないかと思い、お電話させていただきました。\n\n\n(ここに訴求内容を記入)\n\n\n上記の点で、もし、御社にマッチする際は、ぜひお力添えさせていただきたいと考えております。\n\nお電話で申し上げたイベントの資料とホームページを共有させていただきます。\n\nイベント資料:${url}\nホームページ:https://www.bemecareer.com/\n\nいきなり出展の有無についてご検討いただくのは難しいかと存じますので、もしご興味をお持ちいただけましたら、オンラインにて詳細をお話しさせていただきたいと思っております。その際はメールにてご連絡いただけますと幸いです。\n\n引き続き、何卒よろしくお願いいたします。`;
+
+  // 下書き作成のコード付近に挿入
+  syncToFirestore_(appointer, '資料送付（メール下書き作成）', 'アクティブ案件');
+
+
+  if (settings.ccEmail && settings.ccEmail.includes('@')) {
+    GmailApp.createDraft(email, '【お電話の御礼/新卒採用イベント資料のご共有】', body, { cc: settings.ccEmail });
+  } else {
+    GmailApp.createDraft(email, '【お電話の御礼/新卒採用イベント資料のご共有】', body);
+  }
+
+  const sentAt = new Date();
+  const sentAtStr = Utilities.formatDate(sentAt, 'Asia/Tokyo', 'M/d');
+  sheet.getRange(row, CONFIG.A_DOC_DATE).setValue(sentAt);
+  sheet.getRange(row, CONFIG.A_DOC_SENT).setValue(true);
+  sheet.getRange(row, CONFIG.A_KIND).setValue('資料送付');
+  const threeDaysLater = new Date(sentAt.getTime());
+  threeDaysLater.setDate(threeDaysLater.getDate() + 3);
+  sheet.getRange(row, CONFIG.A_NEXT_DATE).setValue(threeDaysLater);
+  sheet.getRange(row, CONFIG.A_NEXT_KIND).setValue('資料後追い');
+  sheet.getRange(row, CONFIG.A_NEXT_METHOD).setValue('メール');
+  sheet.getRange(row, CONFIG.A_NEXT_CONTENT).setValue(`資料送付後の後追い（${rank}）`);
+  appendMultilineCell_(sheet.getRange(row, CONFIG.A_HISTORY), `[${sentAtStr}] ${appointer}: 資料送付メール送信準備 (${rank})`);
+  appendMultilineCell_(sheet.getRange(row, CONFIG.A_MEET_MEMO), `[${sentAtStr}] 資料送付メール送信準備 (${rank})`);
+  clearTargetCheckbox_(sheet, row, CONFIG.A_TARGET);
+  const msg = '資料送付メールの下書きを作成しました。次回アクション日も3日後で登録しています。';
+  SpreadsheetApp.getActiveSpreadsheet().toast(msg, '📧 資料送付', 4);
+  return msg;
+  });
+}
+
+function setupAppointment() {
+  const ui = SpreadsheetApp.getUi();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  if (sheet.getName() !== CONFIG.SS_ACTIVE) {
+    ui.alert('「アクティブ案件」シートで実行してください。'); return;
+  }
+  if (!ensurePermissions()) return;
+  ensureActiveSheetStructure_();
+  const ctx = resolveActiveTargetContext_(sheet);
+  if (ctx.mode === 'error') { ui.alert(ctx.message || '対象案件を特定できませんでした。'); return; }
+  if (ctx.mode === 'choose') {
+    const html = HtmlService.createHtmlOutput(buildTargetChooserHtml_('🗓️ アポセットアップ', 'openAppointmentDialogByRecordId_', ctx.candidates)).setWidth(640).setHeight(320);
+    ui.showModalDialog(html, '対象案件を選択');
+    return;
+  }
+  openAppointmentDialogByRecordId_(ctx.recordId);
+}
+
+function openAppointmentDialogByRecordId_(recordId) {
+  const ui = SpreadsheetApp.getUi();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SS_ACTIVE);
+  if (!sheet) return;
+  ensureActiveSheetStructure_();
+  const row = findRowById_(sheet, recordId, CONFIG.A_RECORD_ID);
+  if (!row) { ui.alert('対象案件が見つかりません。'); return; }
+  const settings = getSettings();
+  let rid = String(sheet.getRange(row, CONFIG.A_RECORD_ID).getValue() || '').trim();
+  if (!rid) { rid = generateUniqueId_('ACT'); sheet.getRange(row, CONFIG.A_RECORD_ID).setValue(rid); }
+  const company = sheet.getRange(row, CONFIG.A_COMPANY).getValue() || '(会社名未入力)';
+  const staff = sheet.getRange(row, CONFIG.A_STAFF).getValue() || '';
+  const email = sheet.getRange(row, CONFIG.A_EMAIL).getValue() || '';
+  const appointer = sheet.getRange(row, CONFIG.A_APPOINTER).getValue() || guessMemberNameByEmail_(MY_EMAIL, settings.members) || '';
+  const meetingRep = sheet.getRange(row, CONFIG.A_MEETING_REP).getValue() || '';
+  const meetTimeRaw = sheet.getRange(row, CONFIG.A_MEET_TIME).getValue();
+  const memo = sheet.getRange(row, CONFIG.A_MEET_MEMO).getValue() || '';
+  const appointerOptions = MEMBER_OPTIONS;
+  const meetValue = formatDateForDatetimeLocal_(meetTimeRaw);
+  const html = HtmlService.createHtmlOutput(buildAppointmentDialogHtml({ row, recordId: rid, company, staff, email, appointer, meetingRep, meetValue, memo, appointerOptions }))
+    .setWidth(720).setHeight(760);
+  ui.showModalDialog(html, '🗓️ アポセットアップ');
+}
+
+function buildAppointmentDialogHtml(data) {
+  const appointerOptions = ['<option value=""></option>'].concat(data.appointerOptions.map(name => `<option value="${escapeHtml(name)}" ${name===data.appointer?'selected':''}>${escapeHtml(name)}</option>`)).join('');
+  const repOptions = ['<option value=""></option>'].concat(data.appointerOptions.map(name => `<option value="${escapeHtml(name)}" ${name===data.meetingRep?'selected':''}>${escapeHtml(name)}</option>`)).join('');
+  return `
+  <html><head><base target="_top"><style>
+  body{font-family:Arial,sans-serif;padding:16px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.row{margin-bottom:10px}label{display:block;font-size:13px;margin:8px 0 6px}input,select,textarea{width:100%;box-sizing:border-box;padding:8px;border:1px solid #dadce0;border-radius:8px}textarea{min-height:140px}.footer{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}.btn{padding:10px 16px;border:none;border-radius:8px;cursor:pointer}.primary{background:#1a73e8;color:#fff}.secondary{background:#f1f3f4}.summary{background:#f8f9fa;padding:10px;border-radius:8px;font-size:13px}
+  </style></head><body>
+  <h2>🗓️ アポセットアップ</h2>
+  <div class="summary">ここで商談担当・メール・日時までまとめて入力できます。保存すると、infoカレンダーにMeet付き予定を作成し、案内メール下書きも作成します。</div>
+  <div class="row"><label>会社名</label><input value="${escapeHtml(data.company)}" disabled></div>
+  <div class="grid2">
+    <div class="row"><label>担当者名</label><input id="staff" value="${escapeHtml(data.staff)}" placeholder="田中様"></div>
+    <div class="row"><label>メールアドレス</label><input id="email" value="${escapeHtml(data.email)}" placeholder="tanaka@example.com"></div>
+  </div>
+  <div class="grid2">
+    <div class="row"><label>アポ獲得者</label><select id="appointer">${appointerOptions}</select></div>
+    <div class="row"><label>商談担当者</label><select id="meetingRep">${repOptions}</select></div>
+  </div>
+  <div class="row"><label>商談日時</label><input id="meetTime" type="datetime-local" value="${escapeHtml(data.meetValue)}"></div>
+  <div class="row"><label>商談メモ / アポメモ</label><textarea id="memo">${escapeHtml(data.memo)}</textarea></div>
+  <input type="hidden" id="rowHint" value="${escapeHtml(String(data.row || ''))}">
+  <input type="hidden" id="companyName" value="${escapeHtml(data.company)}">
+  <div id="savingMsg" style="display:none;margin:8px 0 0;color:#1a73e8;font-size:12px;">反映中です。閉じずにそのままお待ちください…</div>
+  <div class="footer"><button id="cancelBtn" class="btn secondary" onclick="google.script.host.close()">キャンセル</button><button id="submitBtn" class="btn primary" onclick="submitForm()">セットアップする</button></div>
+  <script>
+  function setSubmitting(flag){const submitBtn=document.getElementById('submitBtn');const cancelBtn=document.getElementById('cancelBtn');const savingMsg=document.getElementById('savingMsg');submitBtn.disabled=flag;cancelBtn.disabled=flag;submitBtn.textContent=flag?'反映中…':'セットアップする';savingMsg.style.display=flag?'block':'none';}
+  function submitForm(){
+    const payload={recordId:'${escapeHtml(data.recordId)}',rowHint:document.getElementById('rowHint').value,companyName:document.getElementById('companyName').value,staff:document.getElementById('staff').value.trim(),email:document.getElementById('email').value.trim(),appointer:document.getElementById('appointer').value,meetingRep:document.getElementById('meetingRep').value,meetTime:document.getElementById('meetTime').value,memo:document.getElementById('memo').value.trim()};
+    if(!payload.staff||!payload.email||!payload.appointer||!payload.meetTime){alert('担当者名・メールアドレス・アポ獲得者・商談日時は必須です。');return;}
+    setSubmitting(true);
+    google.script.run.withSuccessHandler(msg=>{if(msg)alert(msg);google.script.host.close();}).withFailureHandler(err=>{setSubmitting(false);alert(err.message||err)}).submitAppointmentSetup(payload);
+  }
+  </script></body></html>`;
+}
+
+function submitAppointmentSetup(payload) {
+  if (!ensurePermissions()) throw new Error('権限承認が必要です。');
+  ensureActiveSheetStructure_();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SS_ACTIVE);
+  ensureActiveSheetStructure_();
+  const row = resolveActiveRow_(sheet, payload);
+  if (!sheet || row <= 1) throw new Error('アクティブ案件の対象行が見つかりません。');
+  const settings = getSettings();
+  const targetCalendarId = settings.infoCalendarId || '';
+  if (!targetCalendarId) throw new Error('設定シートB3に予定作成先カレンダーIDを入れてください。');
+  const calMeta = Calendar.CalendarList.get(targetCalendarId);
+  const accessRole = calMeta.accessRole || '';
+  if (accessRole !== 'owner' && accessRole !== 'writer') throw new Error(`このアカウント(${MY_EMAIL})には ${targetCalendarId} への編集権限がありません。`);
+
+  const company = sheet.getRange(row, CONFIG.A_COMPANY).getValue();
+  const email = String(payload.email || '').trim();
+  const staff = String(payload.staff || '').trim();
+  const appointer = String(payload.appointer || '').trim();
+  const meetingRep = String(payload.meetingRep || '').trim() || appointer;
+  const memo = String(payload.memo || '').trim();
+  const startDate = parseFlexibleDateTime(payload.meetTime, true);
+  if (!company || !email || !staff || !appointer || !startDate) throw new Error('会社名・メール・担当者名・アポ獲得者・商談日時は必須です。');
+  const guardKey = `APT:${payload.recordId || company}:${email}:${payload.meetTime}:${appointer}`;
+  return withSubmissionGuard_(guardKey, 20, () => {
+  const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+
+  sheet.getRange(row, CONFIG.A_STAFF).setValue(staff);
+  sheet.getRange(row, CONFIG.A_EMAIL).setValue(email);
+  sheet.getRange(row, CONFIG.A_APPOINTER).setValue(appointer);
+  sheet.getRange(row, CONFIG.A_MEETING_REP).setValue(meetingRep);
+  sheet.getRange(row, CONFIG.A_MEET_TIME).setValue(startDate);
+  if (memo) appendMultilineCell_(sheet.getRange(row, CONFIG.A_MEET_MEMO), memo);
+
+  const myData = settings.members[appointer] || { full: appointer };
+  const repData = settings.members[meetingRep] || { full: meetingRep };
+  const appointerLastName = String(myData.full || appointer).split(/[ 　]/)[0];
+  const repLastName = String(repData.full || meetingRep).split(/[ 　]/)[0];
+  const calendarTitle = `${company} ${staff}様: 新卒採用イベント_お打ち合わせ`;
+  const repIntro = (appointer === meetingRep || !meetingRep)
+    ? `当日は私${appointerLastName}がお話しさせていただきます。`
+    : `当日は弊社の${repLastName}がお話しさせていただきます。`;
+
+    // カレンダー作成のコード付近に挿入
+  syncToFirestore_(appointer, 'アポセットアップ', 'アクティブ案件');
+
+  let meetUrl = '';
+  let calendarSuccess = false;
+  let calendarError = '';
+  try {
+    const requestId = 'meet-' + Date.now() + '-' + Math.random().toString(36).substring(2, 10);
+    const eventResource = {
+      summary: calendarTitle,
+      description: `会社名: ${company}\n担当者: ${staff}\n商談担当: ${meetingRep}\nメモ:\n${sheet.getRange(row, CONFIG.A_MEET_MEMO).getValue() || ''}`,
+      start: { dateTime: startDate.toISOString(), timeZone: 'Asia/Tokyo' },
+      end: { dateTime: endDate.toISOString(), timeZone: 'Asia/Tokyo' },
+      conferenceData: { createRequest: { requestId: requestId, conferenceSolutionKey: { type: 'hangoutsMeet' } } }
+    };
+    const createdEvent = Calendar.Events.insert(eventResource, targetCalendarId, { conferenceDataVersion: 1, sendUpdates: 'none' });
+    if (createdEvent.conferenceData && createdEvent.conferenceData.entryPoints) {
+      meetUrl = createdEvent.conferenceData.entryPoints[0].uri;
+    } else {
+      Utilities.sleep(1500);
+      const refetched = Calendar.Events.get(targetCalendarId, createdEvent.id);
+      if (refetched.conferenceData && refetched.conferenceData.entryPoints) meetUrl = refetched.conferenceData.entryPoints[0].uri;
+    }
+    calendarSuccess = true;
+  } catch(err) {
+    calendarError = err.message;
+  }
+
+  const fDate = Utilities.formatDate(startDate, 'Asia/Tokyo', 'yyyy年M月d日 (E) HH:mm');
+  const meetUrlForMail = meetUrl || '(Meet URLを手動で貼り付けてください)';
+  const body1 = `${company}\n${staff}様\n\nお世話になっております。\nBeMeキャリアの${appointerLastName}でございます。\n\n先ほどはお電話にてご対応いただき、誠にありがとうございました。\n\nお電話にてお伝えさせていただきました新卒採用イベントについて、ぜひオンラインで詳しくお話しさせていただければと思っております。\n\n${repIntro}\n\nお打ち合わせ情報を共有させていただきます。当日は下記リンクよりご入室いただけますと幸いです。\n\n＜お打ち合わせ情報＞\n\n日時:${fDate} 〜\nURL:${meetUrlForMail}\n\n当日は貴重なお時間を頂戴しますため、しっかり準備のうえ臨ませていただきます。\nお話しできることをとても楽しみにしております。\n\n何卒よろしくお願いいたします。`;
+  const body2 = `${company}\n${staff}様\n\nいつもお世話になっております。\nBeMeキャリアの${appointerLastName}でございます。\n\n明日のお打ち合わせにつきまして、念のためご案内申し上げます。\n\n【日時】\n${fDate}〜\n\n【URL】\n${meetUrlForMail}\n\nご多用のところ恐れ入りますが、ご確認いただけますと幸いです。\nお話しできることを心より楽しみにしております。\n\n何卒よろしくお願いいたします。`;
+
+  if (settings.ccEmail && settings.ccEmail.includes('@')) {
+    GmailApp.createDraft(email, '【お電話の御礼/お打ち合わせ用URLのご共有】', body1, { cc: settings.ccEmail });
+    GmailApp.createDraft(email, `【明日のお打ち合わせのご確認】${company}様`, body2, { cc: settings.ccEmail });
+  } else {
+    GmailApp.createDraft(email, '【お電話の御礼/お打ち合わせ用URLのご共有】', body1);
+    GmailApp.createDraft(email, `【明日のお打ち合わせのご確認】${company}様`, body2);
+  }
+
+  if (calendarSuccess) sheet.getRange(row, CONFIG.A_MEET_URL).setValue(meetUrl);
+  sheet.getRange(row, CONFIG.A_MAIL_SENT).setValue(true);
+  sheet.getRange(row, CONFIG.A_KIND).setValue('アポ確定');
+  const msg = calendarSuccess ? `Meet付き予定を作成し、案内メール下書き2通を作成しました。` : `メール下書きは作成しましたが、カレンダー作成でエラーが出ました: ${calendarError}`;
+  SpreadsheetApp.getActiveSpreadsheet().toast(msg, '🗓️ アポセットアップ', 5);
+  return msg;
+  });
+}
+
+function onEdit(e) {
+  if (!e || !e.range) return;
+  const sheet = e.source.getActiveSheet();
+  const range = e.range;
+  const sheetName = sheet.getName();
+
+  if (sheetName === CONFIG.SS_MASTER && range.getColumn() === CONFIG.M_CHECKBOX && e.value === 'TRUE') {
+    const row = range.getRow();
+    const statusA = String(sheet.getRange(row, CONFIG.M_STATUS).getValue());
+    if (isTransferStatus_(statusA)) {
+      try {
+        const targetRow = upsertToActiveFromMaster_(row, statusA);
+        sheet.getRange(row, CONFIG.M_TRANSFER).setValue(`手動反映済 (アクティブ${targetRow}行目)`);
+      } catch(err) {
+        sheet.getRange(row, CONFIG.M_TRANSFER).setValue('エラー: ' + err.message);
+        console.error('transferToActive error: ' + err.message);
+      }
+    } else {
+      sheet.getRange(row, CONFIG.M_TRANSFER).setValue('対象外: ' + statusA);
+    }
+  }
+}
+
+function upsertToActiveFromMaster_(masterRow, statusA) {
+  ensureActiveSheetStructure_();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sourceSheet = ss.getSheetByName(CONFIG.SS_MASTER);
+  const target = ss.getSheetByName(CONFIG.SS_ACTIVE);
+  const company = String(sourceSheet.getRange(masterRow, CONFIG.M_COMPANY).getValue() || '').trim();
+  const tel = String(sourceSheet.getRange(masterRow, CONFIG.M_TEL).getValue() || '').trim();
+  if (!company) throw new Error('会社名が空です。');
+  let companyId = String(sourceSheet.getRange(masterRow, CONFIG.M_COMPANY_ID).getValue() || '').trim();
+  if (!companyId) {
+    companyId = generateUniqueId_('CMP');
+    sourceSheet.getRange(masterRow, CONFIG.M_COMPANY_ID).setValue(companyId);
+  }
+
+  let targetRow = findRowById_(target, companyId, CONFIG.A_RECORD_ID);
+  if (!targetRow) targetRow = findActiveRowByCompanyAndTel_(target, company, tel);
+  if (!targetRow) targetRow = getNextBlankActiveRow_(target);
+
+  const staff = sourceSheet.getRange(masterRow, CONFIG.M_STAFF).getValue() || '';
+  const email = sourceSheet.getRange(masterRow, CONFIG.M_EMAIL).getValue() || '';
+  const appointer = sourceSheet.getRange(masterRow, CONFIG.M_APPOINTER).getValue() || '';
+  const meetingRep = sourceSheet.getRange(masterRow, CONFIG.M_MEETING_REP).getValue() || '';
+  const memo = sourceSheet.getRange(masterRow, CONFIG.M_MEMO).getValue() || '';
+  const talk = sourceSheet.getRange(masterRow, CONFIG.M_TALK_POINT).getValue() || '';
+  const hist = sourceSheet.getRange(masterRow, CONFIG.M_HISTORY).getValue() || '';
+  const nextDate = sourceSheet.getRange(masterRow, CONFIG.M_NEXT_DATE).getValue() || '';
+
+  target.getRange(targetRow, CONFIG.A_RECORD_ID).setValue(companyId);
+  target.getRange(targetRow, CONFIG.A_COMPANY).setValue(company);
+  target.getRange(targetRow, CONFIG.A_TEL).setValue(tel);
+  if (staff) target.getRange(targetRow, CONFIG.A_STAFF).setValue(staff);
+  if (email) target.getRange(targetRow, CONFIG.A_EMAIL).setValue(email);
+  if (appointer) target.getRange(targetRow, CONFIG.A_APPOINTER).setValue(appointer);
+  if (meetingRep) target.getRange(targetRow, CONFIG.A_MEETING_REP).setValue(meetingRep);
+  if (hist) target.getRange(targetRow, CONFIG.A_HISTORY).setValue(hist);
+  if (nextDate) target.getRange(targetRow, CONFIG.A_NEXT_DATE).setValue(nextDate);
+
+  const aggregatedMemoParts = [];
+  if (memo) aggregatedMemoParts.push(`[最新メモ]\n${memo}`);
+  if (talk) aggregatedMemoParts.push(`[次回トーク要点履歴]\n${talk}`);
+  const aggregatedMemo = aggregatedMemoParts.join('\n\n');
+  if (aggregatedMemo) {
+    target.getRange(targetRow, CONFIG.A_MEET_MEMO).setValue(aggregatedMemo);
+  }
+
+  let kind = '';
+  let docRank = '';
+  if (statusA === 'アポ確定') kind = 'アポ確定';
+  if (statusA === '資料送付予定A') { kind = '資料送付'; docRank = '資料送付予定A'; }
+  if (statusA === '資料送付予定B') { kind = '資料送付'; docRank = '資料送付予定B'; }
+  if (statusA === '資料送付予定C') { kind = '資料送付'; docRank = '資料送付予定C'; }
+  if (kind) target.getRange(targetRow, CONFIG.A_KIND).setValue(kind);
+  if (docRank) target.getRange(targetRow, CONFIG.A_DOC_RANK).setValue(docRank);
+  if (!target.getRange(targetRow, CONFIG.A_PRIORITY).getValue()) target.getRange(targetRow, CONFIG.A_PRIORITY).setValue('⭐中');
+  target.getRange(targetRow, CONFIG.A_ACTION_COUNT).setValue(Number(target.getRange(targetRow, CONFIG.A_ACTION_COUNT).getValue()) || 0);
+  return targetRow;
+}
+
+function findActiveRowByCompanyAndTel_(sheet, company, tel) {
+  const lastRow = Math.max(sheet.getLastRow(), 2);
+  if (lastRow < 2) return 0;
+  const data = sheet.getRange(2, CONFIG.A_COMPANY, lastRow - 1, 3).getValues();
+  for (let i = 0; i < data.length; i++) {
+    const c = String(data[i][0] || '').trim();
+    const t = String(data[i][2] || '').trim();
+    if (c && c === company && t === tel) return i + 2;
+  }
+  return 0;
+}
+
+function getNextBlankActiveRow_(sheet) {
+  const lastRow = Math.max(sheet.getLastRow(), 1);
+  for (let r = 2; r <= Math.max(lastRow, 1000); r++) {
+    const company = sheet.getRange(r, CONFIG.A_COMPANY).getValue();
+    if (!company) return r;
+  }
+  sheet.insertRowsAfter(sheet.getMaxRows(), 100);
+  applyActiveSheetFormatting_(sheet);
+  return sheet.getLastRow() - 99;
+}
+
+function manualTransferTest() {
+  const ui = SpreadsheetApp.getUi();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  if (sheet.getName() !== CONFIG.SS_MASTER) {
+    ui.alert('「企業マスター」シートで実行してください。'); return;
+  }
+  const row = getStableCurrentRow_(sheet);
+  if (row <= 1) { ui.alert('対象行を1セル選択してから実行してください。'); return; }
+  const statusA = String(sheet.getRange(row, CONFIG.M_STATUS).getValue());
+  if (!isTransferStatus_(statusA)) {
+    ui.alert('対象外ステータス', 'ステータスは「アポ確定」または「資料送付予定A/B/C」にしてください。', ui.ButtonSet.OK);
+    return;
+  }
+  const targetRow = upsertToActiveFromMaster_(row, statusA);
+  sheet.getRange(row, CONFIG.M_TRANSFER).setValue(`手動反映済 (アクティブ${targetRow}行目)`);
+  ui.alert('✅ 転送処理完了', `アクティブ案件 ${targetRow}行目に反映しました。`, ui.ButtonSet.OK);
+}
+
+
+function recordFollowup() {
+  const ui = SpreadsheetApp.getUi();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  if (sheet.getName() !== CONFIG.SS_ACTIVE) {
+    ui.alert('「アクティブ案件」シートで実行してください。'); return;
+  }
+  if (!ensurePermissions()) return;
+  ensureActiveSheetStructure_();
+  const ctx = resolveActiveTargetContext_(sheet);
+  if (ctx.mode === 'error') { ui.alert(ctx.message || '対象案件を特定できませんでした。'); return; }
+  if (ctx.mode === 'choose') {
+    const html = HtmlService.createHtmlOutput(buildTargetChooserHtml_('📞 資料送付後追い', 'openDocFollowupDialogByRecordId_', ctx.candidates)).setWidth(640).setHeight(320);
+    ui.showModalDialog(html, '対象案件を選択');
+    return;
+  }
+  openDocFollowupDialogByRecordId_(ctx.recordId);
+}
+
+function openDocFollowupDialogByRecordId_(recordId) {
+  const ui = SpreadsheetApp.getUi();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SS_ACTIVE);
+  if (!sheet) return;
+  ensureActiveSheetStructure_();
+  const row = findRowById_(sheet, recordId, CONFIG.A_RECORD_ID);
+  if (!row) { ui.alert('対象案件が見つかりません。'); return; }
+  let rid = String(sheet.getRange(row, CONFIG.A_RECORD_ID).getValue() || '').trim();
+  if (!rid) { rid = generateUniqueId_('ACT'); sheet.getRange(row, CONFIG.A_RECORD_ID).setValue(rid); }
+  const html = HtmlService.createHtmlOutput(buildDocFollowupDialogHtml_(getDocFollowupRowSnapshot_(sheet, row, rid)))
+    .setWidth(760)
+    .setHeight(780);
+  ui.showModalDialog(html, '📞 資料送付後追い');
+}
+
+function getDocFollowupRowSnapshot_(sheet, row, recordId) {
+  return {
+    row: row,
+    recordId: recordId || sheet.getRange(row, CONFIG.A_RECORD_ID).getValue() || '',
+    recordId: recordId || sheet.getRange(row, CONFIG.A_RECORD_ID).getValue() || '',
+    company: sheet.getRange(row, CONFIG.A_COMPANY).getValue() || '(会社名未入力)',
+    staff: sheet.getRange(row, CONFIG.A_STAFF).getValue() || '',
+    appointer: sheet.getRange(row, CONFIG.A_APPOINTER).getValue() || '',
+    june: sheet.getRange(row, CONFIG.A_JUNE_STATUS).getValue() || '',
+    aug: sheet.getRange(row, CONFIG.A_AUG_STATUS).getValue() || '',
+    nov: sheet.getRange(row, CONFIG.A_NOV_STATUS).getValue() || '',
+    nextMonth: sheet.getRange(row, CONFIG.A_NEXT_MONTH).getValue() || '',
+    nextDate: formatDateForTextInput_(sheet.getRange(row, CONFIG.A_NEXT_DATE).getValue()) || formatDateForTextInput_(sheet.getRange(row, CONFIG.A_NEXT_APPROACH_DATE).getValue()),
+    nextMethod: sheet.getRange(row, CONFIG.A_NEXT_METHOD).getValue() || '電話',
+    nextContent: sheet.getRange(row, CONFIG.A_NEXT_CONTENT).getValue() || '',
+    note: '',
+    eventOptions: getMasterEventStatusOptions_()
+  };
+}
+
+function buildDocFollowupDialogHtml_(data) {
+  const resultButtons = [
+    { result: '不在', label: '不在' },
+    { result: '折り返し依頼', label: '折り返し' },
+    { result: '資料再送希望', label: '資料再送' },
+    { result: '検討中', label: '検討中' },
+    { result: 'アポ確定', label: 'アポ確定' },
+    { result: 'NG', label: 'NG' },
+    { result: '不通', label: '不通' },
+    { result: '見送り', label: '見送り' }
+  ].map(x => `<button type="button" class="option-btn" data-result="${escapeHtml(x.result)}">${escapeHtml(x.label)}</button>`).join('');
+  const sourceOptions = (data.eventOptions && data.eventOptions.length ? data.eventOptions : EVENT_STATUS_OPTIONS);
+  const eventOptionsJune = sourceOptions.map(v => `<option value="${escapeHtml(v)}" ${v===data.june?'selected':''}>${escapeHtml(v || '未設定')}</option>`).join('');
+  const eventOptionsAug = sourceOptions.map(v => `<option value="${escapeHtml(v)}" ${v===data.aug?'selected':''}>${escapeHtml(v || '未設定')}</option>`).join('');
+  const eventOptionsNov = sourceOptions.map(v => `<option value="${escapeHtml(v)}" ${v===data.nov?'selected':''}>${escapeHtml(v || '未設定')}</option>`).join('');
+  const monthOptions = EVENT_MONTH_OPTIONS.map(v => `<option value="${escapeHtml(v)}" ${v===data.nextMonth?'selected':''}>${escapeHtml(v || '未設定')}</option>`).join('');
+  const methodOptions = APPROACH_METHOD_OPTIONS.map(v => `<option value="${escapeHtml(v)}" ${v===data.nextMethod?'selected':''}>${escapeHtml(v || '未設定')}</option>`).join('');
+  return `
+  <html><head><base target="_top"><style>
+    body{font-family:Arial,sans-serif;padding:16px}.summary{background:#f8f9fa;padding:10px;border-radius:8px;font-size:13px;margin-bottom:12px}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 16px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .option-btn{border:1px solid #dadce0;background:#fff;border-radius:10px;padding:10px 8px;cursor:pointer;font-size:13px}
+    .option-btn.active{background:#e8f0fe;border-color:#1a73e8;color:#1a73e8;font-weight:bold}
+    label{display:block;font-size:13px;margin:8px 0 6px}input,textarea,select{width:100%;box-sizing:border-box;padding:8px;border:1px solid #dadce0;border-radius:8px}
+    textarea{min-height:110px;resize:vertical}.row{margin-bottom:10px}.footer{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.btn{padding:10px 16px;border-radius:8px;border:none;cursor:pointer}.btn-primary{background:#1a73e8;color:#fff}.btn-secondary{background:#f1f3f4}
+  </style></head><body>
+    <h2>📞 資料送付後追い</h2>
+    <div class="summary">資料送付後の架電結果・次回後追い日・イベント検討状況を更新します。ここで記録した内容は、アクション回数・履歴ログ・次回アクションに蓄積され、日付を入れた場合は info カレンダーにも反映します。</div>
+    <div class="row"><label>会社名</label><input value="${escapeHtml(data.company)}" disabled></div>
+    <label>1. 後追い結果</label>
+    <div class="grid">${resultButtons}</div>
+    <div class="grid3">
+      <div class="row"><label>6/27イベント</label><select id="june">${eventOptionsJune}</select></div>
+      <div class="row"><label>8/29イベント</label><select id="aug">${eventOptionsAug}</select></div>
+      <div class="row"><label>11月イベント</label><select id="nov">${eventOptionsNov}</select></div>
+    </div>
+    <div class="grid3">
+      <div class="row"><label>次回アプローチ月</label><select id="nextMonth">${monthOptions}</select></div>
+      <div class="row"><label>次回後追い日</label><input id="nextDate" type="text" value="${escapeHtml(data.nextDate)}" placeholder="例: 4/23 13:00"></div>
+      <div class="row"><label>後追い方法</label><select id="nextMethod">${methodOptions}</select></div>
+    </div>
+    <div class="row"><label>内容 / メモ</label><textarea id="memo">${escapeHtml(data.nextContent)}</textarea></div>
+    <input type="hidden" id="result" value="">
+    <input type="hidden" id="rowHint" value="${escapeHtml(String(data.row || ''))}">
+    <input type="hidden" id="companyName" value="${escapeHtml(data.company)}">
+    <div id="savingMsg" style="display:none;margin:8px 0 0;color:#1a73e8;font-size:12px;">反映中です。閉じずにそのままお待ちください…</div>
+    <div class="footer">
+      <button id="cancelBtn" class="btn btn-secondary" onclick="google.script.host.close()">キャンセル</button>
+      <button id="submitBtn" class="btn btn-primary" onclick="submitForm()">記録する</button>
+    </div>
+    <script>
+      document.querySelectorAll('.option-btn').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+          document.querySelectorAll('.option-btn').forEach(x=>x.classList.remove('active'));
+          btn.classList.add('active');
+          document.getElementById('result').value = btn.dataset.result || '';
+        });
+      });
+      function setSubmitting(flag){const submitBtn=document.getElementById('submitBtn');const cancelBtn=document.getElementById('cancelBtn');const savingMsg=document.getElementById('savingMsg');submitBtn.disabled=flag;cancelBtn.disabled=flag;submitBtn.textContent=flag?'反映中…':'記録する';savingMsg.style.display=flag?'block':'none';}
+      function submitForm(){
+        const payload = {
+          recordId: '${escapeHtml(data.recordId)}',
+          rowHint: document.getElementById('rowHint').value,
+          companyName: document.getElementById('companyName').value,
+          result: document.getElementById('result').value,
+          june: document.getElementById('june').value,
+          aug: document.getElementById('aug').value,
+          nov: document.getElementById('nov').value,
+          nextMonth: document.getElementById('nextMonth').value,
+          nextDate: document.getElementById('nextDate').value.trim(),
+          nextMethod: document.getElementById('nextMethod').value,
+          memo: document.getElementById('memo').value.trim()
+        };
+        if (!payload.result) { alert('最初に後追い結果を選んでください。'); return; }
+        setSubmitting(true);
+        google.script.run.withSuccessHandler(msg=>{ if(msg) alert(msg); google.script.host.close(); })
+          .withFailureHandler(err=>{setSubmitting(false);alert(err.message || err)})
+          .submitDocFollowupRecord(payload);
+      }
+    </script>
+  </body></html>`;
+}
+
+function submitDocFollowupRecord(payload) {
+  if (!ensurePermissions()) throw new Error('権限承認が必要です。');
+  ensureActiveSheetStructure_();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SS_ACTIVE);
+  ensureActiveSheetStructure_();
+  const row = resolveActiveRow_(sheet, payload);
+  if (!sheet || row <= 1) throw new Error('アクティブ案件の対象行が見つかりません。');
+  const settings = getSettings();
+  const targetCalendarId = settings.infoCalendarId || '';
+  const company = sheet.getRange(row, CONFIG.A_COMPANY).getValue() || '';
+  const rep = sheet.getRange(row, CONFIG.A_MEETING_REP).getValue() || sheet.getRange(row, CONFIG.A_APPOINTER).getValue() || '';
+  const result = String(payload.result || '').trim();
+  const june = String(payload.june || '');
+  const aug = String(payload.aug || '');
+  const nov = String(payload.nov || '');
+  const nextMonth = String(payload.nextMonth || '');
+  const nextMethod = String(payload.nextMethod || '');
+  const memo = String(payload.memo || '').trim();
+  const nextDate = parseFlexibleDateTime(payload.nextDate);
+
+  if (payload.nextDate && !nextDate) throw new Error('次回後追い日の形式が正しくありません。');
+  const guardKey = `DOC:${payload.recordId || company}:${result}:${payload.nextDate}:${memo}`;
+  return withSubmissionGuard_(guardKey, 15, () => {
+
+  if (june || payload.june === '') sheet.getRange(row, CONFIG.A_JUNE_STATUS).setValue(june);
+  if (aug || payload.aug === '') sheet.getRange(row, CONFIG.A_AUG_STATUS).setValue(aug);
+  if (nov || payload.nov === '') sheet.getRange(row, CONFIG.A_NOV_STATUS).setValue(nov);
+  if (nextMonth || payload.nextMonth === '') sheet.getRange(row, CONFIG.A_NEXT_MONTH).setValue(nextMonth);
+  if (nextDate) {
+    sheet.getRange(row, CONFIG.A_NEXT_DATE).setValue(nextDate);
+    sheet.getRange(row, CONFIG.A_NEXT_APPROACH_DATE).setValue(nextDate);
+  }
+  sheet.getRange(row, CONFIG.A_NEXT_KIND).setValue('資料後追い');
+  if (nextMethod || payload.nextMethod === '') sheet.getRange(row, CONFIG.A_NEXT_METHOD).setValue(nextMethod);
+  if (memo || payload.memo === '') sheet.getRange(row, CONFIG.A_NEXT_CONTENT).setValue(memo);
+
+  const actionCount = Number(sheet.getRange(row, CONFIG.A_ACTION_COUNT).getValue()) || 0;
+  const today = new Date();
+  const todayStr = Utilities.formatDate(today, 'Asia/Tokyo', 'M/d');
+  const prefix = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩'][actionCount] || `(${actionCount + 1})`;
+  const historyEntry = `${prefix}${todayStr} ${rep || '担当未設定'}:資料後追い/${result}${memo ? ' [' + memo + ']' : ''}`;
+  appendMultilineCell_(sheet.getRange(row, CONFIG.A_HISTORY), historyEntry);
+  if (memo) appendMultilineCell_(sheet.getRange(row, CONFIG.A_MEET_MEMO), `[${todayStr}] 資料後追い: ${memo}`);
+  sheet.getRange(row, CONFIG.A_ACTION_COUNT).setValue(actionCount + 1);
+  sheet.getRange(row, CONFIG.A_LAST_ACTION).setValue(today);
+  sheet.getRange(row, CONFIG.A_LAST_RESULT).setValue(`資料後追い:${result}`);
+
+  syncToFirestore_(rep, `資料後追い:${result}`, '資料後追い');
+
+  if (result === 'アポ確定') {
+    sheet.getRange(row, CONFIG.A_KIND).setValue('アポ確定');
+  } else {
+    sheet.getRange(row, CONFIG.A_KIND).setValue('資料送付');
+  }
+
+  if (targetCalendarId) {
+    const baseDesc = `会社名: ${company}
+担当: ${sheet.getRange(row, CONFIG.A_STAFF).getValue() || ''}
+商談担当: ${rep}
+資料後追い結果: ${result}
+6/27イベント: ${june || '未設定'}
+8/29イベント: ${aug || '未設定'}
+11月イベント: ${nov || '未設定'}
+
+最新メモ:
+${memo || ''}`;
+    const nextId = upsertReminderCalendarEvent_(targetCalendarId, sheet.getRange(row, CONFIG.A_NEXT_CAL_ID).getValue(), company, '資料後追い', nextDate, nextMethod, memo || result, baseDesc);
+    if (nextId !== null) sheet.getRange(row, CONFIG.A_NEXT_CAL_ID).setValue(nextId || '');
+  }
+
+  clearTargetCheckbox_(sheet, row, CONFIG.A_TARGET);
+  const msg = result === 'アポ確定'
+    ? '資料送付後追いを記録しました。アポ確定に更新したので、続けて「アポセットアップ」を押してください。'
+    : '資料送付後追いを記録しました。次回後追い日を入れた場合は info カレンダーにも反映しています。';
+  SpreadsheetApp.getActiveSpreadsheet().toast(msg, '📞 資料送付後追い', 5);
+  return msg;
+  });
+}
+
+function recordMeetingOutcome() {
+  const ui = SpreadsheetApp.getUi();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  if (sheet.getName() !== CONFIG.SS_ACTIVE) {
+    ui.alert('「アクティブ案件」シートで実行してください。'); return;
+  }
+  if (!ensurePermissions()) return;
+  ensureActiveSheetStructure_();
+  const ctx = resolveActiveTargetContext_(sheet);
+  if (ctx.mode === 'error') { ui.alert(ctx.message || '対象案件を特定できませんでした。'); return; }
+  if (ctx.mode === 'choose') {
+    const html = HtmlService.createHtmlOutput(buildTargetChooserHtml_('📝 商談更新', 'openMeetingOutcomeDialogByRecordId_', ctx.candidates)).setWidth(640).setHeight(320);
+    ui.showModalDialog(html, '対象案件を選択');
+    return;
+  }
+  openMeetingOutcomeDialogByRecordId_(ctx.recordId);
+}
+
+function openMeetingOutcomeDialogByRecordId_(recordId) {
+  const ui = SpreadsheetApp.getUi();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SS_ACTIVE);
+  if (!sheet) return;
+  ensureActiveSheetStructure_();
+  const row = findRowById_(sheet, recordId, CONFIG.A_RECORD_ID);
+  if (!row) { ui.alert('対象案件が見つかりません。'); return; }
+  let rid = String(sheet.getRange(row, CONFIG.A_RECORD_ID).getValue() || '').trim();
+  if (!rid) { rid = generateUniqueId_('ACT'); sheet.getRange(row, CONFIG.A_RECORD_ID).setValue(rid); }
+  const html = HtmlService.createHtmlOutput(buildMeetingUpdateDialogHtml_(getActiveRowSnapshot_(sheet, row, rid)))
+    .setWidth(840)
+    .setHeight(860);
+  ui.showModalDialog(html, '📝 商談更新');
+}
+
+function getActiveRowSnapshot_(sheet, row, recordId) {
+  return {
+    row: row,
+    company: sheet.getRange(row, CONFIG.A_COMPANY).getValue() || '(会社名未入力)',
+    staff: sheet.getRange(row, CONFIG.A_STAFF).getValue() || '',
+    june: sheet.getRange(row, CONFIG.A_JUNE_STATUS).getValue() || '',
+    aug: sheet.getRange(row, CONFIG.A_AUG_STATUS).getValue() || '',
+    nov: sheet.getRange(row, CONFIG.A_NOV_STATUS).getValue() || '',
+    nextMonth: sheet.getRange(row, CONFIG.A_NEXT_MONTH).getValue() || '',
+    nextDate: formatDateForTextInput_(sheet.getRange(row, CONFIG.A_NEXT_APPROACH_DATE).getValue()),
+    nextMethod: sheet.getRange(row, CONFIG.A_NEXT_METHOD).getValue() || '',
+    nextContent: sheet.getRange(row, CONFIG.A_NEXT_CONTENT).getValue() || '',
+    midDate: formatDateForTextInput_(sheet.getRange(row, CONFIG.A_MID_DATE).getValue()),
+    midMethod: sheet.getRange(row, CONFIG.A_MID_METHOD).getValue() || '',
+    midContent: sheet.getRange(row, CONFIG.A_MID_CONTENT).getValue() || '',
+    finalDate: formatDateForTextInput_(sheet.getRange(row, CONFIG.A_FINAL_DATE).getValue()),
+    finalMethod: sheet.getRange(row, CONFIG.A_FINAL_METHOD).getValue() || '',
+    finalContent: sheet.getRange(row, CONFIG.A_FINAL_CONTENT).getValue() || '',
+    note: sheet.getRange(row, CONFIG.A_MEET_MEMO).getValue() || '',
+    mode: '通常更新',
+    eventOptions: getMasterEventStatusOptions_()
+  };
+}
+
+function buildMeetingUpdateDialogHtml_(data) {
+  const eventOptions = EVENT_STATUS_OPTIONS.map(v => `<option value="${escapeHtml(v)}" ${v===data.june?'selected':''}>${escapeHtml(v || '未設定')}</option>`);
+  const sourceOptions = (data.eventOptions && data.eventOptions.length ? data.eventOptions : EVENT_STATUS_OPTIONS);
+  const eventOptionsJune = sourceOptions.map(v => `<option value="${escapeHtml(v)}" ${v===data.june?'selected':''}>${escapeHtml(v || '未設定')}</option>`).join('');
+  const eventOptionsAug = sourceOptions.map(v => `<option value="${escapeHtml(v)}" ${v===data.aug?'selected':''}>${escapeHtml(v || '未設定')}</option>`).join('');
+  const eventOptionsNov = sourceOptions.map(v => `<option value="${escapeHtml(v)}" ${v===data.nov?'selected':''}>${escapeHtml(v || '未設定')}</option>`).join('');
+  const monthOptions = EVENT_MONTH_OPTIONS.map(v => `<option value="${escapeHtml(v)}" ${v===data.nextMonth?'selected':''}>${escapeHtml(v || '未設定')}</option>`).join('');
+  const methodNext = APPROACH_METHOD_OPTIONS.map(v => `<option value="${escapeHtml(v)}" ${v===data.nextMethod?'selected':''}>${escapeHtml(v || '未設定')}</option>`).join('');
+  const methodMid = APPROACH_METHOD_OPTIONS.map(v => `<option value="${escapeHtml(v)}" ${v===data.midMethod?'selected':''}>${escapeHtml(v || '未設定')}</option>`).join('');
+  const methodFinal = APPROACH_METHOD_OPTIONS.map(v => `<option value="${escapeHtml(v)}" ${v===data.finalMethod?'selected':''}>${escapeHtml(v || '未設定')}</option>`).join('');
+  const modeButtons = OUTCOME_MODE_OPTIONS.map(v => `<button type="button" class="mode-btn ${v===data.mode?'active':''}" data-mode="${escapeHtml(v)}">${escapeHtml(v)}</button>`).join('');
+  return `
+  <html><head><base target="_top"><style>
+  body{font-family:Arial,sans-serif;padding:16px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.row{margin-bottom:10px}label{display:block;font-size:13px;margin:8px 0 6px}input,select,textarea{width:100%;box-sizing:border-box;padding:8px;border:1px solid #dadce0;border-radius:8px}textarea{min-height:100px}.footer{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}.btn{padding:10px 16px;border:none;border-radius:8px;cursor:pointer}.primary{background:#1a73e8;color:#fff}.secondary{background:#f1f3f4}.summary{background:#f8f9fa;padding:10px;border-radius:8px;font-size:13px}.mode-wrap{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px}.mode-btn{border:1px solid #dadce0;background:#fff;border-radius:10px;padding:8px 12px;cursor:pointer}.mode-btn.active{background:#e8f0fe;border-color:#1a73e8;color:#1a73e8;font-weight:bold}
+  </style></head><body>
+  <h2>📝 商談更新</h2>
+  <div class="summary">6/27・8/29・11月イベントの状況、次回 / 中間 / 最終アプローチ、商談後メモをここで一括更新します。日付を入れた項目は info カレンダーへ自動反映します。</div>
+  <div class="row"><label>会社名</label><input value="${escapeHtml(data.company)}" disabled></div>
+  <div class="row"><label>更新モード</label><div class="mode-wrap">${modeButtons}</div><input type="hidden" id="mode" value="${escapeHtml(data.mode)}"></div>
+  <div class="grid3">
+    <div class="row"><label>6/27イベント</label><select id="june">${eventOptionsJune}</select></div>
+    <div class="row"><label>8/29イベント</label><select id="aug">${eventOptionsAug}</select></div>
+    <div class="row"><label>11月イベント</label><select id="nov">${eventOptionsNov}</select></div>
+  </div>
+  <div class="grid3">
+    <div class="row"><label>次回アプローチ月</label><select id="nextMonth">${monthOptions}</select></div>
+    <div class="row"><label>次回アプローチ日</label><input id="nextDate" type="text" value="${escapeHtml(data.nextDate)}" placeholder="例: 4/20 13:00"></div>
+    <div class="row"><label>次回アプローチ方法</label><select id="nextMethod">${methodNext}</select></div>
+  </div>
+  <div class="row"><label>次回内容</label><textarea id="nextContent">${escapeHtml(data.nextContent)}</textarea></div>
+  <div class="grid2">
+    <div class="row"><label>中間アプローチ日</label><input id="midDate" type="text" value="${escapeHtml(data.midDate)}" placeholder="例: 5/10"></div>
+    <div class="row"><label>中間方法</label><select id="midMethod">${methodMid}</select></div>
+  </div>
+  <div class="row"><label>中間内容</label><textarea id="midContent">${escapeHtml(data.midContent)}</textarea></div>
+  <div class="grid2">
+    <div class="row"><label>最終決定アプローチ日</label><input id="finalDate" type="text" value="${escapeHtml(data.finalDate)}" placeholder="例: 6/01"></div>
+    <div class="row"><label>最終方法</label><select id="finalMethod">${methodFinal}</select></div>
+  </div>
+  <div class="row"><label>最終決定内容</label><textarea id="finalContent">${escapeHtml(data.finalContent)}</textarea></div>
+  <div class="row"><label>商談メモ / 後追いメモ</label><textarea id="memo">${escapeHtml(data.note)}</textarea></div>
+  <input type="hidden" id="rowHint" value="${escapeHtml(String(data.row || ''))}">
+  <input type="hidden" id="companyName" value="${escapeHtml(data.company)}">
+  <div id="savingMsg" style="display:none;margin:8px 0 0;color:#1a73e8;font-size:12px;">反映中です。閉じずにそのままお待ちください…</div>
+  <div class="footer"><button id="cancelBtn" class="btn secondary" onclick="google.script.host.close()">キャンセル</button><button id="submitBtn" class="btn primary" onclick="submitForm()">更新する</button></div>
+  <script>
+    document.querySelectorAll('.mode-btn').forEach(btn=>{
+      btn.addEventListener('click',()=>{document.querySelectorAll('.mode-btn').forEach(x=>x.classList.remove('active'));btn.classList.add('active');document.getElementById('mode').value=btn.dataset.mode||'通常更新';});
+    });
+    function setSubmitting(flag){const submitBtn=document.getElementById('submitBtn');const cancelBtn=document.getElementById('cancelBtn');const savingMsg=document.getElementById('savingMsg');submitBtn.disabled=flag;cancelBtn.disabled=flag;submitBtn.textContent=flag?'反映中…':'更新する';savingMsg.style.display=flag?'block':'none';}
+    function submitForm(){
+      const payload={
+        recordId:'${escapeHtml(data.recordId)}',
+        rowHint:document.getElementById('rowHint').value,
+        companyName:document.getElementById('companyName').value,
+        mode:document.getElementById('mode').value,
+        june:document.getElementById('june').value,
+        aug:document.getElementById('aug').value,
+        nov:document.getElementById('nov').value,
+        nextMonth:document.getElementById('nextMonth').value,
+        nextDate:document.getElementById('nextDate').value.trim(),
+        nextMethod:document.getElementById('nextMethod').value,
+        nextContent:document.getElementById('nextContent').value.trim(),
+        midDate:document.getElementById('midDate').value.trim(),
+        midMethod:document.getElementById('midMethod').value,
+        midContent:document.getElementById('midContent').value.trim(),
+        finalDate:document.getElementById('finalDate').value.trim(),
+        finalMethod:document.getElementById('finalMethod').value,
+        finalContent:document.getElementById('finalContent').value.trim(),
+        memo:document.getElementById('memo').value.trim()
+      };
+      setSubmitting(true);
+      google.script.run.withSuccessHandler(msg=>{if(msg)alert(msg);google.script.host.close();}).withFailureHandler(err=>{setSubmitting(false);alert(err.message||err)}).submitMeetingOutcomeRecord(payload);
+    }
+  </script>
+  </body></html>`;
+}
+
+function submitMeetingOutcomeRecord(payload) {
+  if (!ensurePermissions()) throw new Error('権限承認が必要です。');
+  ensureActiveSheetStructure_();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CONFIG.SS_ACTIVE);
+  ensureActiveSheetStructure_();
+  const row = resolveActiveRow_(sheet, payload);
+  if (!sheet || row <= 1) throw new Error('アクティブ案件の対象行が見つかりません。');
+  const settings = getSettings();
+  const targetCalendarId = settings.infoCalendarId || '';
+  const company = sheet.getRange(row, CONFIG.A_COMPANY).getValue() || '';
+  const staff = sheet.getRange(row, CONFIG.A_STAFF).getValue() || '';
+  const meetingRep = sheet.getRange(row, CONFIG.A_MEETING_REP).getValue() || sheet.getRange(row, CONFIG.A_APPOINTER).getValue() || '';
+  const mode = String(payload.mode || '通常更新');
+  const june = String(payload.june || '');
+  const aug = String(payload.aug || '');
+  const nov = String(payload.nov || '');
+  const nextMonth = String(payload.nextMonth || '');
+  const nextDate = parseFlexibleDateTime(payload.nextDate);
+  const nextMethod = String(payload.nextMethod || '');
+  const nextContent = String(payload.nextContent || '').trim();
+  const midDate = parseFlexibleDateTime(payload.midDate);
+  const midMethod = String(payload.midMethod || '');
+  const midContent = String(payload.midContent || '').trim();
+  const finalDate = parseFlexibleDateTime(payload.finalDate);
+  const finalMethod = String(payload.finalMethod || '');
+  const finalContent = String(payload.finalContent || '').trim();
+  const memo = String(payload.memo || '').trim();
+
+  if (payload.nextDate && !nextDate) throw new Error('次回アプローチ日の形式が正しくありません。');
+  if (payload.midDate && !midDate) throw new Error('中間アプローチ日の形式が正しくありません。');
+  if (payload.finalDate && !finalDate) throw new Error('最終決定アプローチ日の形式が正しくありません。');
+  const guardKey = `MTG:${payload.recordId || company}:${mode}:${payload.nextDate}:${payload.midDate}:${payload.finalDate}:${memo}`;
+
+  syncToFirestore_(meetingRep, `商談済:${mode}`, '商談完了');
+  return withSubmissionGuard_(guardKey, 15, () => {
+
+  sheet.getRange(row, CONFIG.A_JUNE_STATUS).setValue(june);
+  sheet.getRange(row, CONFIG.A_AUG_STATUS).setValue(aug);
+  sheet.getRange(row, CONFIG.A_NOV_STATUS).setValue(nov);
+  sheet.getRange(row, CONFIG.A_NEXT_MONTH).setValue(nextMonth);
+  if (nextDate) sheet.getRange(row, CONFIG.A_NEXT_APPROACH_DATE).setValue(nextDate);
+  if (nextMethod) sheet.getRange(row, CONFIG.A_NEXT_METHOD).setValue(nextMethod);
+  if (nextContent || payload.nextDate || nextMethod) sheet.getRange(row, CONFIG.A_NEXT_CONTENT).setValue(nextContent);
+  if (midDate) sheet.getRange(row, CONFIG.A_MID_DATE).setValue(midDate);
+  if (midMethod || payload.midDate) sheet.getRange(row, CONFIG.A_MID_METHOD).setValue(midMethod);
+  if (midContent || payload.midDate || midMethod) sheet.getRange(row, CONFIG.A_MID_CONTENT).setValue(midContent);
+  if (finalDate) sheet.getRange(row, CONFIG.A_FINAL_DATE).setValue(finalDate);
+  if (finalMethod || payload.finalDate) sheet.getRange(row, CONFIG.A_FINAL_METHOD).setValue(finalMethod);
+  if (finalContent || payload.finalDate || finalMethod) sheet.getRange(row, CONFIG.A_FINAL_CONTENT).setValue(finalContent);
+
+  const actionCount = Number(sheet.getRange(row, CONFIG.A_ACTION_COUNT).getValue()) || 0;
+  const today = new Date();
+  const todayStr = Utilities.formatDate(today, 'Asia/Tokyo', 'M/d');
+  const prefix = ['①','②','③','④','⑤','⑥','⑦','⑧','⑨','⑩'][actionCount] || `(${actionCount + 1})`;
+  const resultText = `${mode} / 6月:${june || '未設定'} 8月:${aug || '未設定'} 11月:${nov || '未設定'}`;
+  const extraNotes = [memo, nextContent, midContent, finalContent].filter(Boolean).join(' / ');
+  const historyEntry = `${prefix}${todayStr} ${meetingRep || '担当未設定'}:${resultText}${extraNotes ? ' [' + extraNotes + ']' : ''}`;
+  appendMultilineCell_(sheet.getRange(row, CONFIG.A_HISTORY), historyEntry);
+  if (memo) appendMultilineCell_(sheet.getRange(row, CONFIG.A_MEET_MEMO), `[${todayStr}] ${memo}`);
+  sheet.getRange(row, CONFIG.A_ACTION_COUNT).setValue(actionCount + 1);
+  sheet.getRange(row, CONFIG.A_LAST_ACTION).setValue(today);
+  sheet.getRange(row, CONFIG.A_LAST_RESULT).setValue(mode);
+  sheet.getRange(row, CONFIG.A_MEET_DONE).setValue(true);
+  sheet.getRange(row, CONFIG.A_KIND).setValue('商談済');
+
+  let won = false;
+  if (mode === '出展決定' || [june, aug, nov].some(v => v === '出展決定')) {
+    won = true;
+    sheet.getRange(row, CONFIG.A_WON).setValue(true);
+    sheet.getRange(row, CONFIG.A_KIND).setValue('クローズ');
+  }
+  if (mode === '失注' || ([june, aug, nov].every(v => v === '見送り') && [june, aug, nov].some(Boolean))) {
+    sheet.getRange(row, CONFIG.A_LOST_DATE).setValue(today);
+    if (!sheet.getRange(row, CONFIG.A_LOST_REASON).getValue()) sheet.getRange(row, CONFIG.A_LOST_REASON).setValue('ニーズ不一致');
+    if (!won) sheet.getRange(row, CONFIG.A_KIND).setValue('クローズ');
+  }
+
+  if (targetCalendarId) {
+    const baseDesc = `会社名: ${company}\n担当者: ${staff}\n商談担当: ${meetingRep}\n6/27イベント: ${june || '未設定'}\n8/29イベント: ${aug || '未設定'}\n11月イベント: ${nov || '未設定'}\n\n最新メモ:\n${memo || ''}`;
+    const nextId = upsertReminderCalendarEvent_(targetCalendarId, sheet.getRange(row, CONFIG.A_NEXT_CAL_ID).getValue(), company, '次回アプローチ', nextDate, nextMethod, nextContent, baseDesc);
+    const midId = upsertReminderCalendarEvent_(targetCalendarId, sheet.getRange(row, CONFIG.A_MID_CAL_ID).getValue(), company, '中間アプローチ', midDate, midMethod, midContent, baseDesc);
+    const finalId = upsertReminderCalendarEvent_(targetCalendarId, sheet.getRange(row, CONFIG.A_FINAL_CAL_ID).getValue(), company, '最終決定アプローチ', finalDate, finalMethod, finalContent, baseDesc);
+    if (nextId !== null) sheet.getRange(row, CONFIG.A_NEXT_CAL_ID).setValue(nextId || '');
+    if (midId !== null) sheet.getRange(row, CONFIG.A_MID_CAL_ID).setValue(midId || '');
+    if (finalId !== null) sheet.getRange(row, CONFIG.A_FINAL_CAL_ID).setValue(finalId || '');
+  }
+
+  const msg = '商談更新を反映しました。日付が入っているアプローチは info カレンダーにも反映しています。';
+  SpreadsheetApp.getActiveSpreadsheet().toast(msg, '📝 商談更新', 5);
+  return msg;
+  });
+}
+
+function upsertReminderCalendarEvent_(calendarId, existingEventId, company, label, dateObj, method, content, baseDesc) {
+  if (!dateObj) return null;
+  const start = new Date(dateObj.getTime());
+  if (start.getHours() === 0 && start.getMinutes() === 0) {
+    start.setHours(9, 0, 0, 0);
+  }
+  const end = new Date(start.getTime() + 30 * 60 * 1000);
+  const summary = `【${company}】${label}`;
+  const description = `${baseDesc}\n\nアプローチ種別: ${label}\n方法: ${method || '未設定'}\n内容: ${content || '未設定'}`;
+  const resource = {
+    summary: summary,
+    description: description,
+    start: { dateTime: start.toISOString(), timeZone: 'Asia/Tokyo' },
+    end: { dateTime: end.toISOString(), timeZone: 'Asia/Tokyo' },
+  };
+  try {
+    if (existingEventId) {
+      const updated = Calendar.Events.patch(resource, calendarId, existingEventId, { sendUpdates: 'none' });
+      return updated.id;
+    }
+  } catch (e) {
+    // 既存IDが消えていたら新規作成にフォールバック
+  }
+  const created = Calendar.Events.insert(resource, calendarId, { sendUpdates: 'none' });
+  return created.id;
+}
+
+function appendMultilineCell_(range, text) {
+  const value = String(text || '').trim();
+  if (!value) return;
+  const existing = String(range.getValue() || '').trim();
+  range.setValue(existing ? existing + '\n' + value : value);
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatDateForDatetimeLocal_(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return '';
+  return Utilities.formatDate(d, 'Asia/Tokyo', 'yyyy-MM-dd\'T\'HH:mm');
+}
+
+function formatDateForTextInput_(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return String(value || '');
+  if (d.getHours() === 0 && d.getMinutes() === 0) {
+    return Utilities.formatDate(d, 'Asia/Tokyo', 'yyyy/MM/dd');
+  }
+  return Utilities.formatDate(d, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm');
+}
+
+function parseFlexibleDateTime(input, forceDateTimeLocal) {
+  if (input === null || input === undefined) return null;
+  const raw = String(input).trim();
+  if (!raw) return null;
+
+  if (forceDateTimeLocal) {
+    const direct = new Date(raw);
+    if (!isNaN(direct.getTime())) return direct;
+  }
+
+  const normalized = raw.replace(/-/g, '/').replace('T', ' ').trim();
+  let m = normalized.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?$/);
+  if (m) {
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4] || 0), Number(m[5] || 0), 0, 0);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  m = normalized.match(/^(\d{1,2})\/(\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?$/);
+  if (m) {
+    const now = new Date();
+    const d = new Date(now.getFullYear(), Number(m[1]) - 1, Number(m[2]), Number(m[3] || 0), Number(m[4] || 0), 0, 0);
+    if (d < new Date(now.getFullYear(), now.getMonth(), now.getDate()) && !m[3]) d.setFullYear(d.getFullYear() + 1);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const direct = new Date(raw);
+  return isNaN(direct.getTime()) ? null : direct;
+}
+
+function columnNumberToLetter(n) {
+  let s = '';
+  while (n > 0) {
+    const m = (n - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}
+/** データをアプリ(Firestore)に送信するヘルパー */
+function syncToFirestore_(memberId, type, industry, count = 1) {
+  try {
+    const timestamp = new Date();
+    const dateStr = Utilities.formatDate(timestamp, "Asia/Tokyo", "yyyy-MM-dd");
+    const payload = {
+      fields: {
+        memberId: { stringValue: String(memberId) },
+        type: { stringValue: String(type) },
+        industry: { stringValue: String(industry || '未設定') },
+        timestamp: { timestampValue: timestamp.toISOString() },
+        count: { integerValue: count },
+        date: { stringValue: dateStr }
+      }
+    };
+    const url = `https://firestore.googleapis.com/v1/projects/${CONFIG.FIREBASE_PROJECT_ID}/databases/(default)/documents/eventReports?key=${CONFIG.FIREBASE_API_KEY}`;
+    UrlFetchApp.fetch(url, {
+      method: "post", contentType: "application/json", payload: JSON.stringify(payload), muteHttpExceptions: true
+    });
+  } catch (e) {
+    console.error("Firestore Sync Error: " + e.message);
+  }
+}
+
+/** スプシのメンバー情報をアプリに一括同期する */
+function syncMembersToFirestore() {
+  const settings = getSettings();
+  for (const name in settings.members) {
+    const m = settings.members[name];
+    const payload = {
+      fields: {
+        name: { stringValue: name },
+        email: { stringValue: m.email || "" },
+        full: { stringValue: m.full || name },
+        id: { stringValue: name }
+      }
+    };
+    const url = `https://firestore.googleapis.com/v1/projects/${CONFIG.FIREBASE_PROJECT_ID}/databases/(default)/documents/members/${encodeURIComponent(name)}?key=${CONFIG.FIREBASE_API_KEY}`;
+    try {
+      UrlFetchApp.fetch(url, { method: "patch", contentType: "application/json", payload: JSON.stringify(payload) });
+    } catch(e) {
+      UrlFetchApp.fetch(`https://firestore.googleapis.com/v1/projects/${CONFIG.FIREBASE_PROJECT_ID}/databases/(default)/documents/members?documentId=${encodeURIComponent(name)}&key=${CONFIG.FIREBASE_API_KEY}`, {
+        method: "post", contentType: "application/json", payload: JSON.stringify(payload)
+      });
+    }
+  }
+  SpreadsheetApp.getUi().alert("✅ メンバー情報をアプリに同期しました。");
+}
+
+/**
+ * 過去データ一括同期用スクリプト（この関数を1回だけ手動で実行します）
+ */
+function syncHistoricalData() {
+  // ① 対象のシート名に変更してください（例: "アクティブ案件" や "企業マスター" など）
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("企業マスター"); 
+  
+  if (!sheet) {
+    Logger.log("シートが見つかりません。シート名を確認してください。");
+    return;
+  }
+
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < 2) return; 
+  
+  const data = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+
+  // ② 列の番号を設定してください（配列は0から始まるため A列=0, B列=1, C列=2... となります）
+  // ★ ここはご自身のスプレッドシートの列に合わせて必ず数字を書き換えてください！
+  const DATE_COL = 11;       // L列
+  const INDUSTRY_COL = 7;   // H列
+  const APPOINTER_COL = 3;  // D列
+  const STATUS_COL = 1;     // B列
+  
+  // プロジェクトID（現在のコードの上部で定義されている FIREBASE_PROJECT_ID を指定します）
+  // もしエラーになる場合は "ivent-kpi" などの実際のプロジェクトIDを直接 "" の中に入れてください。
+    const PROJECT_ID = "ivent-kpi";
+
+  
+  let successCount = 0;
+
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    const recordDate = row[DATE_COL]; 
+    const industry = row[INDUSTRY_COL];
+    const appointer = row[APPOINTER_COL];
+    const status = row[STATUS_COL];
+    
+    // アポ獲得者かステータスが空欄の行はスキップ
+    if (!appointer || !status) continue;
+    
+    try {
+       // スプレッドシートの日付をそのまま保持する（空の場合は今日の日付にする）
+       const timestamp = (recordDate instanceof Date) ? recordDate : new Date();
+       const dateStr = Utilities.formatDate(timestamp, "Asia/Tokyo", "yyyy-MM-dd");
+       
+       const payload = {
+         fields: {
+           memberId: { stringValue: String(appointer) },
+           type: { stringValue: String(status) }, 
+           industry: { stringValue: String(industry || '未設定') },
+           timestamp: { timestampValue: timestamp.toISOString() }, // ←ここが過去の日付になるのが重要です
+           count: { integerValue: 1 },
+           date: { stringValue: dateStr }
+         }
+       };
+
+       // kpi_syncコレクションへ送信
+       const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/kpi_sync`;
+       
+       const options = {
+         method: "post",
+         contentType: "application/json",
+         payload: JSON.stringify(payload),
+         muteHttpExceptions: true
+       };
+
+       UrlFetchApp.fetch(url, options);
+       successCount++;
+       
+       // 大量データによるGoogleのAPI制限エラーを回避するため、50件ごとに1秒ストップさせる
+       if (successCount % 50 === 0) {
+         Utilities.sleep(1000); 
+       }
+       
+    } catch (e) {
+      Logger.log("エラー行 " + (i + 2) + ": " + e.message);
+    }
+  }
+  
+  Logger.log("同期完了！ " + successCount + "件の過去データをFirebaseへ移行しました。");
+}
