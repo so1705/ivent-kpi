@@ -152,54 +152,100 @@ const NavButton = ({ active, onClick, icon, label }) => (
 );
 
 const getAIAdvice = (stats, isPersonal) => {
-  const { calls, appts, picConnected } = stats;
+  const { calls, appts, picConnected, requests } = stats;
   const connectRate = calls > 0 ? picConnected / calls : 0;
   const apptRate = picConnected > 0 ? appts / picConnected : 0;
   const totalCvr = calls > 0 ? appts / calls : 0;
+  const requestRate = picConnected > 0 ? requests / picConnected : 0;
   
-  if (calls === 0) return "データが未蓄積です。まずはアクションを起こし、初期のペースメイキングを行いましょう。";
+  if (calls === 0) return "データが未蓄積です。まずは架電アクションを開始し、ベースラインを作成しましょう。";
 
-  let obs = "", strategy = "", action = "";
+  const categories = [];
 
   if (isPersonal) {
     if (connectRate < 0.15) {
-      obs = "現在、コール数に対する本人接続率が平均値を下回っています。";
-      strategy = "アプローチのタイミング最適化が必要です。";
-      action = "曜日や時間帯のターゲットリストを再編し、決済者が着座している可能性が高い時間帯にリソースを集中投下してください。";
-    } else if (apptRate < 0.05) {
-      obs = "接続からアポイントメントへの転換率が低下しています。";
-      strategy = "冒頭30秒のスクリプト構成と、ヒアリングの深度を見直す必要があります。";
-      action = "フロントの警戒心を解くアイスブレイクを強化し、相手のペインポイントに直接刺さる提案へとトークフローを調整してください。";
-    } else if (totalCvr > 0.02) {
-      obs = `全体の獲得効率は ${(totalCvr*100).toFixed(1)}% と非常に高い水準を維持しています。`;
-      strategy = "現在の獲得モデルのスケールアウトが推奨されます。";
-      action = "このペースを維持しつつ、得られた成功パターン（時間帯・トークスクリプト）をチーム全体へナレッジ共有してください。";
-    } else {
-      obs = "標準的な推移を見せています。";
-      strategy = "もう一段階のブレイクスルーには、微細なボトルネックの解消が必要です。";
-      action = "自身の過去の音声記録を確認し、クロージング前の切り返しのタイミングを1秒早める練習を行ってください。";
+      categories.push({
+        obs: "本人接続率が低迷しています。リストの鮮度か時間帯の不一致が疑われます。",
+        strategy: "アプローチタイミングのシフト",
+        action: "ターゲット業界が最も電話に出やすい時間帯（例：飲食なら14-16時、ITなら10-11時）へ架電を集中させてください。"
+      });
+      categories.push({
+        obs: "受付でのブロックが多いようです。",
+        strategy: "フロント突破話法の改善",
+        action: "「〇〇様（個人名）」を指名する、あるいは用件を「資料の件」とシンプルに伝えることで、受付通過率を高めましょう。"
+      });
+    }
+
+    if (apptRate < 0.05) {
+      categories.push({
+        obs: "本人接続はできていますが、アポへの転換が弱いです。",
+        strategy: "冒頭30秒のフック強化",
+        action: "相手が「自分に関係がある」と思えるメリット（他社事例など）を、接続直後の15秒以内に盛り込んでください。"
+      });
+      categories.push({
+        obs: "ネクストアクションの提示が曖昧です。",
+        strategy: "クローズド・クエスチョンの活用",
+        action: "「いつが良いですか？」ではなく「火曜の14時か水曜の11時ならどちらが都合良いですか？」と選択肢を提示してください。"
+      });
+    }
+
+    if (requestRate > 0.15 && apptRate < 0.05) {
+      categories.push({
+        obs: "「資料送付」で逃げられているケースが散見されます。",
+        strategy: "資料送付をアポのステップにする",
+        action: "「資料を送りますので、その内容を5分だけ解説させてください」という流れで、資料送付と同時にアポを確定させましょう。"
+      });
+    }
+
+    if (totalCvr > 0.03) {
+      categories.push({
+        obs: "極めて高いパフォーマンスです。現在のトークスキルは完成されています。",
+        strategy: "成功パターンのナレッジ化",
+        action: "好調な要因（スクリプト、トーン、対象リスト）をチームに共有し、全体の底上げに貢献してください。"
+      });
+    }
+
+    if (categories.length === 0) {
+      categories.push({
+        obs: "安定した推移です。大きなボトルネックは見られません。",
+        strategy: "微細なトーン＆マナーの調整",
+        action: "自分の録音を聞き返し、相手の喋るスピード（ペーシング）に合わせる練習をして、さらに親密度を高めましょう。"
+      });
+      categories.push({
+        obs: "着実に数字を積み上げています。",
+        strategy: "集中力の波のコントロール",
+        action: "50分架電・10分休憩のサイクルを徹底し、高いパフォーマンスを長時間持続させる工夫をしてください。"
+      });
     }
   } else {
     if (connectRate < 0.20) {
-      obs = "プロジェクト全体の接続率が目標閾値を下回って推移しています。";
-      strategy = "リスト枯渇、あるいはターゲティングの不一致が疑われます。";
-      action = "リストの供給源を見直すか、現在のアプローチ対象業界の優先順位を即座に変更してください。";
-    } else if (apptRate < 0.08) {
-      obs = "接続後の有効商談化率が低迷しています。";
-      strategy = "市場のニーズ変化に対し、現在のオファー内容が弱くなっている可能性があります。";
-      action = "提案の切り口（フック）を3パターン用意し、A/Bテストを実施して最も反応率の高いスクリプトに全体統一してください。";
+      categories.push({
+        obs: "チーム全体の接続率が低下しています。リストの枯渇が考えられます。",
+        strategy: "リストの再セグメント化",
+        action: "未架電リストの補充、またはアプローチ対象業界の優先順位を即座に見直してください。"
+      });
+    } else if (apptRate < 0.07) {
+      categories.push({
+        obs: "チーム全体でアポ獲得に苦戦しています。",
+        strategy: "トッププレイヤーのノウハウ展開",
+        action: "成績上位者の録音を全員で聞く「ロープレ・フィードバック会」を実施し、良いフレーズを即座に盗んでください。"
+      });
     } else {
-      obs = "プロジェクトは極めて健全なKPIツリーを形成しています。";
-      strategy = "現在のプロセスは最適化されています。";
-      action = "メンバーの疲労蓄積によるペースダウンを防ぐため、シフトの適正化とモチベーション管理に注力してください。";
+      categories.push({
+        obs: "チーム全体で高い生産性を維持できています。",
+        strategy: "モチベーション維持と環境整備",
+        action: "個々の成果を称え合い、ポジティブな雰囲気を維持することで、週末までのラストスパートをかけましょう。"
+      });
     }
   }
 
+  const advice = categories[Math.floor(Math.random() * categories.length)];
+
   return (
     <div className="space-y-4">
-      <div className="flex gap-3 items-start"><div className="mt-1 w-2 h-2 rounded-full bg-rose-500 shrink-0"></div><p><span className="text-rose-400 font-bold text-[10px] uppercase block mb-0.5">Observation</span>{obs}</p></div>
-      <div className="flex gap-3 items-start"><div className="mt-1 w-2 h-2 rounded-full bg-blue-500 shrink-0"></div><p><span className="text-blue-400 font-bold text-[10px] uppercase block mb-0.5">Strategy</span>{strategy}</p></div>
-      <div className="flex gap-3 items-start"><div className="mt-1 w-2 h-2 rounded-full bg-emerald-500 shrink-0"></div><p><span className="text-emerald-400 font-bold text-[10px] uppercase block mb-0.5">Action Plan</span>{action}</p></div>
+      <div className="flex gap-3 items-start"><div className="mt-1.5 w-2 h-2 rounded-full bg-rose-500 shrink-0"></div><p><span className="text-rose-400 font-bold text-[10px] uppercase block mb-0.5">Observation</span><span className="text-slate-800 font-medium leading-relaxed">{advice.obs}</span></p></div>
+      <div className="flex gap-3 items-start"><div className="mt-1.5 w-2 h-2 rounded-full bg-blue-500 shrink-0"></div><p><span className="text-blue-400 font-bold text-[10px] uppercase block mb-0.5">Strategy</span><span className="text-slate-800 font-medium leading-relaxed">{advice.strategy}</span></p></div>
+      <div className="flex gap-3 items-start"><div className="mt-1.5 w-2 h-2 rounded-full bg-emerald-500 shrink-0"></div><p><span className="text-emerald-400 font-bold text-[10px] uppercase block mb-0.5">Action Plan</span><span className="text-slate-900 font-black leading-relaxed text-base">{advice.action}</span></p></div>
     </div>
   );
 };
@@ -337,7 +383,10 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                            </h3>
                            <div className="p-8 bg-white border-2 border-slate-900 rounded-[2rem] shadow-sm space-y-6">
                               <div className="flex justify-between items-center">
-                                 <span className="text-xs font-bold text-slate-400">一律目標 / 人</span>
+                                 <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-slate-400">一律目標 / 人</span>
+                                    <button onClick={()=>setEditingGoal(activeIndivGoals)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Icon p={I.Edit} size={12}/></button>
+                                 </div>
                                  <span className="text-2xl font-black text-slate-900">{(memberStats.find(m=>m.email===currentUserEmail)?.uniformGoal || 0)} <span className="text-xs">件</span></span>
                               </div>
                               <MetricBar label="達成率" val={myTotals.appts} tgt={memberStats.find(m=>m.email===currentUserEmail)?.uniformGoal || 1} />
@@ -381,6 +430,22 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                               </div>
                               <div className="text-[10px] text-slate-400 font-bold leading-tight">過去実績から算出された期待値です。稼働時間を増やすか、効率を上げることで目標達成に近づきます。</div>
                            </div>
+                        </div>
+                     </div>
+
+                     <div className="space-y-6">
+                        <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                           <div className="w-1.5 h-4 bg-blue-600 rounded-full"></div> 本日の稼働データ (GAS同期)
+                        </h3>
+                        <div className="bg-white border-2 border-slate-900 rounded-[2rem] shadow-sm overflow-hidden">
+                           <GasSyncDataView 
+                              gasData={gasData} 
+                              members={members} 
+                              forcedMemberId={currentMember?.id} 
+                              onEditGasRecord={onEditGasRecord} 
+                              onDeleteGasRecord={onDeleteGasRecord} 
+                              initialPeriod="今日"
+                           />
                         </div>
                      </div>
                   </div>
@@ -657,12 +722,16 @@ const AttendanceView = ({ members, reports, onEdit }) => {
   );
 };
 
-const ShiftView = ({ members, shifts, onAddShift, onDeleteShift }) => {
+const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMemberId }) => {
   const [showModal, setShowModal] = useState(false);
   const [viewMode, setViewMode] = useState('month');
   const [selectedDate, setSelectedDate] = useState(toLocalDateString(new Date()));
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkDates, setBulkDates] = useState([]);
+  const [selectedMemberId, setSelectedMemberId] = useState(myMemberId || "");
+  const [startTime, setStartTime] = useState("10:00");
+  const [endTime, setEndTime] = useState("19:00");
 
-  // カレンダー表示月を管理（月の1日）
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
@@ -705,7 +774,17 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift }) => {
     <div className="space-y-6 pb-24 font-sans">
        <div className="flex flex-col gap-4 border-b-2 border-slate-900 pb-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold">シフト管理・人員配置</h2>
+            <div className="flex items-center gap-4">
+              <h2 className="text-xl font-bold">シフト管理・人員配置</h2>
+              {userRole === 'admin' && viewMode === 'month' && (
+                <button 
+                  onClick={() => { setBulkMode(!bulkMode); setBulkDates([]); }} 
+                  className={`px-3 py-1.5 text-[10px] font-black rounded-full transition-all flex items-center gap-1.5 ${bulkMode ? 'bg-rose-500 text-white shadow-lg' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                >
+                  {bulkMode ? <><Icon p={I.Check} size={12}/> 一括選択モード解除</> : <><Icon p={I.Zap} size={12}/> 管理者一括入力モード</>}
+                </button>
+              )}
+            </div>
             <div className="flex bg-slate-200 p-1 rounded-full">
                <button onClick={()=>setViewMode('day')} className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode==='day'?'bg-slate-900 text-white':'text-slate-500'}`}>日別</button>
                <button onClick={()=>setViewMode('week')} className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode==='week'?'bg-slate-900 text-white':'text-slate-500'}`}>週別</button>
@@ -733,11 +812,22 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift }) => {
                  {calendarData.map((d, i) => {
                    if (!d) return <div key={`empty-${i}`} className="bg-white aspect-[4/3]" />;
                    const dayShifts = displayShifts.filter(s => s.date === d);
-                   const isSelected = d === selectedDate;
+                   const isSelected = bulkMode ? bulkDates.includes(d) : d === selectedDate;
                    const isToday = d === toLocalDateString(new Date());
                    return (
-                     <button key={d} onClick={() => setSelectedDate(d)} className={`bg-white aspect-[4/3] p-2 flex flex-col items-start justify-start transition-all relative border-t border-l border-slate-50 hover:bg-blue-50 group ${isSelected ? 'ring-2 ring-inset ring-blue-600 z-10 bg-blue-50/30' : ''}`}>
-                       <span className={`text-sm font-black mb-1 ${isSelected?'text-blue-600':isToday?'bg-blue-600 text-white px-2 rounded-full':''}`}>{d.split('-')[2]}</span>
+                     <button 
+                       key={d} 
+                       onClick={() => {
+                         if (bulkMode) {
+                           if (bulkDates.includes(d)) setBulkDates(bulkDates.filter(x => x !== d));
+                           else setBulkDates([...bulkDates, d]);
+                         } else {
+                           setSelectedDate(d);
+                         }
+                       }} 
+                       className={`bg-white aspect-[4/3] p-2 flex flex-col items-start justify-start transition-all relative border-t border-l border-slate-50 hover:bg-blue-50 group ${isSelected ? (bulkMode ? 'ring-4 ring-inset ring-rose-500 z-10 bg-rose-50/20' : 'ring-2 ring-inset ring-blue-600 z-10 bg-blue-50/30') : ''}`}
+                     >
+                       <span className={`text-sm font-black mb-1 ${isSelected ? (bulkMode ? 'text-rose-600' : 'text-blue-600') : isToday ? 'bg-blue-600 text-white px-2 rounded-full' : ''}`}>{d.split('-')[2]}</span>
                        <div className="w-full space-y-1">
                           {dayShifts.slice(0, 3).map((s, idx) => {
                              const m = members.find(mem=>mem.id===s.memberId);
@@ -808,9 +898,15 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift }) => {
          </div>
        )}
        
-       <button onClick={()=>setShowModal(true)} className="fixed bottom-24 right-6 w-16 h-16 bg-slate-900 text-white flex flex-col items-center justify-center border-4 border-white shadow-2xl z-40 rounded-full hover:scale-105 transition-transform">
+       <button 
+         onClick={() => {
+           if (bulkMode && bulkDates.length === 0) return alert('一括登録する日付を選択してください。');
+           setShowModal(true);
+         }} 
+         className={`fixed bottom-24 right-6 w-16 h-16 text-white flex flex-col items-center justify-center border-4 border-white shadow-2xl z-40 rounded-full hover:scale-105 transition-transform ${bulkMode ? 'bg-rose-500' : 'bg-slate-900'}`}
+       >
          <Icon p={I.Plus} size={24} />
-         <span className="text-[7px] font-bold uppercase mt-0.5">登録</span>
+         <span className="text-[7px] font-bold uppercase mt-0.5">{bulkMode ? '一括登録' : '登録'}</span>
        </button>
 
        {showModal && (
@@ -1363,9 +1459,9 @@ const GasSyncDataView = ({ gasData, members, forcedMemberId = null, hideHeader =
                        {d.timestamp?.toDate ? d.timestamp.toDate().toLocaleString() : new Date(d.timestamp).toLocaleString()}
                      </span>
                      {(onEditGasRecord && onDeleteGasRecord) && (
-                       <div className="flex gap-1 ml-2">
-                          <button onClick={()=>setEditingData(d)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Icon p={I.Edit} size={14}/></button>
-                          <button onClick={()=>{ if(window.confirm('本当にこの記録を削除しますか？')){ onDeleteGasRecord(d.id); } }} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><Icon p={I.Trash} size={14}/></button>
+                       <div className="flex gap-1.5 ml-2">
+                          <button onClick={()=>setEditingData(d)} className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">✏️ 編集</button>
+                          <button onClick={()=>{ if(window.confirm('本当にこの記録を削除しますか？')){ onDeleteGasRecord(d.id); } }} className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors">🗑️ 削除</button>
                        </div>
                      )}
                   </div>
@@ -1686,7 +1782,7 @@ function App() {
         {activeTab === 'attendance' && <AttendanceView members={members} reports={reports} onEdit={setEditingReport} />}
         {activeTab === 'shifts' && (
           <ShiftView 
-            members={members} shifts={shifts} 
+            members={members} shifts={shifts} userRole={userRole} myMemberId={currentMember?.id}
             onAddShift={(s) => addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shifts'), { ...s, createdAt: Timestamp.now() })} 
             onDeleteShift={(id) => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shifts', id))} 
           />
