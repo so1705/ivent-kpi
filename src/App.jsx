@@ -292,7 +292,7 @@ const CustomChart = ({ data, color, type = 'area' }) => {
   );
 };
 
-const Dashboard = ({ event, totals, memberStats, eventReports, members, currentBaseDate, setCurrentBaseDate, userRole, currentUserEmail, onUpdateGoal, gasData }) => {
+const Dashboard = ({ event, totals, memberStats, eventReports, members, currentBaseDate, setCurrentBaseDate, userRole, currentUserEmail, onUpdateGoal, gasData, onEditGasRecord, onDeleteGasRecord }) => {
   const [drilldownMember, setDrilldownMember] = useState(null);
   const [viewMode, setViewMode] = useState('personal'); 
   const [editingGoal, setEditingGoal] = useState(null);
@@ -524,7 +524,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                 {gasData && (
                    <div className="pt-6 border-t-2 border-slate-100">
                       <h4 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2"><Icon p={I.Zap} size={20} className="text-blue-600"/> 過去の獲得データ</h4>
-                      <GasSyncDataView gasData={gasData} members={members} forcedMemberId={drilldownMember.id} hideHeader={true} />
+                      <GasSyncDataView gasData={gasData} members={members} forcedMemberId={drilldownMember.id} hideHeader={true} onEditGasRecord={onEditGasRecord} onDeleteGasRecord={onDeleteGasRecord} />
                    </div>
                 )}
                 <button onClick={()=>setDrilldownMember(null)} className="w-full bg-slate-900 text-white py-5 font-black rounded-[2rem] shadow-xl hover:bg-black transition-all">統計を閉じる</button>
@@ -552,7 +552,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
 
        {gasData && (
           <div className="mt-16 pt-16 border-t border-slate-200 border-dashed">
-             <GasSyncDataView gasData={gasData} members={members} forcedMemberId={viewMode === 'personal' ? currentMember?.id : null} />
+             <GasSyncDataView gasData={gasData} members={members} forcedMemberId={viewMode === 'personal' ? currentMember?.id : null} onEditGasRecord={onEditGasRecord} onDeleteGasRecord={onDeleteGasRecord} />
           </div>
        )}
     </div>
@@ -1197,9 +1197,10 @@ function InputItem({ label, icon, val, set }) {
 // ==========================================
 // 5. GAS連携データ表示コンポーネント
 // ==========================================
-const GasSyncDataView = ({ gasData, members, forcedMemberId = null, hideHeader = false }) => {
+const GasSyncDataView = ({ gasData, members, forcedMemberId = null, hideHeader = false, onEditGasRecord, onDeleteGasRecord }) => {
   const [selectedMember, setSelectedMember] = useState('all');
   const [selectedPeriod, setSelectedPeriod] = useState('all');
+  const [editingData, setEditingData] = useState(null);
 
   const now = new Date();
   
@@ -1361,6 +1362,12 @@ const GasSyncDataView = ({ gasData, members, forcedMemberId = null, hideHeader =
                      <span className="text-[10px] font-bold text-slate-400">
                        {d.timestamp?.toDate ? d.timestamp.toDate().toLocaleString() : new Date(d.timestamp).toLocaleString()}
                      </span>
+                     {(onEditGasRecord && onDeleteGasRecord) && (
+                       <div className="flex gap-1 ml-2">
+                          <button onClick={()=>setEditingData(d)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Icon p={I.Edit} size={14}/></button>
+                          <button onClick={()=>{ if(window.confirm('本当にこの記録を削除しますか？')){ onDeleteGasRecord(d.id); } }} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><Icon p={I.Trash} size={14}/></button>
+                       </div>
+                     )}
                   </div>
                </div>
              )
@@ -1371,6 +1378,28 @@ const GasSyncDataView = ({ gasData, members, forcedMemberId = null, hideHeader =
             </div>
           )}
        </div>
+       
+       {editingData && (
+         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/90 p-4">
+           <div className="bg-white w-full max-w-sm p-10 space-y-8 border-4 border-slate-900 rounded-3xl shadow-2xl">
+             <h3 className="text-xl font-bold">記録の修正 ({editingData.memberId})</h3>
+             <div className="space-y-4">
+                <label className="text-sm font-bold text-slate-600">ステータス変更</label>
+                <select 
+                  className="w-full p-4 bg-slate-50 border-2 border-slate-200 font-bold outline-none rounded-xl"
+                  value={editingData.type}
+                  onChange={e => setEditingData({...editingData, type: e.target.value})}
+                >
+                   {STATUS_LIST.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </select>
+             </div>
+             <div className="grid grid-cols-2 gap-4">
+                <button onClick={()=>setEditingData(null)} className="w-full text-slate-500 bg-slate-100 py-4 font-bold rounded-2xl">キャンセル</button>
+                <button onClick={()=>{onEditGasRecord(editingData.id, {type: editingData.type}); setEditingData(null);}} className="w-full bg-slate-900 text-white py-4 font-bold shadow-lg rounded-2xl">保存</button>
+             </div>
+           </div>
+         </div>
+       )}
     </div>
   );
 };
@@ -1460,6 +1489,13 @@ function App() {
   const addMember = async (n, r, w, e, sName) => await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'members'), { name: n, role: r, hourlyWage: Number(w), email: e || "", spreadsheetName: sName || "", createdAt: Timestamp.now() });
   const updateMember = async (id, d) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', id), { ...d, updatedAt: Timestamp.now() });
   const deleteMember = async (id) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', id));
+
+  const deleteGasRecord = async (id) => {
+    await deleteDoc(doc(db, 'kpi_sync', id));
+  };
+  const updateGasRecord = async (id, data) => {
+    await updateDoc(doc(db, 'kpi_sync', id), data);
+  };
 
   const addReport = async (d) => {
     const reportDate = d.date ? Timestamp.fromDate(new Date(d.date)) : Timestamp.now();
@@ -1642,6 +1678,8 @@ function App() {
             currentUserEmail={user.email}
             onUpdateGoal={updateEventWeeklyGoals}
             gasData={gasData}
+            onEditGasRecord={updateGasRecord}
+            onDeleteGasRecord={deleteGasRecord}
           />
         )}
         {activeTab === 'analytics' && <AnalyticsView members={members} reports={reports} event={currentEvent} userRole={userRole} />}
@@ -1653,7 +1691,7 @@ function App() {
             onDeleteShift={(id) => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shifts', id))} 
           />
         )}
-        {activeTab === 'gas' && <GasSyncDataView gasData={gasData} members={members} />}
+        {activeTab === 'gas' && <GasSyncDataView gasData={gasData} members={members} onEditGasRecord={updateGasRecord} onDeleteGasRecord={deleteGasRecord} />}
         {activeTab === 'settings' && (
           <Settings 
             events={events} currentEventId={currentEventId} 
