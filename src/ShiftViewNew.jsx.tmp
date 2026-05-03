@@ -1,0 +1,303 @@
+const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMemberId }) => {
+  const [showModal, setShowModal] = useState(false);
+  const [viewMode, setViewMode] = useState('month');
+  const [selectedDate, setSelectedDate] = useState(toLocalDateString(new Date()));
+  
+  // 管理者用一斉入力モード
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkMemberId, setBulkMemberId] = useState("");
+  const [bulkDates, setBulkDates] = useState([]); 
+  const [bulkStartTime, setBulkStartTime] = useState("10:00");
+  const [bulkEndTime, setBulkEndTime] = useState("19:00");
+
+  const [selectedMemberId, setSelectedMemberId] = useState(myMemberId || "");
+  const [startTime, setStartTime] = useState("10:00");
+  const [endTime, setEndTime] = useState("19:00");
+
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+  });
+
+  const moveMonth = (delta) => {
+    const d = new Date(calendarMonth);
+    d.setMonth(d.getMonth() + delta);
+    setCalendarMonth(toLocalDateString(new Date(d.getFullYear(), d.getMonth(), 1)));
+  };
+
+  const wr = getWeekRange(selectedDate);
+  const calendarData = useMemo(() => {
+    const d = new Date(calendarMonth);
+    const y = d.getFullYear();
+    const m = d.getMonth();
+    const first = new Date(y, m, 1);
+    const last = new Date(y, m + 1, 0);
+    const days = [];
+    for (let i = 0; i < first.getDay(); i++) days.push(null);
+    for (let i = 1; i <= last.getDate(); i++) days.push(toLocalDateString(new Date(y, m, i)));
+    return days;
+  }, [calendarMonth]);
+
+  const displayShifts = useMemo(() => {
+    if (viewMode === 'day') return shifts.filter(s => s.date === selectedDate).sort((a,b)=>a.startTime.localeCompare(b.startTime));
+    if (viewMode === 'week') return shifts.filter(s => { const d = new Date(s.date); return d >= wr.start && d <= wr.end; }).sort((a,b)=>a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+    const monthPrefix = calendarMonth.slice(0,7);
+    return shifts.filter(s => s.date.startsWith(monthPrefix)).sort((a,b)=>a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+  }, [shifts, selectedDate, viewMode, wr, calendarMonth]);
+
+  const selectedDateShifts = useMemo(() => {
+    return shifts.filter(s => s.date === selectedDate).sort((a,b)=>a.startTime.localeCompare(b.startTime));
+  }, [shifts, selectedDate]);
+
+  const calYear = new Date(calendarMonth).getFullYear();
+  const calMonthNum = new Date(calendarMonth).getMonth() + 1;
+
+  const handleBulkToggleDate = (d) => {
+    if (!d) return;
+    if (bulkDates.includes(d)) {
+      setBulkDates(bulkDates.filter(x => x !== d));
+    } else {
+      setBulkDates([...bulkDates, d]);
+    }
+  };
+
+  const handleBulkRegister = async () => {
+    if (!bulkMemberId) return alert("スタッフを選択してください。");
+    if (bulkDates.length === 0) return alert("カレンダーから日付を1つ以上選択してください。");
+    
+    if (window.confirm(`${members.find(m=>m.id===bulkMemberId)?.name}さんに計 ${bulkDates.length} 日間のシフトを一括登録しますか？`)) {
+      for (const d of bulkDates) {
+        await onAddShift({ memberId: bulkMemberId, date: d, startTime: bulkStartTime, endTime: bulkEndTime });
+      }
+      alert("一斉登録が完了しました。");
+      setBulkDates([]);
+      setBulkMode(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 pb-40 font-sans">
+       <div className="flex flex-col gap-4 border-b-2 border-slate-900 pb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <h2 className="text-xl font-bold">シフト管理・人員配置</h2>
+              {userRole === 'admin' && (
+                <button 
+                  onClick={() => setBulkMode(!bulkMode)}
+                  className={`px-4 py-2 text-[10px] font-black rounded-full transition-all flex items-center gap-2 ${bulkMode ? 'bg-rose-500 text-white shadow-lg' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                >
+                  {bulkMode ? <><Icon p={I.X} size={14}/> モード解除</> : <><Icon p={I.Zap} size={14}/> 一斉入力モード</>}
+                </button>
+              )}
+            </div>
+            {!bulkMode && (
+              <div className="flex bg-slate-200 p-1 rounded-full">
+                 <button onClick={()=>setViewMode('day')} className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode==='day'?'bg-slate-900 text-white':'text-slate-500'}`}>日別</button>
+                 <button onClick={()=>setViewMode('week')} className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode==='week'?'bg-slate-900 text-white':'text-slate-500'}`}>週別</button>
+                 <button onClick={()=>setViewMode('month')} className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode==='month'?'bg-slate-900 text-white':'text-slate-500'}`}>月間</button>
+              </div>
+            )}
+          </div>
+
+          {bulkMode && (
+            <div className="p-8 bg-rose-50 border-2 border-rose-100 rounded-[2.5rem] space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
+               <div className="flex flex-col md:flex-row gap-8 items-start">
+                  <div className="flex-1 space-y-4">
+                     <label className="text-xs font-black text-rose-500 uppercase tracking-widest block">1. 対象スタッフを選択</label>
+                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                        {members.map(m => (
+                          <button 
+                            key={m.id} 
+                            onClick={() => setBulkMemberId(m.id)}
+                            className={`px-4 py-3 text-xs font-bold rounded-2xl border-2 transition-all ${bulkMemberId === m.id ? 'bg-rose-500 border-rose-500 text-white shadow-lg scale-105' : 'bg-white border-rose-100 text-rose-400 hover:border-rose-200'}`}
+                          >
+                            {m.name}
+                          </button>
+                        ))}
+                     </div>
+                  </div>
+                  <div className="flex gap-4">
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-rose-400 uppercase tracking-widest">開始</label>
+                        <input type="time" value={bulkStartTime} onChange={e=>setBulkStartTime(e.target.value)} className="p-3 bg-white border-2 border-rose-100 rounded-xl font-bold text-sm outline-none focus:border-rose-500" />
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-rose-400 uppercase tracking-widest">終了</label>
+                        <input type="time" value={bulkEndTime} onChange={e=>setBulkEndTime(e.target.value)} className="p-3 bg-white border-2 border-rose-100 rounded-xl font-bold text-sm outline-none focus:border-rose-500" />
+                     </div>
+                  </div>
+               </div>
+               <div className="flex flex-col md:flex-row items-center justify-between border-t border-rose-100 pt-6 gap-4">
+                  <div className="flex items-center gap-3">
+                     <div className="w-10 h-10 bg-rose-100 text-rose-600 flex items-center justify-center rounded-full font-black">2</div>
+                     <p className="text-sm font-bold text-rose-600">下のカレンダーで日付を選択してください（現在 {bulkDates.length} 日選択中）</p>
+                  </div>
+                  <button onClick={handleBulkRegister} className="w-full md:w-auto px-10 py-4 bg-rose-600 text-white font-black rounded-[1.5rem] shadow-xl hover:bg-rose-700 transition-all transform active:scale-95 flex items-center justify-center gap-2">
+                     <Icon p={I.Check} size={20}/> 一斉登録を実行
+                  </button>
+               </div>
+            </div>
+          )}
+
+          {viewMode === 'month' ? (
+            <div className="flex items-center justify-between bg-white border border-slate-200 rounded-2xl px-4 py-3">
+              <button onClick={()=>moveMonth(-1)} className="p-2 rounded-xl hover:bg-slate-100 transition-colors"><Icon p={I.ChevronLeft} size={20}/></button>
+              <span className="font-black text-lg">{calYear}年 {calMonthNum}月</span>
+              <button onClick={()=>moveMonth(1)} className="p-2 rounded-xl hover:bg-slate-100 transition-colors"><Icon p={I.ChevronRight} size={20}/></button>
+            </div>
+          ) : (
+            <input type="date" className="w-full bg-white border border-slate-300 p-3 font-bold text-sm outline-none rounded-xl focus:border-slate-900 transition-colors" value={selectedDate} onChange={e=>setSelectedDate(e.target.value)} />
+          )}
+       </div>
+
+       {viewMode === 'month' ? (
+         <div className="space-y-6">
+           <div className="p-6 md:p-10 bg-white border border-slate-200 shadow-xl rounded-[2.5rem] overflow-hidden">
+              <div className="grid grid-cols-7 gap-px bg-slate-100 border border-slate-100 rounded-2xl overflow-hidden shadow-inner">
+                 {['日','月','火','水','木','金','土'].map((d, i) => (
+                    <div key={d} className={`bg-slate-50/50 p-4 text-center text-xs font-black uppercase ${i===0?'text-rose-500':i===6?'text-blue-500':'text-slate-400'}`}>{d}</div>
+                 ))}
+                 {calendarData.map((d, i) => {
+                    if (!d) return <div key={`empty-${i}`} className="bg-white aspect-[4/3]" />;
+                    const dayShifts = shifts.filter(s => s.date === d);
+                    const isSelected = bulkMode ? bulkDates.includes(d) : d === selectedDate;
+                    const isToday = d === toLocalDateString(new Date());
+                    return (
+                      <button 
+                        key={d} 
+                        onClick={() => bulkMode ? handleBulkToggleDate(d) : setSelectedDate(d)} 
+                        className={`bg-white aspect-[4/3] p-1.5 md:p-3 flex flex-col items-start justify-start transition-all relative border-t border-l border-slate-50 hover:bg-blue-50 group ${isSelected ? (bulkMode ? 'ring-4 ring-inset ring-rose-500 bg-rose-50/20' : 'ring-2 ring-inset ring-blue-600 bg-blue-50/30') : ''}`}
+                      >
+                        <span className={`text-[10px] md:text-sm font-black mb-1 ${isSelected ? (bulkMode ? 'text-rose-600' : 'text-blue-600') : isToday ? 'bg-blue-600 text-white px-2 rounded-full' : ''}`}>{d.split('-')[2]}</span>
+                        <div className="w-full space-y-0.5 overflow-hidden">
+                           {dayShifts.slice(0, 4).map((s, idx) => {
+                              const m = members.find(mem=>mem.id===s.memberId);
+                              return <div key={idx} className="text-[6px] md:text-[8px] font-black bg-slate-100 text-slate-700 px-1 py-0.5 rounded truncate w-full flex items-center gap-1 border-l-2 border-slate-400">{m?.name}</div>
+                           })}
+                           {dayShifts.length > 4 && <div className="text-[6px] font-black text-slate-300 pl-1">他 {dayShifts.length - 4} 名</div>}
+                        </div>
+                      </button>
+                    );
+                 })}
+              </div>
+           </div>
+
+           {!bulkMode && (
+             <div className="bg-white border border-slate-200 shadow-xl rounded-[2.5rem] overflow-hidden">
+                <div className="p-8 border-b border-slate-100 flex items-center justify-between">
+                   <h3 className="text-xl font-black text-slate-900 flex items-center gap-4"><div className="p-3 bg-blue-600 text-white rounded-xl shadow-lg"><Icon p={I.Calendar} size={20}/></div> {selectedDate.split('-')[1]}月{selectedDate.split('-')[2]}日のシフト詳細</h3>
+                   <span className="px-4 py-2 bg-slate-50 rounded-full text-xs font-black text-slate-400 uppercase tracking-widest">{selectedDateShifts.length} 名のスタッフが予定</span>
+                </div>
+                {selectedDateShifts.length === 0 ? (
+                   <div className="text-center py-20 text-slate-400 font-bold text-sm">この日のシフト登録はありません。右下の＋ボタンから登録してください。</div>
+                ) : (
+                   <div className="divide-y divide-slate-50">
+                      {selectedDateShifts.map(s => {
+                        const m = members.find(mem=>mem.id===s.memberId);
+                        return (
+                          <div key={s.id} className="flex items-center justify-between p-8 bg-white hover:bg-slate-50 transition-colors group">
+                            <div className="flex items-center gap-6">
+                               <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-lg shadow-sm">{m?.name?.slice(0,1)}</div>
+                               <div>
+                                  <div className="font-black text-slate-900 text-lg leading-tight">{m?.name}</div>
+                                  <div className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">{m?.role}</div>
+                               </div>
+                            </div>
+                            <div className="flex items-center gap-10">
+                               <div className="text-right">
+                                  <div className="text-[10px] font-bold text-slate-300 uppercase mb-1">勤務時間</div>
+                                  <div className="text-xl font-black text-blue-600 tabular-nums">{s.startTime} - {s.endTime}</div>
+                               </div>
+                               {(userRole === 'admin' || s.memberId === myMemberId) && (
+                                  <button onClick={()=>{if(window.confirm('このシフトを削除しますか？')) onDeleteShift(s.id)}} className="p-3 text-slate-200 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all"><Icon p={I.Trash} size={20}/></button>
+                               )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                   </div>
+                )}
+             </div>
+           )}
+         </div>
+       ) : (
+         <div className="space-y-px bg-slate-200 border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+            {displayShifts.map(s => {
+               const m = members.find(mem=>mem.id===s.memberId);
+               return (
+                 <div key={s.id} className="bg-white p-5 flex items-center justify-between hover:bg-slate-50 transition-all border-l-4 border-transparent hover:border-slate-900">
+                    <div className="flex items-center gap-4">
+                       <div className="w-10 h-10 bg-slate-100 flex items-center justify-center font-bold text-slate-900 rounded-full">{m?.name?.slice(0,1)}</div>
+                       <div>
+                          <div className="font-bold text-slate-900">{m?.name}</div>
+                          <div className="text-[9px] font-bold text-slate-400 flex gap-3 mt-0.5">
+                             {viewMode === 'week' && <span className="flex items-center gap-1"><Icon p={I.Calendar} size={10}/>{s.date}</span>}
+                             <span className="flex items-center gap-1"><Icon p={I.Clock} size={10}/>{s.startTime} - {s.endTime}</span>
+                          </div>
+                       </div>
+                    </div>
+                    {(userRole === 'admin' || s.memberId === myMemberId) && (
+                      <button onClick={()=>{if(window.confirm('削除しますか？')) onDeleteShift(s.id)}} className="p-2 text-slate-200 hover:text-rose-600 transition-colors"><Icon p={I.Trash} size={18}/></button>
+                    )}
+                 </div>
+               );
+            })}
+         </div>
+       )}
+       
+       {!bulkMode && (
+         <button onClick={()=>setShowModal(true)} className="fixed bottom-24 right-6 w-16 h-16 bg-slate-900 text-white flex flex-col items-center justify-center border-4 border-white shadow-2xl z-40 rounded-full hover:scale-105 transition-transform">
+           <Icon p={I.Plus} size={24} />
+           <span className="text-[7px] font-bold uppercase mt-0.5">登録</span>
+         </button>
+       )}
+
+       {showModal && (
+         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/90 p-4 backdrop-blur-sm">
+            <div className="bg-white w-full max-w-sm rounded-[3rem] shadow-2xl overflow-hidden border-4 border-slate-900 animate-in zoom-in duration-300">
+                <div className="p-8 bg-slate-900 text-white flex items-center justify-between">
+                   <h3 className="font-black text-xl uppercase tracking-tighter">シフト登録</h3>
+                   <button onClick={()=>setShowModal(false)} className="p-2 hover:bg-white/10 rounded-xl transition-colors"><Icon p={I.X}/></button>
+                </div>
+                <div className="p-10 space-y-8">
+                   <div className="space-y-4">
+                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">対象スタッフ</label>
+                     <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                        {members.map(m => (
+                          <button 
+                            key={m.id} 
+                            onClick={() => setSelectedMemberId(m.id)}
+                            className={`px-4 py-3 text-xs font-bold rounded-xl border-2 transition-all text-left ${selectedMemberId === m.id ? 'bg-slate-900 border-slate-900 text-white shadow-lg scale-[1.02]' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                          >
+                            {m.name}
+                          </button>
+                        ))}
+                     </div>
+                   </div>
+                   <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">開始時間</label>
+                        <input type="time" value={startTime} onChange={e=>setStartTime(e.target.value)} className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none focus:border-slate-900 rounded-2xl transition-colors" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">終了時間</label>
+                        <input type="time" value={endTime} onChange={e=>setEndTime(e.target.value)} className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none focus:border-slate-900 rounded-2xl transition-colors" />
+                      </div>
+                   </div>
+                   <button 
+                    onClick={async ()=>{
+                      if(!selectedMemberId) return alert("スタッフを選択してください。");
+                      await onAddShift({ memberId: selectedMemberId, date: selectedDate, startTime, endTime });
+                      setShowModal(false);
+                    }} 
+                    className="w-full bg-slate-900 text-white py-5 font-black rounded-[2rem] shadow-xl hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all"
+                   >
+                     シフトを保存
+                   </button>
+                </div>
+            </div>
+         </div>
+       )}
+    </div>
+  );
+};

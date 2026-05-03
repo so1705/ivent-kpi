@@ -438,7 +438,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                         <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
                            <div className="w-1.5 h-4 bg-blue-600 rounded-full"></div> 本日の稼働データ (GAS同期)
                         </h3>
-                        <div className="bg-white rounded-[2rem] shadow-sm overflow-hidden p-8">
+                        <div className="bg-white rounded-[2rem] shadow-sm p-6 md:p-10">
                            <GasSyncDataView 
                               gasData={gasData} 
                               members={members} 
@@ -578,7 +578,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
 
                 <div className="bg-slate-900 p-8 text-white relative rounded-[2rem] overflow-hidden">
                    <div className="absolute top-0 right-0 p-4 opacity-5"><Icon p={I.Zap} size={80} /></div>
-                   <h4 className="text-[10px] font-bold text-blue-400 uppercase mb-4 tracking-widest">個別戦略アドバイス</h4>
+                   <h4 className="text-[10px] font-bold text-white uppercase mb-4 tracking-widest">個別戦略アドバイス</h4>
                    <div className="text-sm leading-relaxed font-bold">
                       {getAIAdvice({
                         calls: drilldownMember.calls,
@@ -730,6 +730,9 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
   const [selectedDate, setSelectedDate] = useState(toLocalDateString(new Date()));
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkDates, setBulkDates] = useState([]);
+  const [bulkMemberId, setBulkMemberId] = useState("");
+  const [bulkStartTime, setBulkStartTime] = useState("10:00");
+  const [bulkEndTime, setBulkEndTime] = useState("19:00");
   const [selectedMemberId, setSelectedMemberId] = useState(myMemberId || "");
   const [startTime, setStartTime] = useState("10:00");
   const [endTime, setEndTime] = useState("19:00");
@@ -772,27 +775,92 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
   const calYear = new Date(calendarMonth).getFullYear();
   const calMonthNum = new Date(calendarMonth).getMonth() + 1;
 
+  const handleBulkToggleDate = (d) => {
+    if (!d) return;
+    if (bulkDates.includes(d)) {
+      setBulkDates(bulkDates.filter(x => x !== d));
+    } else {
+      setBulkDates([...bulkDates, d]);
+    }
+  };
+
+  const handleBulkRegister = async () => {
+    if (!bulkMemberId) return alert("スタッフを選択してください。");
+    if (bulkDates.length === 0) return alert("カレンダーから日付を1つ以上選択してください。");
+    
+    if (window.confirm(`${members.find(m=>m.id===bulkMemberId)?.name}さんに計 ${bulkDates.length} 日間のシフトを一括登録しますか？`)) {
+      for (const d of bulkDates) {
+        await onAddShift({ memberId: bulkMemberId, date: d, startTime: bulkStartTime, endTime: bulkEndTime });
+      }
+      alert("一斉登録が完了しました。");
+      setBulkDates([]);
+      setBulkMode(false);
+    }
+  };
+
   return (
     <div className="space-y-6 pb-24 font-sans">
        <div className="flex flex-col gap-4 border-b-2 border-slate-900 pb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <h2 className="text-xl font-bold">シフト管理・人員配置</h2>
-              {userRole === 'admin' && viewMode === 'month' && (
+              {userRole === 'admin' && (
                 <button 
-                  onClick={() => { setBulkMode(!bulkMode); setBulkDates([]); }} 
-                  className={`px-3 py-1.5 text-[10px] font-black rounded-full transition-all flex items-center gap-1.5 ${bulkMode ? 'bg-rose-500 text-white shadow-lg' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                  onClick={() => setBulkMode(!bulkMode)}
+                  className={`px-4 py-2 text-[10px] font-black rounded-full transition-all flex items-center gap-2 ${bulkMode ? 'bg-rose-500 text-white shadow-lg' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
                 >
-                  {bulkMode ? <><Icon p={I.Check} size={12}/> 一括選択モード解除</> : <><Icon p={I.Zap} size={12}/> 管理者一括入力モード</>}
+                  {bulkMode ? <><Icon p={I.X} size={14}/> モード解除</> : <><Icon p={I.Zap} size={14}/> 一斉入力モード</>}
                 </button>
               )}
             </div>
-            <div className="flex bg-slate-200 p-1 rounded-full">
-               <button onClick={()=>setViewMode('day')} className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode==='day'?'bg-slate-900 text-white':'text-slate-500'}`}>日別</button>
-               <button onClick={()=>setViewMode('week')} className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode==='week'?'bg-slate-900 text-white':'text-slate-500'}`}>週別</button>
-               <button onClick={()=>setViewMode('month')} className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode==='month'?'bg-slate-900 text-white':'text-slate-500'}`}>月間</button>
-            </div>
+            {!bulkMode && (
+              <div className="flex bg-slate-200 p-1 rounded-full">
+                 <button onClick={()=>setViewMode('day')} className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode==='day'?'bg-slate-900 text-white':'text-slate-500'}`}>日別</button>
+                 <button onClick={()=>setViewMode('week')} className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode==='week'?'bg-slate-900 text-white':'text-slate-500'}`}>週別</button>
+                 <button onClick={()=>setViewMode('month')} className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode==='month'?'bg-slate-900 text-white':'text-slate-500'}`}>月間</button>
+              </div>
+            )}
           </div>
+
+          {bulkMode && (
+            <div className="p-8 bg-rose-50 border-2 border-rose-100 rounded-[2.5rem] space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
+               <div className="flex flex-col md:flex-row gap-8 items-start">
+                  <div className="flex-1 space-y-4">
+                     <label className="text-xs font-black text-rose-500 uppercase tracking-widest block">1. 対象スタッフを選択</label>
+                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                        {members.map(m => (
+                          <button 
+                            key={m.id} 
+                            onClick={() => setBulkMemberId(m.id)}
+                            className={`px-4 py-3 text-xs font-bold rounded-2xl border-2 transition-all ${bulkMemberId === m.id ? 'bg-rose-500 border-rose-500 text-white shadow-lg scale-105' : 'bg-white border-rose-100 text-rose-400 hover:border-rose-200'}`}
+                          >
+                            {m.name}
+                          </button>
+                        ))}
+                     </div>
+                  </div>
+                  <div className="flex gap-4">
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-rose-400 uppercase tracking-widest">開始</label>
+                        <input type="time" value={bulkStartTime} onChange={e=>setBulkStartTime(e.target.value)} className="p-3 bg-white border-2 border-rose-100 rounded-xl font-bold text-sm outline-none focus:border-rose-500" />
+                     </div>
+                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-rose-400 uppercase tracking-widest">終了</label>
+                        <input type="time" value={bulkEndTime} onChange={e=>setBulkEndTime(e.target.value)} className="p-3 bg-white border-2 border-rose-100 rounded-xl font-bold text-sm outline-none focus:border-rose-500" />
+                     </div>
+                  </div>
+               </div>
+               <div className="flex flex-col md:flex-row items-center justify-between border-t border-rose-100 pt-6 gap-4">
+                  <div className="flex items-center gap-3">
+                     <div className="w-10 h-10 bg-rose-100 text-rose-600 flex items-center justify-center rounded-full font-black">2</div>
+                     <p className="text-sm font-bold text-rose-600">下のカレンダーで日付を選択してください（現在 {bulkDates.length} 日選択中）</p>
+                  </div>
+                  <button onClick={handleBulkRegister} className="w-full md:w-auto px-10 py-4 bg-rose-600 text-white font-black rounded-[1.5rem] shadow-xl hover:bg-rose-700 transition-all transform active:scale-95 flex items-center justify-center gap-2">
+                     <Icon p={I.Check} size={20}/> 一斉登録を実行
+                  </button>
+               </div>
+            </div>
+          )}
           {viewMode === 'month' ? (
             <div className="flex items-center justify-between bg-white border border-slate-200 rounded-2xl px-4 py-3">
               <button onClick={()=>moveMonth(-1)} className="p-2 rounded-xl hover:bg-slate-100 transition-colors"><Icon p={I.ChevronLeft} size={20}/></button>
@@ -868,7 +936,9 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
                                 <div className="text-[10px] font-bold text-slate-300 uppercase mb-1">勤務時間</div>
                                 <div className="text-xl font-black text-blue-600 tabular-nums">{s.startTime} - {s.endTime}</div>
                              </div>
-                             <button onClick={()=>{if(window.confirm('このシフトを削除しますか？')) onDeleteShift(s.id)}} className="p-3 text-slate-200 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all"><Icon p={I.Trash} size={20}/></button>
+                               {(userRole === 'admin' || s.memberId === myMemberId) && (
+                                  <button onClick={()=>{if(window.confirm('このシフトを削除しますか？')) onDeleteShift(s.id)}} className="p-3 text-slate-200 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all"><Icon p={I.Trash} size={20}/></button>
+                               )}
                           </div>
                         </div>
                       );
@@ -900,16 +970,12 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
          </div>
        )}
        
-       <button 
-         onClick={() => {
-           if (bulkMode && bulkDates.length === 0) return alert('一括登録する日付を選択してください。');
-           setShowModal(true);
-         }} 
-         className={`fixed bottom-24 right-6 w-16 h-16 text-white flex flex-col items-center justify-center border-4 border-white shadow-2xl z-40 rounded-full hover:scale-105 transition-transform ${bulkMode ? 'bg-rose-500' : 'bg-slate-900'}`}
-       >
-         <Icon p={I.Plus} size={24} />
-         <span className="text-[7px] font-bold uppercase mt-0.5">{bulkMode ? '一括登録' : '登録'}</span>
-       </button>
+       {!bulkMode && (
+         <button onClick={()=>setShowModal(true)} className="fixed bottom-24 right-6 w-16 h-16 bg-slate-900 text-white flex flex-col items-center justify-center border-4 border-white shadow-2xl z-40 rounded-full hover:scale-105 transition-transform">
+           <Icon p={I.Plus} size={24} />
+           <span className="text-[7px] font-bold uppercase mt-0.5">登録</span>
+         </button>
+       )}
 
        {showModal && (
          <div className="fixed inset-0 bg-slate-900/95 z-[200] flex items-center justify-center p-4 backdrop-blur-md">
@@ -1079,7 +1145,7 @@ const AnalyticsView = ({ members, reports, event, userRole }) => {
              <div className="relative z-10 space-y-8">
                 <div className="flex items-center gap-3">
                    <div className="w-1.5 h-6 bg-blue-500 rounded-full"></div>
-                   <h3 className="text-xs font-black text-blue-400 uppercase tracking-widest">AI戦略アドバイザー</h3>
+                   <h3 className="text-xs font-black text-white uppercase tracking-widest">AI戦略アドバイザー</h3>
                 </div>
                 <div className="text-sm font-bold leading-relaxed pr-6 bg-white/5 p-6 rounded-2xl border border-white/10 backdrop-blur-sm text-white">
                    {getAIAdvice(stats, selectedMid !== 'all')}
@@ -1087,7 +1153,7 @@ const AnalyticsView = ({ members, reports, event, userRole }) => {
              </div>
              <div className="relative z-10 border-t border-white/10 pt-6 flex items-center justify-between text-[11px] font-black text-slate-500 uppercase tracking-widest">
                 <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div> リアルタイム解析中</span>
-                <span className="opacity-40 italic">深層分析エンジン v5.0.3</span>
+                <span className="opacity-40 italic text-white/50">深層分析エンジン v5.0.3</span>
              </div>
           </section>
        </div>
@@ -1104,8 +1170,16 @@ const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, 
   const [newWage, setNewWage] = useState("1500");
   const [editingMember, setEditingMember] = useState(null);
   
-  const currentEvent = useMemo(() => events?.find(e => e.id === currentEventId) || null, [events, currentEventId]);
-  const activeWeeklyGoals = currentEvent?.weeklyGoals?.[getMondayKey(currentBaseDate)] || currentEvent?.goals?.weekly || { appts: 0 };
+  const currentEvent = useMemo(() => {
+    if (!events || !currentEventId) return null;
+    return events.find(e => e.id === currentEventId) || null;
+  }, [events, currentEventId]);
+
+  const activeWeeklyGoals = useMemo(() => {
+    if (!currentEvent || !currentBaseDate) return { appts: 0 };
+    const mon = getMondayKey(currentBaseDate);
+    return currentEvent?.weeklyGoals?.[mon] || currentEvent?.goals?.weekly || { appts: 0 };
+  }, [currentEvent, currentBaseDate]);
 
   const [gasUrl, setGasUrl] = useState(localStorage.getItem('kpi_gas_url') || "");
   const [legacyAppId, setLegacyAppId] = useState(localStorage.getItem('kpi_legacy_appid') || "");
