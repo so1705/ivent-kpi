@@ -1495,7 +1495,28 @@ function App() {
       hours: acc.hours + (Number(r.hours) || 0),
       picConnected: acc.picConnected + (Number(r.picConnected) || 0),
     }), { appts: 0, calls: 0, requests: 0, meetings: 0, deals: 0, lost: 0, hours: 0, picConnected: 0 });
+    
+    const sumGas = (arr) => arr.reduce((acc, d) => {
+      acc.calls += 1;
+      if (d.type === 'アポ確定') acc.appts += 1;
+      if (d.type === '資料送付予定A' || d.type === '資料送付予定B' || d.type === '資料送付予定C') acc.requests += 1;
+      return acc;
+    }, { appts: 0, calls: 0, requests: 0 });
+
+    const gasWd = gasData.filter(d => {
+      if (!d.timestamp) return false;
+      const ts = d.timestamp.toDate ? d.timestamp.toDate() : new Date(d.timestamp);
+      return ts >= wr.start && ts <= wr.end;
+    });
+
     const s = sum(wD);
+    const gWs = sumGas(gasWd);
+    s.appts += gWs.appts; s.calls += gWs.calls; s.requests += gWs.requests;
+
+    const t = sum(tD);
+    const gTs = sumGas(gasData);
+    t.appts += gTs.appts; t.calls += gTs.calls; t.requests += gTs.requests;
+
     // 今週の全メンバーのシフトから総予定時間を算出
     const weekShifts = shifts.filter(sh => {
       const d = new Date(sh.date);
@@ -1507,8 +1528,8 @@ function App() {
       return acc + (h2 + m2/60) - (h1 + m1/60);
     }, 0);
 
-    return { weekly: s, total: sum(tD), totalScheduledHours };
-  }, [reports, currentEventId, currentBaseDate, shifts]);
+    return { weekly: s, total: t, totalScheduledHours };
+  }, [reports, currentEventId, currentBaseDate, shifts, gasData]);
 
   const memberStats = useMemo(() => {
     const wr = getWeekRange(currentBaseDate);
@@ -1533,6 +1554,16 @@ function App() {
         outOfTarget: acc.outOfTarget + (Number(r.outOfTarget)||0),
       }), { deals: 0, prospects: 0, lost: 0, appts: 0, calls: 0, requests: 0, hours: 0, picConnected: 0, noAnswer: 0, receptionRefusal: 0, picAbsent: 0, outOfTarget: 0 });
       
+      // Merge GAS data
+      gasData.filter(d => d.memberId === m.spreadsheetName || d.memberId === m.name).forEach(d => {
+        myTot.calls += 1;
+        if (d.type === 'アポ確定') myTot.appts += 1;
+        if (d.type === '資料送付予定A' || d.type === '資料送付予定B' || d.type === '資料送付予定C') myTot.requests += 1;
+        if (d.type === '担当者不在' || d.type === '折り返し' || d.type === '再架電🔥' || d.type === '再架電😍' || d.type === '営業時間外') myTot.picAbsent += 1;
+        if (d.type === '受付拒否') myTot.receptionRefusal += 1;
+        if (d.type === '担当者拒否') myTot.outOfTarget += 1;
+      });
+
       const meetings = myTot.deals + (m.role==='closer' ? myTot.prospects : 0) + myTot.lost;
       const cph = myTot.hours > 0 ? (myTot.calls / myTot.hours).toFixed(1) : "0.0";
       
@@ -1554,7 +1585,7 @@ function App() {
 
       return { ...m, ...myTot, meetings, cph, scheduledHours, expectedAppts, uniformGoal };
     }).sort((a,b) => b.cph - a.cph);
-  }, [members, reports, currentEventId, shifts, currentEvent, currentBaseDate]);
+  }, [members, reports, currentEventId, shifts, currentEvent, currentBaseDate, gasData]);
 
   if (connectionStatus === "unauthenticated" || !user) {
     return (

@@ -2301,7 +2301,7 @@ function syncToFirestore_(memberId, type, industry, count = 1) {
         date: { stringValue: dateStr }
       }
     };
-    const url = `https://firestore.googleapis.com/v1/projects/${CONFIG.FIREBASE_PROJECT_ID}/databases/(default)/documents/eventReports?key=${CONFIG.FIREBASE_API_KEY}`;
+    const url = `https://firestore.googleapis.com/v1/projects/${CONFIG.FIREBASE_PROJECT_ID}/databases/(default)/documents/kpi_sync?key=${CONFIG.FIREBASE_API_KEY}`;
     UrlFetchApp.fetch(url, {
       method: "post", contentType: "application/json", payload: JSON.stringify(payload), muteHttpExceptions: true
     });
