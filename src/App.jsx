@@ -122,7 +122,8 @@ const I = {
   LogOut: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></>,
   Info: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></>,
   User: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
-  Search: <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>
+  Search: <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
+  Edit: <><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></>
 };
 
 const BREAKDOWN_LABELS = {
@@ -243,9 +244,9 @@ const getAIAdvice = (stats, isPersonal) => {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-3 items-start"><div className="mt-1.5 w-2 h-2 rounded-full bg-rose-500 shrink-0"></div><p><span className="text-rose-400 font-bold text-[10px] uppercase block mb-0.5">Observation</span><span className="text-slate-800 font-medium leading-relaxed">{advice.obs}</span></p></div>
-      <div className="flex gap-3 items-start"><div className="mt-1.5 w-2 h-2 rounded-full bg-blue-500 shrink-0"></div><p><span className="text-blue-400 font-bold text-[10px] uppercase block mb-0.5">Strategy</span><span className="text-slate-800 font-medium leading-relaxed">{advice.strategy}</span></p></div>
-      <div className="flex gap-3 items-start"><div className="mt-1.5 w-2 h-2 rounded-full bg-emerald-500 shrink-0"></div><p><span className="text-emerald-400 font-bold text-[10px] uppercase block mb-0.5">Action Plan</span><span className="text-slate-900 font-black leading-relaxed text-base">{advice.action}</span></p></div>
+      <div className="flex gap-3 items-start"><div className="mt-1.5 w-2 h-2 rounded-full bg-rose-500 shrink-0"></div><p><span className="text-rose-400 font-bold text-[10px] uppercase block mb-0.5">Observation</span><span className="text-white font-medium leading-relaxed">{advice.obs}</span></p></div>
+      <div className="flex gap-3 items-start"><div className="mt-1.5 w-2 h-2 rounded-full bg-blue-500 shrink-0"></div><p><span className="text-blue-400 font-bold text-[10px] uppercase block mb-0.5">Strategy</span><span className="text-white font-medium leading-relaxed">{advice.strategy}</span></p></div>
+      <div className="flex gap-3 items-start"><div className="mt-1.5 w-2 h-2 rounded-full bg-emerald-500 shrink-0"></div><p><span className="text-emerald-400 font-bold text-[10px] uppercase block mb-0.5">Action Plan</span><span className="text-white font-black leading-relaxed text-base">{advice.action}</span></p></div>
     </div>
   );
 };
@@ -385,7 +386,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                               <div className="flex justify-between items-center">
                                  <div className="flex items-center gap-2">
                                     <span className="text-xs font-bold text-slate-400">一律目標 / 人</span>
-                                    <button onClick={()=>setEditingGoal(activeIndivGoals)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Icon p={I.Edit} size={12}/></button>
+                                    <button onClick={()=>setEditingGoal(activeIndivGoals)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Icon p={I.Edit} size={14}/></button>
                                  </div>
                                  <span className="text-2xl font-black text-slate-900">{(memberStats.find(m=>m.email===currentUserEmail)?.uniformGoal || 0)} <span className="text-xs">件</span></span>
                               </div>
@@ -437,7 +438,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                         <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
                            <div className="w-1.5 h-4 bg-blue-600 rounded-full"></div> 本日の稼働データ (GAS同期)
                         </h3>
-                        <div className="bg-white border-2 border-slate-900 rounded-[2rem] shadow-sm overflow-hidden">
+                        <div className="bg-white rounded-[2rem] shadow-sm overflow-hidden">
                            <GasSyncDataView 
                               gasData={gasData} 
                               members={members} 
@@ -1079,7 +1080,7 @@ const AnalyticsView = ({ members, reports, event, userRole }) => {
                    <div className="w-1.5 h-6 bg-blue-500 rounded-full"></div>
                    <h3 className="text-xs font-black text-blue-400 uppercase tracking-widest">AI戦略アドバイザー</h3>
                 </div>
-                <div className="text-sm font-bold leading-relaxed pr-6 bg-white/5 p-6 rounded-2xl border border-white/10 backdrop-blur-sm">
+                <div className="text-sm font-bold leading-relaxed pr-6 bg-white/5 p-6 rounded-2xl border border-white/10 backdrop-blur-sm text-white">
                    {getAIAdvice(stats, selectedMid !== 'all')}
                 </div>
              </div>
@@ -1093,7 +1094,7 @@ const AnalyticsView = ({ members, reports, event, userRole }) => {
   );
 };
 
-const Settings = ({ events, members, onAddEvent, onDeleteEvent, onAddMember, onDelMember, onUpdateMember, onClose }) => {
+const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, onAddMember, onDelMember, onUpdateMember, onUpdateGoal, currentBaseDate, onClose }) => {
   const [newEName, setNewEName] = useState("");
   const [newMName, setNewMName] = useState("");
   const [newSpreadsheetName, setNewSpreadsheetName] = useState("");
@@ -1102,6 +1103,9 @@ const Settings = ({ events, members, onAddEvent, onDeleteEvent, onAddMember, onD
   const [newWage, setNewWage] = useState("1500");
   const [editingMember, setEditingMember] = useState(null);
   
+  const currentEvent = useMemo(() => events.find(e => e.id === currentEventId), [events, currentEventId]);
+  const activeWeeklyGoals = currentEvent?.weeklyGoals?.[getMondayKey(currentBaseDate)] || currentEvent?.goals?.weekly || { appts: 0 };
+
   const [gasUrl, setGasUrl] = useState(localStorage.getItem('kpi_gas_url') || "");
   const [legacyAppId, setLegacyAppId] = useState(localStorage.getItem('kpi_legacy_appid') || "");
   const [isSyncing, setIsSyncing] = useState(false);
@@ -1155,6 +1159,21 @@ const Settings = ({ events, members, onAddEvent, onDeleteEvent, onAddMember, onD
                      <button onClick={()=>{if(window.confirm('この案件を完全に削除しますか？')) onDeleteEvent(e.id)}} className="text-slate-300 hover:text-rose-600 transition-colors"><Icon p={I.Trash} size={18}/></button>
                   </div>
                 ))}
+             </div>
+
+             <h3 className="text-sm font-bold text-slate-800 border-l-4 border-indigo-600 pl-3 mt-12">全体目標の設定 (管理者のみ)</h3>
+             <div className="p-8 bg-white border border-slate-200 space-y-6 shadow-sm rounded-3xl">
+                <div className="space-y-4">
+                   <label className="text-[10px] font-bold text-slate-400 uppercase">今週の全体アポイント目標</label>
+                   <div className="flex gap-4">
+                      <input type="number" id="admin-global-goal" className="flex-1 p-4 bg-slate-50 border-2 border-slate-100 font-black text-2xl outline-none rounded-xl" defaultValue={activeWeeklyGoals.appts} />
+                      <button onClick={() => {
+                         const val = Number(document.getElementById('admin-global-goal').value);
+                         onUpdateGoal(getMondayKey(currentBaseDate), null, { ...activeWeeklyGoals, appts: val });
+                         alert("全体目標を更新しました。");
+                      }} className="px-8 bg-indigo-600 text-white font-bold rounded-2xl">保存</button>
+                   </div>
+                </div>
              </div>
 
              <h3 className="text-sm font-bold text-slate-800 border-l-4 border-blue-600 pl-3 mt-12">外部データ同期 (GAS / 過去データ)</h3>
@@ -1459,9 +1478,9 @@ const GasSyncDataView = ({ gasData, members, forcedMemberId = null, hideHeader =
                        {d.timestamp?.toDate ? d.timestamp.toDate().toLocaleString() : new Date(d.timestamp).toLocaleString()}
                      </span>
                      {(onEditGasRecord && onDeleteGasRecord) && (
-                       <div className="flex gap-1.5 ml-2">
-                          <button onClick={()=>setEditingData(d)} className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">✏️ 編集</button>
-                          <button onClick={()=>{ if(window.confirm('本当にこの記録を削除しますか？')){ onDeleteGasRecord(d.id); } }} className="flex items-center gap-1 px-2.5 py-1.5 text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors">🗑️ 削除</button>
+                       <div className="flex gap-1 ml-2">
+                          <button onClick={()=>setEditingData(d)} className="p-2 text-slate-400 hover:text-blue-600 rounded-lg transition-colors"><Icon p={I.Edit} size={14}/></button>
+                          <button onClick={()=>{ if(window.confirm('本当にこの記録を削除しますか？')){ onDeleteGasRecord(d.id); } }} className="p-2 text-slate-400 hover:text-rose-600 rounded-lg transition-colors"><Icon p={I.Trash} size={14}/></button>
                        </div>
                      )}
                   </div>
@@ -1579,8 +1598,17 @@ function App() {
 
   const addEvent = async (n, d) => await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'events'), { name: n, date: d, goals: defaultGoals, weeklyGoals: {}, createdAt: Timestamp.now() });
   const deleteEvent = async (id) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', id));
-  const updateEventGoals = async (id, g) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', id), { goals: g });
   const updateEventWeeklyGoals = async (id, wk, wg, ig) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', id), { [`weeklyGoals.${wk}`]: wg, [`individualWeeklyGoals.${wk}`]: ig });
+  
+  const handleUpdateGoal = (monday, memberId, goal) => {
+    const currentEvent = events.find(e => e.id === currentEventId);
+    if (memberId) {
+      const ig = currentEvent?.individualWeeklyGoals?.[monday] || {};
+      updateEventWeeklyGoals(currentEventId, monday, currentEvent?.weeklyGoals?.[monday] || currentEvent?.goals?.weekly || { appts: 0 }, { ...ig, [memberId]: goal });
+    } else {
+      updateEventWeeklyGoals(currentEventId, monday, goal, currentEvent?.individualWeeklyGoals?.[monday] || {});
+    }
+  };
   
   const addMember = async (n, r, w, e, sName) => await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'members'), { name: n, role: r, hourlyWage: Number(w), email: e || "", spreadsheetName: sName || "", createdAt: Timestamp.now() });
   const updateMember = async (id, d) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', id), { ...d, updatedAt: Timestamp.now() });
@@ -1606,6 +1634,7 @@ function App() {
   const deleteReport = async (id) => { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reports', id)); setEditingReport(null); };
 
   const currentEvent = useMemo(() => events.find(e => e.id === currentEventId) || { goals: defaultGoals }, [events, currentEventId]);
+  const currentMember = useMemo(() => members.find(m => m.email === user?.email), [members, user]);
   
   const totals = useMemo(() => {
     const wr = getWeekRange(currentBaseDate);
@@ -1772,7 +1801,7 @@ function App() {
             currentBaseDate={currentBaseDate} setCurrentBaseDate={setCurrentBaseDate}
             userRole={userRole}
             currentUserEmail={user.email}
-            onUpdateGoal={updateEventWeeklyGoals}
+            onUpdateGoal={handleUpdateGoal}
             gasData={gasData}
             onEditGasRecord={updateGasRecord}
             onDeleteGasRecord={deleteGasRecord}
