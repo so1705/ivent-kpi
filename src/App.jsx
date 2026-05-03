@@ -438,7 +438,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                         <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
                            <div className="w-1.5 h-4 bg-blue-600 rounded-full"></div> 本日の稼働データ (GAS同期)
                         </h3>
-                        <div className="bg-white rounded-[2rem] shadow-sm overflow-hidden">
+                        <div className="bg-white rounded-[2rem] shadow-sm overflow-hidden p-8">
                            <GasSyncDataView 
                               gasData={gasData} 
                               members={members} 
@@ -446,6 +446,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                               onEditGasRecord={onEditGasRecord} 
                               onDeleteGasRecord={onDeleteGasRecord} 
                               initialPeriod="今日"
+                              hideHeader={true}
                            />
                         </div>
                      </div>
@@ -1103,7 +1104,7 @@ const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, 
   const [newWage, setNewWage] = useState("1500");
   const [editingMember, setEditingMember] = useState(null);
   
-  const currentEvent = useMemo(() => events.find(e => e.id === currentEventId), [events, currentEventId]);
+  const currentEvent = useMemo(() => events?.find(e => e.id === currentEventId) || null, [events, currentEventId]);
   const activeWeeklyGoals = currentEvent?.weeklyGoals?.[getMondayKey(currentBaseDate)] || currentEvent?.goals?.weekly || { appts: 0 };
 
   const [gasUrl, setGasUrl] = useState(localStorage.getItem('kpi_gas_url') || "");
@@ -1601,7 +1602,8 @@ function App() {
   const updateEventWeeklyGoals = async (id, wk, wg, ig) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', id), { [`weeklyGoals.${wk}`]: wg, [`individualWeeklyGoals.${wk}`]: ig });
   
   const handleUpdateGoal = (monday, memberId, goal) => {
-    const currentEvent = events.find(e => e.id === currentEventId);
+    const currentEvent = events?.find(e => e.id === currentEventId);
+    if (!currentEventId) return;
     if (memberId) {
       const ig = currentEvent?.individualWeeklyGoals?.[monday] || {};
       updateEventWeeklyGoals(currentEventId, monday, currentEvent?.weeklyGoals?.[monday] || currentEvent?.goals?.weekly || { appts: 0 }, { ...ig, [memberId]: goal });
