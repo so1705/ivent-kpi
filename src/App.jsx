@@ -1409,7 +1409,7 @@ function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData =
 // ==========================================
 // 5. GAS連携データ表示コンポーネント
 // ==========================================
-const GasSyncDataView = ({ gasData, members, forcedMemberId = null, hideHeader = false, onEditGasRecord, onDeleteGasRecord, initialPeriod = "今日" }) => {
+const GasSyncDataView = ({ gasData, members, forcedMemberId = null, hideHeader = false, onEditGasRecord, onDeleteGasRecord, initialPeriod = "全期間" }) => {
   const [period, setPeriod] = useState(initialPeriod);
   const [selectedMid, setSelectedMid] = useState("all");
   const [selectedType, setSelectedType] = useState("all");
@@ -1448,27 +1448,23 @@ const GasSyncDataView = ({ gasData, members, forcedMemberId = null, hideHeader =
     return list;
   }, [gasData, members, forcedMemberId, period, selectedMid, selectedType]);
 
-  const summary = useMemo(() => {
-    const counts = { appts: 0, requests: 0, recalls: 0, others: 0 };
-    filtered.forEach(d => {
-      if (d.type === 'アポ確定') counts.appts++;
-      else if (d.type?.startsWith('資料送付予定')) counts.requests++;
-      else if (d.type?.startsWith('再架電')) counts.recalls++;
-      else counts.others++;
-    });
-    return counts;
+  const counts = useMemo(() => {
+    return filtered.reduce((acc, d) => {
+      acc[d.type] = (acc[d.type] || 0) + 1;
+      return acc;
+    }, {});
   }, [filtered]);
 
   const STATUS_LIST = [
-    { key: 'アポ確定', label: 'アポ確定', color: 'text-blue-600' },
-    { key: '資料送付予定A', label: '資料送付A', color: 'text-emerald-600' },
-    { key: '資料送付予定B', label: '資料送付B', color: 'text-emerald-500' },
-    { key: '資料送付予定C', label: '資料送付C', color: 'text-emerald-400' },
-    { key: '再架電🔥', label: '再架電🔥', color: 'text-rose-500' },
-    { key: '再架電😍', label: '再架電😍', color: 'text-pink-500' },
-    { key: '担当者不在', label: '担当者不在', color: 'text-slate-600' },
-    { key: '受付拒否', label: '受付拒否', color: 'text-rose-600' },
-    { key: '折り返し', label: '折り返し', color: 'text-orange-500' }
+    { key: 'アポ確定', label: 'アポ確定', icon: I.Check, color: 'bg-blue-600' },
+    { key: '資料送付予定A', label: '資料送付A', icon: I.FileText, color: 'bg-emerald-600' },
+    { key: '資料送付予定B', label: '資料送付B', icon: I.FileText, color: 'bg-emerald-500' },
+    { key: '資料送付予定C', label: '資料送付C', icon: I.FileText, color: 'bg-emerald-400' },
+    { key: '再架電🔥', label: '再架電🔥', icon: I.Zap, color: 'bg-rose-500' },
+    { key: '再架電😍', label: '再架電😍', icon: I.Zap, color: 'bg-pink-500' },
+    { key: '担当者不在', label: '不在', icon: I.Phone, color: 'bg-slate-400' },
+    { key: '受付拒否', label: '拒否', icon: I.Ban, color: 'bg-rose-600' },
+    { key: '折り返し', label: '折返', icon: I.Phone, color: 'bg-orange-500' }
   ];
 
   return (
@@ -1497,22 +1493,21 @@ const GasSyncDataView = ({ gasData, members, forcedMemberId = null, hideHeader =
           </div>
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl">
-              <div className="text-[10px] font-black text-blue-600 uppercase mb-1">アポ確定</div>
-              <div className="text-2xl font-black text-blue-900">{summary.appts} <span className="text-xs font-normal">件</span></div>
+            <div className="bg-slate-900 text-white p-6 rounded-3xl shadow-sm flex flex-col items-center col-span-2 md:col-span-4">
+                <div className="text-xs font-bold text-slate-400 uppercase">選択中のアクション総数</div>
+                <div className="text-5xl font-black mt-2">{filtered.length}</div>
             </div>
-            <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl">
-              <div className="text-[10px] font-black text-emerald-600 uppercase mb-1">資料送付</div>
-              <div className="text-2xl font-black text-emerald-900">{summary.requests} <span className="text-xs font-normal">件</span></div>
-            </div>
-            <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl">
-              <div className="text-[10px] font-black text-amber-600 uppercase mb-1">再架電</div>
-              <div className="text-2xl font-black text-amber-900">{summary.recalls} <span className="text-xs font-normal">件</span></div>
-            </div>
-            <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl">
-              <div className="text-[10px] font-black text-slate-400 uppercase mb-1">その他</div>
-              <div className="text-2xl font-black text-slate-900">{summary.others} <span className="text-xs font-normal">件</span></div>
-            </div>
+            {STATUS_LIST.map(st => {
+              const val = counts[st.key] || 0;
+              if (val === 0 && st.key !== 'アポ確定') return null;
+              return (
+                <div key={st.key} className="bg-white border border-slate-100 p-5 rounded-3xl shadow-sm flex flex-col items-center">
+                   <div className={`p-2 rounded-xl mb-2 ${st.color} text-white`}><Icon p={st.icon} size={16}/></div>
+                   <div className="text-[9px] font-bold text-slate-400 uppercase">{st.label}</div>
+                   <div className="text-2xl font-black text-slate-900">{val}</div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
