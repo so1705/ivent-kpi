@@ -10,7 +10,7 @@ import {
 } from 'firebase/firestore';
 
 // ==========================================
-// 1. 髫ｪ・ｭ陞ｳ繝ｻ& 郢晏･ﾎ晉ｹ昜ｻ｣繝ｻ鬮｢・｢隰ｨ・ｰ
+// 1. 髫�E�E�E�・�E�E�E�陞ｳ繝ｻ& 郢晏�E�E�E��E�E�E�晉�E�E�昜ｻ�E�E�E�繝ｻ鬮�E�E�E�・�E�E�E�隰�E�E�E�・�E�E�E�
 // ==========================================
 const appId = 'tele-apo-manager-v42-date-nav';
 const ADMIN_EMAIL = 'sotaro50017@gmail.com'; 
@@ -86,6 +86,87 @@ const parseTime = (t) => {
   return t.split(":").map(Number);
 };
 
+const GasSyncDataView = ({ gasData, members, forcedMemberId, hideHeader, onEditGasRecord, onDeleteGasRecord, initialPeriod = "本日" }) => {
+  const [period, setPeriod] = useState(initialPeriod);
+  const [search, setSearch] = useState("");
+
+  const filtered = useMemo(() => {
+    let list = gasData || [];
+    if (forcedMemberId) {
+      const m = members.find(mem => mem.id === forcedMemberId);
+      list = list.filter(d => d.memberId === m?.spreadsheetName || d.memberId === m?.name);
+    }
+    if (search) {
+      list = list.filter(d => d.type?.includes(search) || d.memo?.includes(search) || d.memberId?.includes(search));
+    }
+    
+    const now = new Date();
+    if (period === "本日") {
+      const today = toLocalDateString(now);
+      list = list.filter(d => {
+        if (!d.timestamp) return false;
+        const dt = d.timestamp.toDate ? d.timestamp.toDate() : (d.timestamp.seconds ? new Date(d.timestamp.seconds * 1000) : new Date(d.timestamp));
+        return toLocalDateString(dt) === today;
+      });
+    } else if (period === "今週") {
+      const wr = getWeekRange(now);
+      list = list.filter(d => {
+        if (!d.timestamp) return false;
+        const dt = d.timestamp.toDate ? d.timestamp.toDate() : (d.timestamp.seconds ? new Date(d.timestamp.seconds * 1000) : new Date(d.timestamp));
+        return dt >= wr.start && dt <= wr.end;
+      });
+    }
+    return list;
+  }, [gasData, members, forcedMemberId, search, period]);
+
+  return (
+    <div className="space-y-6">
+      {!hideHeader && (
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b-2 border-slate-900 pb-4">
+           <h2 className="text-xl font-black flex items-center gap-3"><Icon p={I.Zap} size={20}/> GAS 同期データ</h2>
+           <div className="flex gap-2">
+              <select value={period} onChange={e=>setPeriod(e.target.value)} className="bg-white border border-slate-300 p-2 px-4 font-bold text-xs rounded-xl outline-none shadow-sm">
+                 <option value="本日">本日</option>
+                 <option value="今週">今週</option>
+                 <option value="全期間">全期間</option>
+              </select>
+              <input placeholder="検索..." value={search} onChange={e=>setSearch(e.target.value)} className="bg-white border border-slate-300 p-2 px-4 font-bold text-xs rounded-xl outline-none focus:border-slate-900 shadow-sm" />
+           </div>
+        </div>
+      )}
+      <div className="space-y-3">
+        {filtered.map(d => (
+          <div key={d.id} className="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm flex items-center justify-between group hover:border-blue-200 transition-all">
+            <div className="flex items-center gap-4">
+               <div className={'w-2 h-10 rounded-full ' + (d.type === 'アポ獲得' ? 'bg-blue-600' : d.type?.includes('資料請求') ? 'bg-emerald-500' : 'bg-slate-200')}></div>
+               <div>
+                  <div className="flex items-center gap-2">
+                     <span className="text-[10px] font-black text-slate-400 uppercase">
+                       {d.timestamp ? (d.timestamp.toDate ? d.timestamp.toDate().toLocaleString() : (d.timestamp.seconds ? new Date(d.timestamp.seconds * 1000).toLocaleString() : new Date(d.timestamp).toLocaleString())) : '---'}
+                     </span>
+                     <span className="text-[10px] font-black px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">{d.memberId}</span>
+                  </div>
+                  <div className="font-black text-slate-900">{d.type}</div>
+                  {d.memo && <div className="text-[10px] text-slate-400 font-bold mt-1">{d.memo}</div>}
+               </div>
+            </div>
+            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+               <button onClick={() => {
+                 const m = prompt("メモを入力してください", d.memo || "");
+                 if (m !== null) onEditGasRecord(d.id, { memo: m });
+               }} className="p-2 text-slate-300 hover:text-blue-600 transition-colors"><Icon p={I.Edit} size={14}/></button>
+               <button onClick={() => {
+                 if (window.confirm("このレコードを削除しますか？")) onDeleteGasRecord(d.id);
+               }} className="p-2 text-slate-300 hover:text-rose-600 transition-colors"><Icon p={I.Trash} size={14}/></button>
+            </div>
+          </div>
+        ))}
+        {filtered.length === 0 && <div className="py-10 text-center text-slate-300 font-bold text-[10px] uppercase tracking-widest border-2 border-dashed border-slate-100 rounded-3xl">同期データはありません</div>}
+      </div>
+    </div>
+  );
+};
+
 const getMondayKey = (dateObj) => {
   const d = new Date(dateObj);
   const day = d.getDay();
@@ -136,9 +217,9 @@ const BREAKDOWN_LABELS = {
   picConnected: "本人接続",
   requests: "資料請求",
   appts: "アポ獲得",
-  rejection: "受付拒否",
-  absent: "担当者不在",
-  other: "不在/他"
+  receptionRefusal: "受付拒否",
+  picAbsent: "担当者不在",
+  noAnswer: "不在/他"
 };
 
 // ==========================================
@@ -175,85 +256,28 @@ const getAIAdvice = (stats, isPersonal) => {
         strategy: "アプローチ時間の最適化とターゲット精査",
         action: "ゴールデンタイム（14-16時、10-11時）への架電集中と、担当者が不在がちなリストの後回しを徹底してください。"
       });
-      categories.push({
-        obs: "受付でのブロック率が高い可能性があります。",
-        strategy: "フロント突破トークの改善とトーン調整",
-        action: "第一声のトーンを明るく、かつ誠実な印象に変えてみてください。用件を簡潔に伝え、担当者に繋ぐメリットを強調しましょう。"
-      });
     }
-
     if (apptRate < 0.05) {
       categories.push({
         obs: "本人接続はできていますが、アポイント獲得に至る率が低いです。クロージングの弱さが課題かもしれません。",
         strategy: "ニーズ喚起とキラーフレーズの強化",
         action: "現状の課題を深掘りする質問を増やし、解決策としてのメリットを提示するタイミングを15秒早めてみてください。"
       });
-      categories.push({
-        obs: "資料請求への逃げ（ソフトリジェクション）が多いようです。",
-        strategy: "テストクローズと反論処理の徹底",
-        action: "「まずは資料を」と言われた際の切り返しを用意し、その場で日程を打診する「テストクローズ」を1回増やしましょう。"
-      });
-    }
-
-    if (requestRate > 0.15 && apptRate < 0.05) {
-      categories.push({
-        obs: "資料請求は取れていますが、アポに繋がっていません。興味は引けているので、背中を押す一言が足りないようです。",
-        strategy: "資料送付をアポ獲得のステップに変える",
-        action: "資料を送る際、「内容を口頭で5分だけ補足させてください」と日程を合わせ、その場で日時を確定させる動きを徹底してください。"
-      });
-    }
-
-    if (totalCvr > 0.03) {
-      categories.push({
-        obs: "全体的なパフォーマンスが非常に高いです。現在のトークとリズムを維持し、質の高いリストへの集中を続けてください。",
-        strategy: "成功パターンの言語化と横展開",
-        action: "今日うまくいった要因をメモし、チームに共有してください。好調な時こそ、さらに10件架電を増やすことで圧倒的な成果に繋がります。"
-      });
-    }
-
-    if (categories.length === 0) {
-      categories.push({
-        obs: "安定した実績が出ています。現状を維持しつつ、さらなる効率化を目指しましょう。",
-        strategy: "稼働時間あたりの生産性向上",
-        action: "1時間あたりの架電数を10件増やすための「間」の短縮を意識してください。リズムを崩さず継続することが鍵です。"
-      });
-      categories.push({
-        obs: "接続数・獲得数ともにバランスが良い状態です。",
-        strategy: "トークの質向上と高単価案件へのシフト",
-        action: "50件に1件の「超」良質アポを狙い、相手の悩みに対する共感トークを一段階深めてみてください。"
-      });
     }
   } else {
-    if (connectRate < 0.20) {
+    if (connectRate < 0.2) {
       categories.push({
-        obs: "チーム全体で本人接続率が低下しています。リストの質または架電時間の有効性が低下している恐れがあります。",
-        strategy: "リストのリフレッシュと稼働時間の調整",
-        action: "担当者が不在になりやすいセクターを一時的に後回しにし、在宅率が高い時間帯へのリソース集中を検討してください。"
-      });
-    } else if (apptRate < 0.07) {
-      categories.push({
-        obs: "接続はできていますが、アポ獲得に苦戦しています。スクリプトの形骸化や意欲の低下が懸念されます。",
-        strategy: "スクリプトの再確認とロールプレイングの実施",
-        action: "好調なメンバーのトークを録音で聞き直し、全員で共通の勝ちパターンを再定義する時間を15分設けてください。"
-      });
-    } else {
-      categories.push({
-        obs: "チーム全体で非常に良好な数値です。モチベーションを維持し、目標達成を確実なものにしましょう。",
-        strategy: "アクション数の最大化と質の維持",
-        action: "現状のペースを維持すれば目標達成は確実です。ラストスパートとして、あと5件ずつの架電を全員で積み上げましょう。"
+        obs: "チーム全体の接続率が低迷しています。",
+        strategy: "架電リストの見直しと時間管理",
+        action: "リストの属性を再確認し、繋がりやすい時間帯への人員配置を再調整しましょう。"
       });
     }
   }
 
-  const advice = categories[Math.floor(Math.random() * categories.length)];
-
-  return (
-    <div className="space-y-4">
-      <div className="flex gap-3 items-start"><div className="mt-1.5 w-2 h-2 rounded-full bg-rose-500 shrink-0"></div><p><span className="text-rose-400 font-bold text-[10px] uppercase block mb-0.5">Observation</span><span className="text-white font-medium leading-relaxed">{advice.obs}</span></p></div>
-      <div className="flex gap-3 items-start"><div className="mt-1.5 w-2 h-2 rounded-full bg-blue-500 shrink-0"></div><p><span className="text-blue-400 font-bold text-[10px] uppercase block mb-0.5">Strategy</span><span className="text-white font-medium leading-relaxed">{advice.strategy}</span></p></div>
-      <div className="flex gap-3 items-start"><div className="mt-1.5 w-2 h-2 rounded-full bg-emerald-500 shrink-0"></div><p><span className="text-emerald-400 font-bold text-[10px] uppercase block mb-0.5">Action Plan</span><span className="text-white font-black leading-relaxed text-base">{advice.action}</span></p></div>
-    </div>
-  );
+  if (categories.length === 0) return "現在のパフォーマンスは安定しています。この調子で継続しましょう。";
+  
+  const advice = categories[0];
+  return advice.obs + "【戦略】" + advice.strategy + " 【アクション】" + advice.action;
 };
 
 
@@ -286,7 +310,7 @@ const MainMetric = ({ label, icon, current, target }) => {
              <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg"><Icon p={icon} size={20}/></div>
              <span className="text-sm font-bold text-slate-900">{label}</span>
           </div>
-          <span className={`text-[10px] font-black px-3 py-1 rounded-full ${isOk ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>{isOk ? '達成' : '目標まで'}</span>
+          <span className={`text-[10px] font-black px-3 py-1 rounded-full ${isOk ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>{isOk ? '達�E' : '目標まで'}</span>
        </div>
        <div className="flex items-end justify-between pt-2">
           <div className="text-5xl font-black text-slate-900 tabular-nums tracking-tighter">
@@ -303,7 +327,7 @@ const MainMetric = ({ label, icon, current, target }) => {
 };
 
 const CustomChart = ({ data, color, type = 'area' }) => {
-  if (!data || data.length === 0) return <div className="h-full flex items-center justify-center text-slate-300 font-bold text-xs uppercase tracking-widest">データがありません</div>;
+  if (!data || data.length === 0) return <div className="h-full flex items-center justify-center text-slate-300 font-bold text-xs uppercase tracking-widest">チE�E�Eタがありません</div>;
   const len = data.length - 1 || 1;
   const max = Math.max(...data.map(d => d.value), 1);
   const points = data.map((d, i) => `${(i / len) * 100},${100 - (d.value / max) * 100}`).join(' ');
@@ -371,14 +395,14 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
           <div className="space-y-3">
              <h2 className="text-4xl font-black text-slate-900 tracking-tighter">{event.name}</h2>
              <div className="flex items-center gap-4 text-xs font-bold text-slate-400">
-                <span className="flex items-center gap-2"><div className="w-2 h-2 bg-emerald-500 rounded-full"></div> 実績データ</span>
+                <span className="flex items-center gap-2"><div className="w-2 h-2 bg-emerald-500 rounded-full"></div> 実績チE�E�Eタ</span>
                 <span className="w-px h-3 bg-slate-200"></span>
-                <span>同期日時: {new Date().toLocaleString()}</span>
+                <span>同期日晁E {new Date().toLocaleString()}</span>
              </div>
           </div>
           <div className="flex bg-slate-200 p-1 rounded-2xl">
-             <button onClick={()=>setViewMode('personal')} className={`px-8 py-3 text-xs font-bold transition-all rounded-xl ${viewMode==='personal'?'bg-white text-blue-600 shadow-sm':'text-slate-500 hover:text-slate-900'}`}>{currentUserEmail === ADMIN_EMAIL ? '管理者データ' : 'マイデータ'}</button>
-             <button onClick={()=>setViewMode('team')} className={`px-8 py-3 text-xs font-bold transition-all rounded-xl ${viewMode==='team'?'bg-white text-blue-600 shadow-sm':'text-slate-500 hover:text-slate-900'}`}>チーム全体</button>
+             <button onClick={()=>setViewMode('personal')} className={`px-8 py-3 text-xs font-bold transition-all rounded-xl ${viewMode==='personal'?'bg-white text-blue-600 shadow-sm':'text-slate-500 hover:text-slate-900'}`}>{currentUserEmail === ADMIN_EMAIL ? '管琁E�E��E�E�E��E�ータ' : 'マイチE�E�Eタ'}</button>
+             <button onClick={()=>setViewMode('team')} className={`px-8 py-3 text-xs font-bold transition-all rounded-xl ${viewMode==='team'?'bg-white text-blue-600 shadow-sm':'text-slate-500 hover:text-slate-900'}`}>チE��Eム全佁E/button>
           </div>
        </div>
 
@@ -392,12 +416,12 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                            <div className="p-8 bg-white border-2 border-slate-900 rounded-[2rem] shadow-sm space-y-6">
                               <div className="flex justify-between items-center">
                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs font-bold text-slate-400">週次目標 / 件</span>
+                                    <span className="text-xs font-bold text-slate-400">週次目樁E/ 件</span>
                                     <button onClick={()=>setEditingGoal(activeIndivGoals)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Icon p={I.Edit} size={14}/></button>
                                  </div>
                                  <span className="text-2xl font-black text-slate-900">{(memberStats.find(m=>m.email===currentUserEmail)?.uniformGoal || 0)} <span className="text-xs">件</span></span>
                               </div>
-                              <MetricBar label="獲得" val={myTotals.appts} tgt={memberStats.find(m=>m.email===currentUserEmail)?.uniformGoal || 1} />
+                              <MetricBar label="獲征E val={myTotals.appts} tgt={memberStats.find(m=>m.email===currentUserEmail)?.uniformGoal || 1} />
                            </div>
                         </div>
 
@@ -411,7 +435,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                                  <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">見込み</div>
                                  <div className="text-5xl font-black">{memberStats.find(m=>m.email===currentUserEmail)?.expectedAppts || 0}<span className="text-sm font-normal ml-2 opacity-50">件</span></div>
                                  <div className="pt-4 border-t border-emerald-800 flex justify-between items-center">
-                                    <span className="text-xs font-bold opacity-60">目標差分</span>
+                                    <span className="text-xs font-bold opacity-60">目標差刁E/span>
                                     <span className="text-lg font-black">
                                        {((memberStats.find(m=>m.email===currentUserEmail)?.expectedAppts || 0) - (memberStats.find(m=>m.email===currentUserEmail)?.uniformGoal || 0)).toFixed(1)}
                                        <span className="text-xs ml-1">件</span>
@@ -423,8 +447,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
 
                         <div className="lg:col-span-1 space-y-6">
                            <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
-                             <div className="w-1.5 h-4 bg-slate-300 rounded-full"></div> 稼働効率
-                           </h3>
+                             <div className="w-1.5 h-4 bg-slate-300 rounded-full"></div> 稼働効玁E                           </h3>
                            <div className="p-8 bg-white border border-slate-100 rounded-[2rem] shadow-sm flex flex-col justify-between h-[180px]">
                               <div className="flex justify-between items-start">
                                  <div>
@@ -432,18 +455,18 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                                     <div className="text-3xl font-black text-blue-600">{(myTotals.calls / (myTotals.hours || 1)).toFixed(1)}</div>
                                  </div>
                                  <div>
-                                    <div className="text-[10px] font-bold text-slate-400 uppercase text-right">予定時間</div>
+                                    <div className="text-[10px] font-bold text-slate-400 uppercase text-right">予定時閁E/div>
                                     <div className="text-xl font-black text-slate-900 text-right">{memberStats.find(m=>m.email===currentUserEmail)?.scheduledHours || 0}H</div>
                                  </div>
                               </div>
-                              <div className="text-[10px] text-slate-400 font-bold leading-tight">今週の稼働データです。現在のペースを維持しましょう。</div>
+                              <div className="text-[10px] text-slate-400 font-bold leading-tight">今週の稼働データです。現在のペ�Eスを維持しましょぁE�E��E�E/div>
                            </div>
                         </div>
                      </div>
 
                      <div className="space-y-6">
                         <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
-                           <div className="w-1.5 h-4 bg-blue-600 rounded-full"></div> 同期データ
+                           <div className="w-1.5 h-4 bg-blue-600 rounded-full"></div> 同期チE�E�Eタ
                         </h3>
                         <div className="bg-white rounded-[2rem] shadow-sm p-6 md:p-10">
                            <GasSyncDataView 
@@ -463,14 +486,12 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                         <div className="space-y-6">
                            <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
-                             <div className="w-1.5 h-4 bg-blue-600 rounded-full"></div> チーム目標
-                           </h3>
+                             <div className="w-1.5 h-4 bg-blue-600 rounded-full"></div> チE��Eム目樁E                           </h3>
                            <MainMetric label="目標達成率" icon={I.Check} current={totals.weekly.appts} target={activeWeeklyGoals.appts} />
                         </div>
                         <div className="space-y-6">
                            <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
-                             <div className="w-1.5 h-4 bg-slate-300 rounded-full"></div> チーム効率
-                           </h3>
+                             <div className="w-1.5 h-4 bg-slate-300 rounded-full"></div> チE��Eム効玁E                           </h3>
                            <div className="flex flex-col gap-10 p-10 bg-white border border-slate-100 rounded-[3rem] shadow-sm">
                               <MetricBar label="接続率" val={totals.weekly.picConnected} tgt={totals.weekly.calls} />
                               <MetricBar label="アポ率" val={totals.weekly.appts} tgt={totals.weekly.picConnected} />
@@ -480,18 +501,18 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
 
                      <div className="bg-white border border-slate-100 rounded-[2.5rem] shadow-sm overflow-hidden">
                         <div className="p-6 bg-slate-50 border-b border-slate-100 text-xs font-black flex items-center justify-between text-slate-600 uppercase tracking-widest">
-                           <span className="flex items-center gap-3"><Icon p={I.Users} size={16}/> メンバー別</span>
-                           <span className="text-[10px] text-slate-400">CPH / 獲得</span>
+                           <span className="flex items-center gap-3"><Icon p={I.Users} size={16}/> メンバ�E別</span>
+                           <span className="text-[10px] text-slate-400">CPH / 獲征E/span>
                         </div>
                         <div className="divide-y divide-slate-50 overflow-x-auto">
                            <table className="w-full text-left border-collapse min-w-[600px]">
                               <thead className="bg-slate-50/50">
                                  <tr className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">
-                                    <th className="p-6">メンバー名</th>
+                                    <th className="p-6">メンバ�E吁E/th>
                                     <th className="p-6">架電</th>
-                                    <th className="p-6">接続</th>
-                                    <th className="p-6">資料</th>
-                                    <th className="p-6 text-blue-600">アポ</th>
+                                    <th className="p-6">接綁E/th>
+                                    <th className="p-6">賁E�E��E�</th>
+                                    <th className="p-6 text-blue-600">アチE/th>
                                     <th className="p-6">CPH</th>
                                     <th className="p-6 text-right">詳細</th>
                                  </tr>
@@ -541,11 +562,11 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                 <div className="grid grid-cols-2 gap-4">
                    {[
                      { label: '架電', val: drilldownMember.calls, color: 'text-slate-900' },
-                     { label: '接続', val: drilldownMember.picConnected, color: 'text-slate-900' },
-                     { label: '資料', val: drilldownMember.requests, color: 'text-slate-900' },
-                     { label: 'アポ', val: drilldownMember.appts, color: 'text-blue-600' },
+                     { label: '接綁E, val: drilldownMember.picConnected, color: 'text-slate-900' },
+                     { label: '賁E�E��E�', val: drilldownMember.requests, color: 'text-slate-900' },
+                     { label: 'アチE, val: drilldownMember.appts, color: 'text-blue-600' },
                      { label: '見込み', val: drilldownMember.expectedAppts, color: 'text-emerald-600' },
-                     { label: '予定時間', val: `${drilldownMember.scheduledHours}H`, color: 'text-slate-400' },
+                     { label: '予定時閁E, val: `${drilldownMember.scheduledHours}H`, color: 'text-slate-400' },
                    ].map(stat => (
                       <div key={stat.label} className="p-5 bg-slate-50 border border-slate-100 rounded-3xl">
                          <div className="text-[10px] font-black text-slate-400 uppercase mb-1">{stat.label}</div>
@@ -555,19 +576,19 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                 </div>
 
                 <div className="space-y-4">
-                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">内訳</h4>
+                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">冁E�E��E�</h4>
                    <div className="space-y-3">
                       {[
-                        { label: 'アポ', val: drilldownMember.appts || 0, color: 'bg-blue-600' },
-                        { label: '資料', val: drilldownMember.requests || 0, color: 'bg-emerald-500' },
-                        { label: '接続', val: (drilldownMember.picConnected || 0) - (drilldownMember.appts || 0) - (drilldownMember.requests || 0), color: 'bg-slate-400' },
+                        { label: 'アチE, val: drilldownMember.appts || 0, color: 'bg-blue-600' },
+                        { label: '賁E�E��E�', val: drilldownMember.requests || 0, color: 'bg-emerald-500' },
+                        { label: '接綁E, val: (drilldownMember.picConnected || 0) - (drilldownMember.appts || 0) - (drilldownMember.requests || 0), color: 'bg-slate-400' },
                         { label: '受付拒否', val: drilldownMember.receptionRefusal || 0, color: 'bg-rose-400' },
-                        { label: '不在 / その他', val: (drilldownMember.calls || 0) - (drilldownMember.picConnected || 0) - (drilldownMember.receptionRefusal || 0), color: 'bg-slate-100' },
+                        { label: '不在 / そ�E仁E, val: (drilldownMember.calls || 0) - (drilldownMember.picConnected || 0) - (drilldownMember.receptionRefusal || 0), color: 'bg-slate-100' },
                       ].map(item => {
                          const safeVal = Math.max(0, item.val);
                          const safeCalls = Math.max(1, drilldownMember.calls || 1);
                          const p = Math.max(0, Math.min(100, (safeVal / safeCalls) * 100));
-                         if (safeVal <= 0 && item.label !== 'アポ') return null;
+                         if (safeVal <= 0 && item.label !== 'アチE) return null;
                          return (
                             <div key={item.label} className="space-y-1">
                                <div className="flex justify-between text-[9px] font-bold">
@@ -597,11 +618,11 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
 
                 {gasData && (
                    <div className="pt-6 border-t-2 border-slate-100">
-                      <h4 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2"><Icon p={I.Zap} size={20} className="text-blue-600"/> 同期データ</h4>
+                      <h4 className="text-lg font-black text-slate-900 mb-6 flex items-center gap-2"><Icon p={I.Zap} size={20} className="text-blue-600"/> 同期チE�E�Eタ</h4>
                       <GasSyncDataView gasData={gasData} members={members} forcedMemberId={drilldownMember.id} hideHeader={true} onEditGasRecord={onEditGasRecord} onDeleteGasRecord={onDeleteGasRecord} />
                    </div>
                 )}
-                <button onClick={()=>setDrilldownMember(null)} className="w-full bg-slate-900 text-white py-5 font-black rounded-[2rem] shadow-xl hover:bg-black transition-all">閉じる</button>
+                <button onClick={()=>setDrilldownMember(null)} className="w-full bg-slate-900 text-white py-5 font-black rounded-[2rem] shadow-xl hover:bg-black transition-all">閉じめE/button>
              </div>
           </div>
        )}
@@ -609,7 +630,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
        {editingGoal && (
          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/90 p-4">
             <div className="bg-white w-full max-w-sm p-10 space-y-8 border-4 border-slate-900 rounded-3xl shadow-2xl">
-               <h3 className="text-xl font-bold">目標設定</h3>
+               <h3 className="text-xl font-bold">目標設宁E/h3>
                <div className="space-y-4">
                   <label className="text-[10px] font-bold text-slate-400 uppercase">目標獲得数</label>
                   <input type="number" className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-black text-2xl outline-none rounded-xl" defaultValue={editingGoal.appts} id="new-indiv-goal" />
@@ -618,7 +639,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                   const val = Number(document.getElementById('new-indiv-goal').value);
                   onUpdateGoal(getMondayKey(currentBaseDate), currentMember.id, { ...activeIndivGoals, appts: val });
                   setEditingGoal(null);
-               }} className="w-full bg-slate-900 text-white py-4 font-bold shadow-lg rounded-2xl">保存</button>
+               }} className="w-full bg-slate-900 text-white py-4 font-bold shadow-lg rounded-2xl">保孁E/button>
                <button onClick={()=>setEditingGoal(null)} className="w-full text-slate-400 text-sm font-bold pt-4">キャンセル</button>
             </div>
          </div>
@@ -678,18 +699,18 @@ const AttendanceView = ({ members, reports, onEdit }) => {
 
        <div className="grid grid-cols-2 gap-3">
           <div className="bg-slate-900 p-6 text-white rounded-2xl">
-             <span className="font-bold opacity-60 text-[10px] block mb-1">合計稼働時間</span>
+             <span className="font-bold opacity-60 text-[10px] block mb-1">合計稼働時閁E/span>
              <span className="text-3xl font-black">{totalH}<span className="text-sm opacity-30 ml-1">H</span></span>
           </div>
           <div className="bg-white border border-slate-200 p-6 rounded-2xl">
-             <span className="font-bold text-slate-400 text-[10px] block mb-1">合計報酬額</span>
+             <span className="font-bold text-slate-400 text-[10px] block mb-1">合計報酬顁E/span>
              <span className="text-2xl font-black">¥{totalCost.toLocaleString()}</span>
           </div>
        </div>
 
        {selectedMemberId === 'all' && memberSummary.length > 0 && (
          <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
-           <div className="p-4 bg-slate-50 border-b border-slate-100 text-xs font-black text-slate-500 uppercase tracking-widest">メンバー別内訳</div>
+           <div className="p-4 bg-slate-50 border-b border-slate-100 text-xs font-black text-slate-500 uppercase tracking-widest">メンバ�E別冁E�E��E�</div>
            {memberSummary.map(m => (
              <div key={m.id} className="flex items-center justify-between p-4 border-b border-slate-50 last:border-0">
                <div className="flex items-center gap-3">
@@ -714,7 +735,7 @@ const AttendanceView = ({ members, reports, onEdit }) => {
                     <div className="w-9 h-9 bg-slate-900 text-white flex items-center justify-center font-bold text-xs rounded-full">{m?.name?.slice(0,1)}</div>
                     <div className="flex flex-col">
                         <span className="text-[9px] font-bold text-slate-400">{r.date ? toLocalDateString(r.date.toDate ? r.date.toDate() : (r.date.seconds ? new Date(r.date.seconds * 1000) : new Date(r.date))) : "---"}</span>
-                        <span className="font-bold text-slate-800 text-sm">{m?.name || '不明'}</span>
+                        <span className="font-bold text-slate-800 text-sm">{m?.name || '不�E'}</span>
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -724,7 +745,7 @@ const AttendanceView = ({ members, reports, onEdit }) => {
               </button>
             );
           })}
-          {fReports.length === 0 && <div className="py-12 text-center text-slate-400 font-bold text-sm bg-white">データがありません</div>}
+          {fReports.length === 0 && <div className="py-12 text-center text-slate-400 font-bold text-sm bg-white">チE�E�Eタがありません</div>}
        </div>
     </div>
   );
@@ -798,15 +819,15 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
   };
 
   const handleBulkRegister = async () => {
-    if (!bulkMemberId) return alert("メンバーを選択してください");
+    if (!bulkMemberId) return alert("メンバ�Eを選択してください");
     if (bulkSchedule.length === 0) return alert("登録する日程を選択してください");
     
     const mName = members.find(m=>m.id===bulkMemberId)?.name;
-    if (window.confirm(`${mName}さんのシフト${bulkSchedule.length}件を一括登録しますか？`)) {
+    if (window.confirm(`${mName}さんのシフト${bulkSchedule.length}件を一括登録しますか�E�E�E�`)) {
       for (const item of bulkSchedule) {
         await onAddShift({ memberId: bulkMemberId, date: item.date, startTime: item.startTime, endTime: item.endTime });
       }
-      alert("一括登録が完了しました");
+      alert("一括登録が完亁E�E��E�ました");
       setBulkSchedule([]);
       setBulkMode(false);
     }
@@ -817,13 +838,13 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
        <div className="flex flex-col gap-4 border-b-2 border-slate-900 pb-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <h2 className="text-xl font-bold">シフト・予定管理</h2>
+              <h2 className="text-xl font-bold">シフト・予定管琁E/h2>
               {userRole === 'admin' && (
                 <button 
                   onClick={() => setBulkMode(!bulkMode)}
                   className={`px-4 py-2 text-[10px] font-black rounded-full transition-all flex items-center gap-2 ${bulkMode ? 'bg-rose-500 text-white shadow-lg' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
                 >
-                  {bulkMode ? <><Icon p={I.X} size={14}/> モード解除</> : <><Icon p={I.Zap} size={14}/> 一括登録モード</>}
+                  {bulkMode ? <><Icon p={I.X} size={14}/> モード解除</> : <><Icon p={I.Zap} size={14}/> 一括登録モーチE/>}
                 </button>
               )}
             </div>
@@ -840,7 +861,7 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
             <div className="p-8 bg-rose-50 border-2 border-rose-100 rounded-[2.5rem] space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
                <div className="flex flex-col md:flex-row gap-8 items-start">
                   <div className="flex-1 space-y-4">
-                     <label className="text-xs font-black text-rose-500 uppercase tracking-widest block">1. メンバーを選択</label>
+                     <label className="text-xs font-black text-rose-500 uppercase tracking-widest block">1. メンバ�Eを選抁E/label>
                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                         {members.map(m => (
                           <button 
@@ -854,18 +875,18 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
                      </div>
                   </div>
                   <div className="space-y-4 bg-white p-6 rounded-3xl border border-rose-100 shadow-sm">
-                     <label className="text-[10px] font-black text-rose-500 uppercase tracking-widest block">デフォルト時間設定</label>
+                     <label className="text-[10px] font-black text-rose-500 uppercase tracking-widest block">チE�E��E�ォルト時間設宁E/label>
                      <div className="flex gap-4">
                         <div className="space-y-1">
-                           <span className="text-[9px] font-bold text-slate-400">開始</span>
+                           <span className="text-[9px] font-bold text-slate-400">開姁E/span>
                            <input type="time" value={bulkStartTime} onChange={e=>setBulkStartTime(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-100 rounded-lg font-bold text-xs" />
                         </div>
                         <div className="space-y-1">
-                           <span className="text-[9px] font-bold text-slate-400">終了</span>
+                           <span className="text-[9px] font-bold text-slate-400">終亁E/span>
                            <input type="time" value={bulkEndTime} onChange={e=>setBulkEndTime(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-100 rounded-lg font-bold text-xs" />
                         </div>
                      </div>
-                     <p className="text-[9px] text-slate-400 font-bold mt-2">カレンダーから日付をタップして選択してください。</p>
+                     <p className="text-[9px] text-slate-400 font-bold mt-2">カレンダーから日付をタチE�E�Eして選択してください、E/p>
                   </div>
                </div>
 
@@ -878,7 +899,7 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
                             <div className="flex flex-col">
                                <span className="text-[10px] font-black text-rose-500">{item.date.slice(5).replace('-', '/')}</span>
                                <span className="text-xs font-bold text-slate-600">
-                                 {['日','月','火','水','木','金','土'][new Date(item.date).getDay()]}曜日
+                                 {['日','朁E,'火','水','木','釁E,'圁E][new Date(item.date).getDay()]}曜日
                                </span>
                             </div>
                             <div className="flex items-center gap-2">
@@ -894,20 +915,23 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
                )}
 
                <div className="flex flex-col md:flex-row items-center justify-between border-t border-rose-100 pt-6 gap-4">
-                  <div className="flex items-center gap-3">
-                     <div className="w-10 h-10 bg-rose-100 text-rose-600 flex items-center justify-center rounded-full font-black">3</div>
-                     <p className="text-sm font-bold text-rose-600">選択したすべてのシフトを一括登録します。現在 {bulkSchedule.length} 件選択中</p>
-                  </div>
-                  <button onClick={handleBulkRegister} className="w-full md:w-auto px-10 py-4 bg-rose-600 text-white font-black rounded-[1.5rem] shadow-xl hover:bg-rose-700 transition-all transform active:scale-95 flex items-center justify-center gap-2">
-                     <Icon p={I.Check} size={20}/> 一括登録を実行する
-                  </button>
-               </div>
+                   <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-rose-100 text-rose-600 flex items-center justify-center rounded-full font-black">3</div>
+                      <p className="text-sm font-bold text-rose-600">選択したすべてのシフトを一括登録します。現在 {bulkSchedule.length} 件選択中</p>
+                   </div>
+                   <div className="flex gap-3 w-full md:w-auto">
+                      <button onClick={()=>setBulkSchedule([])} className="px-6 py-4 bg-white border-2 border-rose-100 text-rose-400 font-bold rounded-2xl hover:bg-rose-50 transition-all">全クリア</button>
+                      <button onClick={handleBulkRegister} className="flex-1 md:flex-none px-10 py-4 bg-rose-600 text-white font-black rounded-[1.5rem] shadow-xl hover:bg-rose-700 transition-all transform active:scale-95 flex items-center justify-center gap-2">
+                         <Icon p={I.Check} size={20}/> 一括登録を実行する
+                      </button>
+                   </div>
+                </div>
             </div>
           )}
           {viewMode === 'month' ? (
             <div className="flex items-center justify-between bg-white border border-slate-200 rounded-2xl px-4 py-3">
               <button onClick={()=>moveMonth(-1)} className="p-2 rounded-xl hover:bg-slate-100 transition-colors"><Icon p={I.ChevronLeft} size={20}/></button>
-              <span className="font-black text-lg">{calYear}年 {calMonthNum}月</span>
+              <span className="font-black text-lg">{calYear}年 {calMonthNum}朁E/span>
               <button onClick={()=>moveMonth(1)} className="p-2 rounded-xl hover:bg-slate-100 transition-colors"><Icon p={I.ChevronRight} size={20}/></button>
             </div>
           ) : (
@@ -919,7 +943,7 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
          <div className="space-y-6">
            <div className="p-10 bg-white border border-slate-200 shadow-xl rounded-[2.5rem]">
               <div className="grid grid-cols-7 gap-px bg-slate-100 border border-slate-100 rounded-2xl overflow-hidden">
-                 {['日','月','火','水','木','金','土'].map((d, i) => (
+                 {['日','朁E,'火','水','木','釁E,'圁E].map((d, i) => (
                     <div key={d} className={`bg-slate-50/50 p-4 text-center text-xs font-black uppercase ${i===0?'text-rose-500':i===6?'text-blue-500':'text-slate-400'}`}>{d}</div>
                  ))}
                  {calendarData.map((d, i) => {
@@ -949,11 +973,11 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
 
            <div className="bg-white border border-slate-200 shadow-xl rounded-[2.5rem] overflow-hidden">
               <div className="p-8 border-b border-slate-100 flex items-center justify-between">
-                 <h3 className="text-xl font-black text-slate-900 flex items-center gap-4"><div className="p-3 bg-blue-600 text-white rounded-xl shadow-lg"><Icon p={I.Calendar} size={20}/></div> {selectedDate.split('-')[1]}月{selectedDate.split('-')[2]}日のシフト詳細</h3>
-                 <span className="px-4 py-2 bg-slate-50 rounded-full text-xs font-black text-slate-400 uppercase tracking-widest">{selectedDateShifts.length} 件の予定が入っています</span>
+                 <h3 className="text-xl font-black text-slate-900 flex items-center gap-4"><div className="p-3 bg-blue-600 text-white rounded-xl shadow-lg"><Icon p={I.Calendar} size={20}/></div> {selectedDate.split('-')[1]}朁EselectedDate.split('-')[2]}日のシフト詳細</h3>
+                 <span className="px-4 py-2 bg-slate-50 rounded-full text-xs font-black text-slate-400 uppercase tracking-widest">{selectedDateShifts.length} 件の予定が入ってぁE�E��E�ぁE/span>
               </div>
               {selectedDateShifts.length === 0 ? (
-                 <div className="text-center py-20 text-slate-400 font-bold text-sm">この日のシフト登録はありません。右下の「+」ボタンから登録してください。</div>
+                 <div className="text-center py-20 text-slate-400 font-bold text-sm">こ�E日のシフト登録はありません。右下�E、E」�Eタンから登録してください、E/div>
               ) : (
                  <div className="divide-y divide-slate-50">
                     {selectedDateShifts.map(s => {
@@ -969,11 +993,11 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
                           </div>
                           <div className="flex items-center gap-10">
                              <div className="text-right">
-                                <div className="text-[10px] font-bold text-slate-300 uppercase mb-1">勤務時間</div>
+                                <div className="text-[10px] font-bold text-slate-300 uppercase mb-1">勤務時閁E/div>
                                 <div className="text-xl font-black text-blue-600 tabular-nums">{s.startTime} - {s.endTime}</div>
                              </div>
                                {(userRole === 'admin' || s.memberId === myMemberId) && (
-                                   <button onClick={()=>{if(window.confirm('このシフトを削除しますか？')) onDeleteShift(s.id)}} className="p-3 text-slate-200 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all"><Icon p={I.Trash} size={20}/></button>
+                                   <button onClick={()=>{if(window.confirm('こ�Eシフトを削除しますか�E�E�E�E)) onDeleteShift(s.id)}} className="p-3 text-slate-200 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all"><Icon p={I.Trash} size={20}/></button>
                                )}
                           </div>
                         </div>
@@ -999,7 +1023,7 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
                           </div>
                        </div>
                     </div>
-                    <button onClick={()=>{if(window.confirm('削除しますか？')) onDeleteShift(s.id)}} className="p-2 text-slate-200 hover:text-rose-600 transition-colors"><Icon p={I.Trash} size={18}/></button>
+                    <button onClick={()=>{if(window.confirm('削除しますか�E�E�E�E)) onDeleteShift(s.id)}} className="p-2 text-slate-200 hover:text-rose-600 transition-colors"><Icon p={I.Trash} size={18}/></button>
                  </div>
                );
             })}
@@ -1022,24 +1046,24 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
                </div>
                <div className="space-y-6">
                   <div>
-                    <label className="text-[10px] font-bold text-slate-400 uppercase mb-3 block">メンバー</label>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase mb-3 block">メンバ�E</label>
                     <div className="flex flex-wrap gap-2">{members.map(m => (
                       <button key={m.id} onClick={()=>{setSelectedMemberId(m.id);}} className={`px-4 py-2 border font-bold text-xs transition-all rounded-full ${selectedMemberId===m.id?'bg-slate-900 text-white':'border-slate-200 hover:bg-slate-50'}`}>{m.name}</button>
                     ))}</div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                      <div>
-                       <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">開始</label>
+                       <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">開姁E/label>
                        <input type="time" className="w-full p-4 border-2 border-slate-100 font-bold outline-none focus:border-slate-900 rounded-xl transition-colors" value={startTime} onChange={e=>setStartTime(e.target.value)} />
                      </div>
                      <div>
-                       <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">終了</label>
+                       <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">終亁E/label>
                        <input type="time" className="w-full p-4 border-2 border-slate-100 font-bold outline-none focus:border-slate-900 rounded-xl transition-colors" value={endTime} onChange={e=>setEndTime(e.target.value)} />
                      </div>
                   </div>
                </div>
                <button onClick={async ()=>{
-                  if(!selectedMemberId) return alert("メンバーを選択してください");
+                  if(!selectedMemberId) return alert("メンバ�Eを選択してください");
                   await onAddShift({ memberId: selectedMemberId, date: selectedDate, startTime, endTime });
                   setShowModal(false);
                }} className="w-full bg-slate-900 text-white py-4 font-bold rounded-2xl hover:bg-black transition-colors">登録する</button>
@@ -1052,19 +1076,19 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
 
 
 const METRIC_HELP = {
-  CPH: 'CPH (Calls Per Hour): 1時間あたりの架電効率。アポイント獲得に向けた「数」の重要指標です。',
-  接続率: '接続率 = 本人接続 / 架電。担当者に繋がった割合。リストの質や架電時間の有効性を示します。',
-  アポ率: 'アポ率 = アポ獲得 / 本人接続。接続した際のアポ打診の成功率。トークスキルやニーズ喚起力を示します。',
-  獲得: '獲得 = 今週の個人アポ獲得数。',
-  見込み: '見込み = 現在のペース・効率・残りの予定時間から算出した、週次着地予測値です。',
-  本人接続: '本人接続 = 架電して本人（担当者）に繋がった件数。不在や受付拒否を除いた、対話ができた数です。',
+  CPH: 'CPH (Calls Per Hour): 1時間あたり�E架電効玁E�E��E�アポイント獲得に向けた「数」�E重要指標です、E,
+  接続率: '接続率 = 本人接綁E/ 架電。担当老E�E��E�繋がった割合。リスト�E質めE�E��E�電時間の有効性を示します、E,
+  アポ率: 'アポ率 = アポ獲征E/ 本人接続。接続した際のアポ打診の成功玁E�E��E�ト�EクスキルめE�E��E�ーズ喚起力を示します、E,
+  獲征E '獲征E= 今週の個人アポ獲得数、E,
+  見込み: '見込み = 現在のペ�Eス・効玁E�E�E残りの予定時間から算�Eした、E�E��E�次着地予測値です、E,
+  本人接綁E '本人接綁E= 架電して本人�E�E�E�拁E��老E�E��E�に繋がった件数。不在めE�E��E�付拒否を除ぁE�E��E�、対話ができた数です、E,
 };
 
 const MetricHelpModal = ({ onClose }) => (
   <div className="fixed inset-0 z-[500] flex items-end md:items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4" onClick={onClose}>
     <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden" onClick={e=>e.stopPropagation()}>
       <div className="p-6 bg-slate-900 text-white flex items-center justify-between">
-        <h3 className="font-black text-lg flex items-center gap-3"><Icon p={I.Help} size={20} color="white"/> 指標の解説</h3>
+        <h3 className="font-black text-lg flex items-center gap-3"><Icon p={I.Help} size={20} color="white"/> 持E�E��E��E�E解説</h3>
         <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 transition-colors"><Icon p={I.X} size={20} color="white"/></button>
       </div>
       <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
@@ -1117,7 +1141,7 @@ const AnalyticsView = ({ members, reports, event, userRole }) => {
         const mon = getMondayKey(dateObj);
         key = mon.slice(5).replace('-', '/');
       } else if (periodMode === 'monthly') {
-        key = `${dateObj.getMonth()+1}月`;
+        key = `${dateObj.getMonth()+1}朁E;
       } else {
         key = `${dateObj.getFullYear()}年`;
       }
@@ -1126,15 +1150,7 @@ const AnalyticsView = ({ members, reports, event, userRole }) => {
     return Object.entries(map).map(([day, value]) => ({ day, value })).sort((a,b)=>a.day.localeCompare(b.day));
   }, [fReports, chartMetric, periodMode]);
 
-  const metricLabels = { 
-    calls: '架電数', 
-    appts: 'アポ獲得数', 
-    requests: '資料請求数', 
-    picConnected: '本人接続数',
-    receptionRefusal: '受付拒否',
-    picAbsent: '担当者不在',
-    noAnswer: '不在/その他'
-  };
+  const metricLabels = BREAKDOWN_LABELS;
   const periodLabels = { daily: '日次', weekly: '週次', monthly: '月次', yearly: '年次' };
 
   return (
@@ -1142,13 +1158,13 @@ const AnalyticsView = ({ members, reports, event, userRole }) => {
        {showHelp && <MetricHelpModal onClose={()=>setShowHelp(false)} />}
        <div className="flex flex-col md:flex-row md:items-center justify-between border-b-2 border-slate-900 pb-4 gap-4">
           <div className="flex items-center gap-3">
-            <h2 className="text-xl font-black flex items-center gap-3"><Icon p={I.PieChart} size={20}/> パフォーマンス分析</h2>
-            <button onClick={()=>setShowHelp(true)} className="p-2 rounded-full bg-slate-100 hover:bg-blue-100 text-slate-400 hover:text-blue-600 transition-colors" title="指標のヘルプ">
+            <h2 className="text-xl font-black flex items-center gap-3"><Icon p={I.PieChart} size={20}/> パフォーマンス刁E�E��E�</h2>
+            <button onClick={()=>setShowHelp(true)} className="p-2 rounded-full bg-slate-100 hover:bg-blue-100 text-slate-400 hover:text-blue-600 transition-colors" title="持E�E��E��E�EヘルチE>
               <Icon p={I.Help} size={16}/>
             </button>
           </div>
           <select className="bg-white border border-slate-300 p-2 px-4 font-bold text-xs outline-none rounded-xl shadow-sm" value={selectedMid} onChange={e=>setSelectedMid(e.target.value)}>
-             <option value="all">チーム全体の推移を表示</option>
+             <option value="all">チE��Eム全体�E推移を表示</option>
              {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
        </div>
@@ -1171,7 +1187,7 @@ const AnalyticsView = ({ members, reports, event, userRole }) => {
                  ))}
                </div>
                <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
-                 <button onClick={()=>setChartType('line')} className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition-all ${chartType==='line'?'bg-blue-600 text-white':'text-slate-400'}`}>折れ線</button>
+                 <button onClick={()=>setChartType('line')} className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition-all ${chartType==='line'?'bg-blue-600 text-white':'text-slate-400'}`}>折れ緁E/button>
                  <button onClick={()=>setChartType('area')} className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition-all ${chartType==='area'?'bg-blue-600 text-white':'text-slate-400'}`}>エリア</button>
                </div>
              </div>
@@ -1183,9 +1199,9 @@ const AnalyticsView = ({ members, reports, event, userRole }) => {
 
        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
           <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-10">
-             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">主要コンバージョン率 (CVR)</h3>
+             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">主要コンバ�Eジョン玁E(CVR)</h3>
              <div className="space-y-10">
-                <MetricBar label="接続率 (架電あたり)" val={stats.picConnected} tgt={stats.calls} />
+                <MetricBar label="接続率 (架電あためE" val={stats.picConnected} tgt={stats.calls} />
                 <MetricBar label="アポ率 (本人接続あたり)" val={stats.appts} tgt={stats.picConnected} />
              </div>
           </div>
@@ -1239,7 +1255,7 @@ const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, 
   const handleSaveSyncSettings = () => {
     localStorage.setItem('kpi_gas_url', gasUrl);
     localStorage.setItem('kpi_legacy_appid', legacyAppId);
-    alert("保存が完了しました");
+    alert("保存が完亁E�E��E�ました");
   };
 
   const handleManualSync = async () => {
@@ -1255,7 +1271,7 @@ const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, 
           legacyAppId: legacyAppId 
         })
       });
-      alert("同期リクエストを送信しました。Googleスプレッドシート側のGASが実行されるまでお待ちください。");
+      alert("同期リクエストを送信しました、EoogleスプレチE�E��E�シート�EのGASが実行されるまでお征E�E��E�ください、E);
     } catch (e) {
       alert("同期エラー: " + e.message);
     }
@@ -1267,13 +1283,13 @@ const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, 
        <div className="flex items-center justify-between border-b-4 border-slate-900 pb-6">
           <div className="flex items-center gap-6">
              <button onClick={onClose} className="p-4 bg-slate-900 text-white rounded-2xl"><Icon p={I.X}/></button>
-             <div><h2 className="font-black text-3xl text-slate-900 leading-none">設定・管理</h2><p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mt-1">イベント、メンバー、同期設定の管理</p></div>
+             <div><h2 className="font-black text-3xl text-slate-900 leading-none">設定�E管琁E/h2><p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mt-1">イベント、メンバ�E、同期設定�E管琁E/p></div>
           </div>
        </div>
 
        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
           <section className="space-y-6">
-             <h3 className="text-sm font-bold text-slate-800 border-l-4 border-slate-900 pl-3">イベント・案件管理</h3>
+             <h3 className="text-sm font-bold text-slate-800 border-l-4 border-slate-900 pl-3">イベント�E案件管琁E/h3>
              <div className="p-8 bg-white border border-slate-200 space-y-4 shadow-sm rounded-3xl">
                 <input className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold focus:border-slate-900 outline-none rounded-xl" placeholder="新規イベント名" value={newEName} onChange={e=>setNewEName(e.target.value)} />
                 <button onClick={()=>{if(newEName){onAddEvent(newEName, ""); setNewEName("");}}} className="w-full bg-slate-900 text-white py-4 font-bold rounded-2xl hover:bg-black transition-colors">イベントを追加</button>
@@ -1282,15 +1298,15 @@ const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, 
                 {events.map(e => (
                   <div key={e.id} className="flex items-center justify-between p-4 bg-white text-sm font-bold">
                      <span>{e.name}</span>
-                     <button onClick={()=>{if(window.confirm('イベントを削除しますか？')) onDeleteEvent(e.id)}} className="text-slate-300 hover:text-rose-600 transition-colors"><Icon p={I.Trash} size={18}/></button>
+                     <button onClick={()=>{if(window.confirm('イベントを削除しますか�E�E�E�E)) onDeleteEvent(e.id)}} className="text-slate-300 hover:text-rose-600 transition-colors"><Icon p={I.Trash} size={18}/></button>
                   </div>
                 ))}
              </div>
 
-             <h3 className="text-sm font-bold text-slate-800 border-l-4 border-indigo-600 pl-3 mt-12">全体目標設定</h3>
+             <h3 className="text-sm font-bold text-slate-800 border-l-4 border-indigo-600 pl-3 mt-12">全体目標設宁E/h3>
              <div className="p-8 bg-white border border-slate-200 space-y-6 shadow-sm rounded-3xl">
                 <div className="space-y-4">
-                   <label className="text-[10px] font-bold text-slate-400 uppercase">今週の全体獲得目標</label>
+                   <label className="text-[10px] font-bold text-slate-400 uppercase">今週の全体獲得目樁E/label>
                    <div className="flex gap-4">
                       <input type="number" id="admin-global-goal" className="flex-1 p-4 bg-slate-50 border-2 border-slate-100 font-black text-2xl outline-none rounded-xl" defaultValue={activeWeeklyGoals.appts} />
                       <button onClick={() => {
@@ -1302,44 +1318,44 @@ const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, 
                 </div>
              </div>
 
-             <h3 className="text-sm font-bold text-slate-800 border-l-4 border-blue-600 pl-3 mt-12">外部データ連携 (GAS / スプレッドシート)</h3>
+             <h3 className="text-sm font-bold text-slate-800 border-l-4 border-blue-600 pl-3 mt-12">外部チE�E�Eタ連携 (GAS / スプレチE�E��E�シーチE</h3>
              <div className="p-8 bg-white border border-slate-200 space-y-6 shadow-sm rounded-3xl">
                 <div className="space-y-2">
                    <label className="text-[10px] font-bold text-slate-400 uppercase">Google Apps Script URL</label>
                    <input className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none rounded-xl text-xs" placeholder="https://script.google.com/macros/s/..." value={gasUrl} onChange={e=>setGasUrl(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                   <label className="text-[10px] font-bold text-slate-400 uppercase">旧App ID (既存のシート名など)</label>
-                   <input className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none rounded-xl text-xs" placeholder="例: tele-apo-manager-original" value={legacyAppId} onChange={e=>setLegacyAppId(e.target.value)} />
+                   <label className="text-[10px] font-bold text-slate-400 uppercase">旧App ID (既存�Eシート名など)</label>
+                   <input className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none rounded-xl text-xs" placeholder="侁E tele-apo-manager-original" value={legacyAppId} onChange={e=>setLegacyAppId(e.target.value)} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                   <button onClick={handleSaveSyncSettings} className="w-full bg-white border-2 border-slate-200 text-slate-600 py-4 font-bold rounded-2xl hover:bg-slate-50 transition-colors">設定を保存</button>
+                   <button onClick={handleSaveSyncSettings} className="w-full bg-white border-2 border-slate-200 text-slate-600 py-4 font-bold rounded-2xl hover:bg-slate-50 transition-colors">設定を保孁E/button>
                    <button onClick={handleManualSync} disabled={isSyncing} className="w-full bg-blue-600 text-white py-4 font-bold rounded-2xl hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                      <Icon p={I.Zap} size={18} /> {isSyncing ? '同期中...' : '手動同期実行'}
+                      <Icon p={I.Zap} size={18} /> {isSyncing ? '同期中...' : '手動同期実衁E}
                    </button>
                 </div>
              </div>
           </section>
 
           <section className="space-y-6">
-             <h3 className="text-sm font-bold text-slate-800 border-l-4 border-emerald-600 pl-3">チームメンバー管理</h3>
+             <h3 className="text-sm font-bold text-slate-800 border-l-4 border-emerald-600 pl-3">チE��Eムメンバ�E管琁E/h3>
              <div className="p-8 bg-white border border-slate-200 space-y-4 shadow-sm rounded-3xl">
                 <div className="grid grid-cols-2 gap-4">
                    <input className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold rounded-xl" placeholder="名前" value={newMName} onChange={e=>setNewMName(e.target.value)} />
-                   <input className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold rounded-xl" placeholder="スプレッドシート名" value={newSpreadsheetName} onChange={e=>setNewSpreadsheetName(e.target.value)} />
+                   <input className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold rounded-xl" placeholder="スプレチE�E��E�シート名" value={newSpreadsheetName} onChange={e=>setNewSpreadsheetName(e.target.value)} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                    <input className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold rounded-xl" placeholder="Gmail" value={newEmail} onChange={e=>setNewEmail(e.target.value)} />
                    <select className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none rounded-xl" value={newRole} onChange={e=>setNewRole(e.target.value)}>
                       <option value="apo">アポインター</option>
                       <option value="closer">クローザー</option>
-                      <option value="admin">管理者</option>
+                      <option value="admin">管琁E�E��E�E/option>
                    </select>
                 </div>
                 <div className="grid grid-cols-1 gap-4">
                    <input type="number" className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none rounded-xl" placeholder="時給" value={newWage} onChange={e=>setNewWage(e.target.value)} />
                 </div>
-                <button onClick={()=>{if(newMName){onAddMember(newMName, newRole, newWage, newEmail, newSpreadsheetName); setNewMName(""); setNewEmail(""); setNewSpreadsheetName("");}}} className="w-full bg-emerald-600 text-white py-4 font-bold rounded-2xl hover:bg-emerald-700 transition-colors">メンバーを登録</button>
+                <button onClick={()=>{if(newMName){onAddMember(newMName, newRole, newWage, newEmail, newSpreadsheetName); setNewMName(""); setNewEmail(""); setNewSpreadsheetName("");}}} className="w-full bg-emerald-600 text-white py-4 font-bold rounded-2xl hover:bg-emerald-700 transition-colors">メンバ�Eを登録</button>
              </div>
              <div className="flex flex-col gap-px bg-slate-200 border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
                 {members.map(m => (
@@ -1361,17 +1377,17 @@ const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, 
        {editingMember && (
          <div className="fixed inset-0 bg-slate-900/95 z-[300] flex items-center justify-center p-6 backdrop-blur-md">
             <div className="bg-white w-full max-w-sm p-10 space-y-8 border-4 border-slate-900 rounded-3xl shadow-2xl">
-               <h3 className="text-xl font-bold border-b-2 border-slate-100 pb-4">メンバー情報の編集</h3>
+               <h3 className="text-xl font-bold border-b-2 border-slate-100 pb-4">メンバ�E惁E�E��E�の編雁E/h3>
                <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                      <input className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold rounded-xl" value={editingMember.name} onChange={e=>setEditingMember({...editingMember, name: e.target.value})} placeholder="名前" />
-                     <input className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold rounded-xl" value={editingMember.spreadsheetName || ''} onChange={e=>setEditingMember({...editingMember, spreadsheetName: e.target.value})} placeholder="スプレッドシート名" />
+                     <input className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold rounded-xl" value={editingMember.spreadsheetName || ''} onChange={e=>setEditingMember({...editingMember, spreadsheetName: e.target.value})} placeholder="スプレチE�E��E�シート名" />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                      <select className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none rounded-xl" value={editingMember.role} onChange={e=>setEditingMember({...editingMember, role: e.target.value})}>
                         <option value="apo">アポインター</option>
                         <option value="closer">クローザー</option>
-                        <option value="admin">管理者</option>
+                        <option value="admin">管琁E�E��E�E/option>
                      </select>
                      <input type="number" className="w-full p-4 bg-slate-50 border-2 border-slate-200 font-bold outline-none rounded-xl" value={editingMember.hourlyWage} onChange={e=>setEditingMember({...editingMember, hourlyWage: e.target.value})} placeholder="時給" />
                   </div>
@@ -1401,7 +1417,7 @@ function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData =
 
   const submit = (e) => { 
     e.preventDefault(); 
-    if (!val.memberId) return alert("メンバーを選択してください"); 
+    if (!val.memberId) return alert("メンバ�Eを選択してください"); 
     const d = { 
       ...val, 
       calls: Number(val.calls), 
@@ -1422,20 +1438,20 @@ function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData =
        <div className="w-full h-full md:max-w-2xl md:h-auto bg-white border-4 border-slate-900 flex flex-col overflow-hidden shadow-2xl rounded-[2.5rem]">
           <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
              <button type="button" onClick={onClose} className="p-3 border border-slate-200 bg-white rounded-2xl hover:bg-slate-50 transition-colors"><Icon p={I.X}/></button>
-             <h2 className="font-black text-xl uppercase tracking-widest text-slate-900">{initialData ? '実績を編集' : '新規実績登録'}</h2>
+             <h2 className="font-black text-xl uppercase tracking-widest text-slate-900">{initialData ? '実績を編雁E : '新規実績登録'}</h2>
              <div className="w-12"/>
           </div>
           <form onSubmit={submit} className="flex-1 overflow-y-auto p-10 space-y-10 bg-white">
              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-4">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">メンバー</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">メンバ�E</label>
                   <select className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none focus:border-slate-900 rounded-2xl transition-all" value={val.memberId} onChange={e=>setVal({...val, memberId: e.target.value})}>
                      <option value="">選択してください</option>
                      {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                   </select>
                 </div>
                 <div className="space-y-4">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">日付</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">日仁E/label>
                   <input type="date" className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none focus:border-slate-900 rounded-2xl transition-all" value={val.date} onChange={e=>setVal({...val, date: e.target.value})} />
                 </div>
              </div>
@@ -1443,9 +1459,9 @@ function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData =
              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
                   { label: '架電数', field: 'calls' },
-                  { label: '本人接続', field: 'picConnected' },
-                  { label: 'アポ獲得', field: 'appts' },
-                  { label: '資料請求', field: 'requests' },
+                  { label: '本人接綁E, field: 'picConnected' },
+                  { label: 'アポ獲征E, field: 'appts' },
+                  { label: '賁E�E��E�請汁E, field: 'requests' },
                 ].map(f => (
                   <div key={f.field} className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase">{f.label}</label>
@@ -1457,9 +1473,9 @@ function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData =
              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
                   { label: '受付拒否', field: 'receptionRefusal' },
-                  { label: '担当不在', field: 'picAbsent' },
-                  { label: '不在/他', field: 'noAnswer' },
-                  { label: '稼働時間', field: 'hours' },
+                  { label: '拁E�E��E�不在', field: 'picAbsent' },
+                  { label: '不在/仁E, field: 'noAnswer' },
+                  { label: '稼働時閁E, field: 'hours' },
                 ].map(f => (
                   <div key={f.field} className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase">{f.label}</label>
@@ -1473,7 +1489,7 @@ function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData =
                    {initialData ? '更新する' : '登録する'}
                 </button>
                 {initialData && (
-                  <button type="button" onClick={()=>{if(window.confirm('この実績を削除しますか？')) {onDelete(initialData.id); onClose();}}} className="w-full text-rose-500 font-bold py-2 hover:bg-rose-50 rounded-xl transition-all">削除する</button>
+                  <button type="button" onClick={()=>{if(window.confirm('こ�E実績を削除しますか�E�E�E�E)) {onDelete(initialData.id); onClose();}}} className="w-full text-rose-500 font-bold py-2 hover:bg-rose-50 rounded-xl transition-all">削除する</button>
                 )}
              </div>
           </form>
@@ -1576,8 +1592,8 @@ function App() {
     }), { appts: 0, calls: 0, requests: 0 });
 
     const sumGas = (list) => list.reduce((acc, r) => {
-       if (r.type === 'アポ獲得') acc.appts += 1;
-       if (r.type?.includes('資料請求')) acc.requests += 1;
+       if (r.type === 'アポ獲征E) acc.appts += 1;
+       if (r.type?.includes('賁E�E��E�請汁E)) acc.requests += 1;
        acc.calls += 1;
        return acc;
     }, { appts: 0, calls: 0, requests: 0 });
@@ -1631,8 +1647,8 @@ function App() {
       
       gasData.filter(d => d.memberId === m.spreadsheetName || d.memberId === m.name).forEach(d => {
         myTot.calls += 1;
-        if (d.type === 'アポ獲得') myTot.appts += 1;
-        if (d.type?.includes('資料請求')) myTot.requests += 1;
+        if (d.type === 'アポ獲征E) myTot.appts += 1;
+        if (d.type?.includes('賁E�E��E�請汁E)) myTot.requests += 1;
         if (d.type?.includes('不在') || d.type?.includes('拒否')) myTot.picAbsent += 1;
       });
 
@@ -1664,7 +1680,7 @@ function App() {
                </div>
                <div className="space-y-2">
                 <h1 className="text-4xl font-black tracking-tighter">KPI SYNC</h1>
-                <p className="text-slate-400 text-sm font-bold">業務効率を最大化する。ログインしてチームの目標を確認しましょう。</p>
+                <p className="text-slate-400 text-sm font-bold">業務効玁E�E��E�最大化する。ログインしてチE��Eムの目標を確認しましょぁE�E��E�E/p>
                </div>
             </div>
             <button onClick={handleLogin} className="w-full bg-slate-900 text-white py-5 font-black text-lg shadow-xl flex items-center justify-center gap-4 hover:shadow-2xl transition-all rounded-[2rem]">
@@ -1690,7 +1706,7 @@ function App() {
            <div className="flex items-center gap-4">
               <div className="text-right hidden md:block">
                  <div className="text-xs font-black">{user.displayName}</div>
-                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{userRole === 'admin' ? '管理者権限' : 'アポインター権限'}</div>
+                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{userRole === 'admin' ? '管琁E�E��E�E�E��E�陁E : 'アポインター権陁E}</div>
               </div>
               <button onClick={handleLogout} className="p-3 bg-white hover:bg-slate-50 text-slate-400 hover:text-slate-900 transition-all border border-slate-100 shadow-sm rounded-2xl">
                 <Icon p={I.LogOut} size={20} />
@@ -1729,6 +1745,8 @@ function App() {
             onAddEvent={addEvent} onDeleteEvent={deleteEvent}
             onUpdateGoals={updateEventGoals} onUpdateWeeklyGoals={updateEventWeeklyGoals}
             members={members} onAddMember={addMember} onDelMember={deleteMember} onUpdateMember={updateMember}
+            onUpdateGoal={handleUpdateGoal}
+            currentBaseDate={currentBaseDate}
             onClose={() => setActiveTab('dashboard')}
           />
         )}
@@ -1736,12 +1754,12 @@ function App() {
 
       {(activeTab === 'dashboard' || activeTab === 'analytics' || activeTab === 'shifts' || activeTab === 'attendance' || activeTab === 'gas' || activeTab === 'settings') && (
         <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t-2 border-slate-100 flex items-center justify-between no-print pt-2 pb-6 px-4">
-          <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={I.Grid} label="ダッシュボード" />
-          <NavButton active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} icon={I.PieChart} label="分析" />
+          <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={I.Grid} label="ダチE�E��E�ュボ�EチE />
+          <NavButton active={activeTab === 'analytics'} onClick={() => setActiveTab('analytics')} icon={I.PieChart} label="刁E�E��E�" />
           <NavButton active={activeTab === 'shifts'} onClick={() => setActiveTab('shifts')} icon={I.Calendar} label="シフト" />
           <NavButton active={activeTab === 'attendance'} onClick={() => setActiveTab('attendance')} icon={I.Clock} label="勤怠/実績" />
           <NavButton active={activeTab === 'gas'} onClick={() => setActiveTab('gas')} icon={I.Zap} label="GAS同期" />
-          <NavButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={I.Settings} label="設定" />
+          <NavButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={I.Settings} label="設宁E />
         </nav>
       )}
 
