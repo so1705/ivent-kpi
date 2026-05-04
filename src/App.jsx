@@ -375,8 +375,22 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
   const [viewMode, setViewMode] = useState('personal'); 
   const [editingGoal, setEditingGoal] = useState(null);
 
-  const currentMember = useMemo(() => members.find(m => m.email === currentUserEmail), [members, currentUserEmail]);
-  const myReports = useMemo(() => eventReports.filter(r => r.memberId === currentMember?.id && r.eventId === event.id), [eventReports, currentMember, event]);
+    const currentMember = useMemo(() => members.find(m => m.email === currentUserEmail), [members, currentUserEmail]);
+  
+  const myReports = useMemo(() => {
+    const reps = eventReports.filter(r => r.memberId === currentMember?.id && r.eventId === event.id).map(r => ({
+      ...r,
+      date: r.date?.toDate ? r.date.toDate() : new Date(r.date)
+    }));
+    const gas = (gasData || []).filter(d => d.memberId === currentMember?.spreadsheetName || d.memberId === currentMember?.name).map(d => ({
+      appts: d.type === 'アポ獲得' ? 1 : 0,
+      calls: 1,
+      picConnected: (d.type === 'アポ獲得' || d.type?.includes('資料請求') || d.type?.includes('接続')) ? 1 : 0,
+      date: d.timestamp?.toDate ? d.timestamp.toDate() : (d.timestamp?.seconds ? new Date(d.timestamp.seconds * 1000) : new Date(d.timestamp))
+    }));
+    return [...reps, ...gas].sort((a,b) => a.date - b.date);
+  }, [eventReports, currentMember, event, gasData]);
+
   const myTotals = useMemo(() => {
      return myReports.reduce((acc, r) => ({
         appts: acc.appts + (Number(r.appts) || 0),
@@ -466,7 +480,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                              <div className="w-1.5 h-4 bg-blue-600 rounded-full"></div> 直近の稼働状況
                            </h3>
                            <div className="bg-white border border-slate-100 p-10 rounded-[2.5rem] shadow-sm h-[350px]">
-                              <CustomChart data={myReports.slice(-7).map(r=>({ day: r.date.toDate ? r.date.toDate().getDate() : new Date(r.date).getDate(), value: r.appts }))} color="#2563eb" />
+                              <CustomChart data={myReports.slice(-7).map(r=>({ day: r.date.getDate(), value: r.appts }))} color="#2563eb" />
                            </div>
                         </div>
 
