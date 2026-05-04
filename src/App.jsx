@@ -412,8 +412,12 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
   }, [viewMode, personalPeriod, personalDate, eventReports, gasData, currentMember]);
 
   const activeWeeklyGoals = event.weeklyGoals?.[getMondayKey(currentBaseDate)] || event.goals?.weekly || {};
-  const activeIndivGoals = event.individualWeeklyGoals?.[getMondayKey(currentBaseDate)]?.[currentMember?.id] || activeWeeklyGoals;
-  const activeMonthlyGoal = event.individualMonthlyGoals?.[toLocalMonthString(new Date())]?.[currentMember?.id] || 50;
+  const indivWeekly = event.individualWeeklyGoals?.[getMondayKey(currentBaseDate)]?.[currentMember?.id] || activeWeeklyGoals;
+  const indivMonthly = event.individualMonthlyGoals?.[toLocalMonthString(new Date())]?.[currentMember?.id] || { appts: 50, calls: 500 };
+  
+  const activeIndivGoals = personalPeriod === '月次' ? indivMonthly : indivWeekly;
+  // Legacy support for monthly goals that were just numbers
+  const displayMonthlyGoalAppts = (typeof indivMonthly === 'object') ? (indivMonthly.appts || 0) : indivMonthly;
 
   return (
     <div className="space-y-12 pb-24 font-sans">
@@ -449,20 +453,34 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                 )}
              </div>
 
-             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                <div className="bg-white border-2 border-slate-900 p-8 rounded-[2.5rem] shadow-sm space-y-4">
-                   <div className="flex justify-between items-center">
-                      <div className="text-[10px] font-black text-slate-400 uppercase">目標達成率 ({personalPeriod})</div>
-                      <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><Icon p={I.Target} size={16}/></div>
-                   </div>
-                   <div className="text-5xl font-black text-slate-900 tracking-tighter">
-                      {((personalStats.totalAppts / (activeIndivGoals.appts || 1)) * 100).toFixed(0)}%
-                   </div>
-                   <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-600 transition-all duration-1000" style={{ width: `${Math.min(100, (personalStats.totalAppts / (activeIndivGoals.appts || 1)) * 100)}%` }}></div>
-                   </div>
-                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{personalStats.totalAppts} / {activeIndivGoals.appts} APPTS</div>
-                </div>
+             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
+                 <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm space-y-6">
+                    <div className="flex items-center justify-between">
+                       <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">アポ目標達成率 ({personalPeriod})</div>
+                       <Icon p={I.Target} size={18} color="#10b981"/>
+                    </div>
+                    <div className="flex items-end justify-between">
+                       <div className="text-4xl font-black text-slate-900 leading-none">{((personalStats.totalAppts / Math.max(1, activeIndivGoals.appts || 0)) * 100).toFixed(0)}%</div>
+                       <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{personalStats.totalAppts} / {activeIndivGoals.appts || 0} APPTS</div>
+                    </div>
+                    <div className="h-2 bg-slate-50 rounded-full overflow-hidden">
+                       <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${Math.min(100, (personalStats.totalAppts / Math.max(1, activeIndivGoals.appts || 0)) * 100)}%` }}></div>
+                    </div>
+                 </div>
+
+                 <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm space-y-6">
+                    <div className="flex items-center justify-between">
+                       <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">架電目標達成率 ({personalPeriod})</div>
+                       <Icon p={I.Phone} size={18} color="#0ea5e9"/>
+                    </div>
+                    <div className="flex items-end justify-between">
+                       <div className="text-4xl font-black text-slate-900 leading-none">{((personalStats.totalCalls / Math.max(1, activeIndivGoals.calls || 0)) * 100).toFixed(0)}%</div>
+                       <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{personalStats.totalCalls} / {activeIndivGoals.calls || 0} CALLS</div>
+                    </div>
+                    <div className="h-2 bg-slate-50 rounded-full overflow-hidden">
+                       <div className="h-full bg-sky-500 transition-all duration-1000" style={{ width: `${Math.min(100, (personalStats.totalCalls / Math.max(1, activeIndivGoals.calls || 0)) * 100)}%` }}></div>
+                    </div>
+                 </div>
 
                 <div className="bg-slate-900 text-white p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden flex flex-col justify-between">
                    <div className="absolute top-0 right-0 p-4 opacity-10"><Icon p={I.Trophy} size={100} /></div>
@@ -481,12 +499,6 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">稼働効率 (CPH)</div>
                    <div className="text-5xl font-black text-slate-900 tabular-nums">{personalStats.cph}</div>
                    <div className="text-[10px] text-slate-400 font-bold leading-tight">架電数 / 稼働時間</div>
-                </div>
-
-                <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm space-y-4">
-                   <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">予定稼働時間</div>
-                   <div className="text-5xl font-black text-slate-900 tabular-nums">{memberStats.find(m=>m.email===currentUserEmail)?.scheduledHours || 0}<span className="text-sm ml-2 opacity-30 uppercase font-black tracking-widest">H</span></div>
-                   <div className="text-[10px] text-slate-400 font-bold leading-tight">今週のシフト合計</div>
                 </div>
              </div>
 
@@ -774,11 +786,15 @@ const AttendanceView = ({ members, reports, onEdit }) => {
             <h2 className="text-xl font-bold flex items-center gap-3">稼働・人件費統計</h2>
             <input type="month" className="bg-white border border-slate-300 p-2 font-bold text-sm outline-none rounded-xl" value={selectedMonth} onChange={e=>setSelectedMonth(e.target.value)} />
           </div>
-          <div className="flex gap-2 flex-wrap">
-            <button onClick={()=>setSelectedMemberId('all')} className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${selectedMemberId==='all'?'bg-slate-900 text-white border-slate-900':'bg-white text-slate-500 border-slate-200'}`}>全員</button>
-            {members.map(m => (
-              <button key={m.id} onClick={()=>setSelectedMemberId(m.id)} className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${selectedMemberId===m.id?'bg-blue-600 text-white border-blue-600':'bg-white text-slate-500 border-slate-200'}`}>{m.name}</button>
-            ))}
+          <div className="flex items-center gap-3">
+            <select 
+              className="flex-1 md:flex-none bg-white border border-slate-300 p-2 px-4 font-bold text-xs outline-none rounded-xl shadow-sm"
+              value={selectedMemberId}
+              onChange={e => setSelectedMemberId(e.target.value)}
+            >
+              <option value="all">全員の統計を表示</option>
+              {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
           </div>
        </div>
 
@@ -1426,31 +1442,50 @@ const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, 
        </div>
 
        {/* Personal Goal Section - Everyone */}
-       <div className="p-10 bg-white border border-slate-100 rounded-[3rem] shadow-sm space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+       <div className="p-6 md:p-10 bg-white border border-slate-100 rounded-[2rem] md:rounded-[3rem] shadow-sm space-y-8 md:space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <h3 className="text-xl font-black flex items-center gap-4"><div className="w-1.5 h-6 bg-blue-600 rounded-full"></div> 個人目標の設定</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-             <div className="space-y-4">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">今週のアポ目標 (Weekly)</label>
-                <div className="flex gap-3">
-                   <input type="number" id="p-weekly-goal" className="flex-1 p-5 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] font-black text-2xl outline-none focus:border-blue-600 transition-all" defaultValue={myWeeklyGoal} />
-                   <button onClick={() => {
-                      const val = Number(document.getElementById('p-weekly-goal').value);
-                      onUpdateGoal(mon, me.id, { appts: val }, 'weekly');
-                      alert("週間目標を更新しました");
-                   }} className="px-10 bg-blue-600 text-white font-black rounded-[1.5rem] shadow-xl hover:bg-blue-700 active:scale-95 transition-all">保存</button>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-10">
+             {/* Weekly */}
+             <div className="space-y-6 p-6 bg-slate-50/50 rounded-3xl border border-slate-100">
+                <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest block">週間目標 (Weekly Targets)</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                   <div className="space-y-2">
+                      <span className="text-[10px] font-bold text-slate-400">アポ数</span>
+                      <input type="number" id="pw-appts" className="w-full p-4 bg-white border-2 border-slate-100 rounded-2xl font-black text-xl outline-none focus:border-blue-600 transition-all" defaultValue={myIndivWeeklyGoal.appts || 0} />
+                   </div>
+                   <div className="space-y-2">
+                      <span className="text-[10px] font-bold text-slate-400">架電数</span>
+                      <input type="number" id="pw-calls" className="w-full p-4 bg-white border-2 border-slate-100 rounded-2xl font-black text-xl outline-none focus:border-blue-600 transition-all" defaultValue={myIndivWeeklyGoal.calls || 0} />
+                   </div>
                 </div>
+                <button onClick={() => {
+                   const appts = Number(document.getElementById('pw-appts').value);
+                   const calls = Number(document.getElementById('pw-calls').value);
+                   onUpdateGoal(mon, me.id, { appts, calls }, 'weekly');
+                   alert("週間個人目標を更新しました");
+                }} className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl shadow-lg hover:bg-blue-700 active:scale-95 transition-all">週間目標を保存</button>
              </div>
-             <div className="space-y-4">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">今月の総アポ目標 (Monthly)</label>
-                <div className="flex gap-3">
-                   <input type="number" id="p-monthly-goal" className="flex-1 p-5 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] font-black text-2xl outline-none focus:border-emerald-600 transition-all" defaultValue={myMonthlyGoal} />
-                   <button onClick={() => {
-                      const val = Number(document.getElementById('p-monthly-goal').value);
-                      onUpdateGoal(mKey, me.id, val, 'monthly');
-                      alert("月間目標を更新しました");
-                   }} className="px-10 bg-emerald-600 text-white font-black rounded-[1.5rem] shadow-xl hover:bg-emerald-700 active:scale-95 transition-all">保存</button>
+
+             {/* Monthly */}
+             <div className="space-y-6 p-6 bg-slate-50/50 rounded-3xl border border-slate-100">
+                <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block">月間目標 (Monthly Targets)</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                   <div className="space-y-2">
+                      <span className="text-[10px] font-bold text-slate-400">アポ数</span>
+                      <input type="number" id="pm-appts" className="w-full p-4 bg-white border-2 border-slate-100 rounded-2xl font-black text-xl outline-none focus:border-emerald-600 transition-all" defaultValue={typeof myIndivMonthlyGoal === 'object' ? myIndivMonthlyGoal.appts : myIndivMonthlyGoal} />
+                   </div>
+                   <div className="space-y-2">
+                      <span className="text-[10px] font-bold text-slate-400">架電数</span>
+                      <input type="number" id="pm-calls" className="w-full p-4 bg-white border-2 border-slate-100 rounded-2xl font-black text-xl outline-none focus:border-emerald-600 transition-all" defaultValue={myIndivMonthlyGoal.calls || 0} />
+                   </div>
                 </div>
-             </div> 
+                <button onClick={() => {
+                   const appts = Number(document.getElementById('pm-appts').value);
+                   const calls = Number(document.getElementById('pm-calls').value);
+                   onUpdateGoal(mKey, me.id, { appts, calls }, 'monthly');
+                   alert("月間個人目標を更新しました");
+                }} className="w-full py-4 bg-emerald-600 text-white font-black rounded-2xl shadow-lg hover:bg-emerald-700 active:scale-95 transition-all">月間目標を保存</button>
+             </div>
           </div>
        </div>
 
