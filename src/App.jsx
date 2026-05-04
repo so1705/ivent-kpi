@@ -927,29 +927,42 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
   return (
     <div className="space-y-6 pb-24 font-sans">
        <div className="flex flex-col gap-4 border-b-2 border-slate-900 pb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <h2 className="text-xl font-bold">シフト管理・人員配置</h2>
-              {userRole === 'admin' && (
-                <button 
-                  onClick={() => setBulkMode(!bulkMode)}
-                  className={`px-4 py-2 text-[10px] font-black rounded-full transition-all flex items-center gap-2 ${bulkMode ? 'bg-rose-500 text-white shadow-lg' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                >
-                  {bulkMode ? <><Icon p={I.X} size={14}/> モード解除</> : <><Icon p={I.Zap} size={14}/> 一斉入力モード</>}
-                </button>
-              )}
-            </div>
-            {!bulkMode && (
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-8">
               <div className="flex items-center gap-4">
-                <select 
-                  className="bg-white border border-slate-300 p-2 px-4 font-bold text-[10px] outline-none rounded-xl shadow-sm"
-                  value={selectedMemberId}
-                  onChange={e => setSelectedMemberId(e.target.value)}
-                >
-                  <option value="all">全員のシフトを表示</option>
-                  {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                </select>
-                <div className="flex bg-slate-200 p-1 rounded-full">
+                <h2 className="text-xl font-bold">シフト管理・人員配置</h2>
+                <div className="hidden md:block">
+                  {userRole === 'admin' && (
+                    <button 
+                      onClick={() => setBulkMode(!bulkMode)}
+                      className={`px-4 py-2 text-[10px] font-black rounded-full transition-all flex items-center gap-2 ${bulkMode ? 'bg-rose-500 text-white shadow-lg' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                    >
+                      {bulkMode ? <><Icon p={I.X} size={14}/> モード解除</> : <><Icon p={I.Zap} size={14}/> 一斉入力モード</>}
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              {!bulkMode && (
+                <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+                  <div className="md:hidden">
+                    {userRole === 'admin' && (
+                      <button 
+                        onClick={() => setBulkMode(!bulkMode)}
+                        className={`px-4 py-2 text-[10px] font-black rounded-full transition-all flex items-center gap-2 ${bulkMode ? 'bg-rose-500 text-white shadow-lg' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                      >
+                        {bulkMode ? <Icon p={I.X} size={14}/> : <Icon p={I.Zap} size={14}/>} {bulkMode ? '解除' : '一斉入力'}
+                      </button>
+                    )}
+                  </div>
+                  <select 
+                    className="flex-1 md:flex-none bg-white border border-slate-300 p-2 px-3 font-bold text-[10px] outline-none rounded-xl shadow-sm"
+                    value={selectedMemberId}
+                    onChange={e => setSelectedMemberId(e.target.value)}
+                  >
+                    <option value="all">全員を表示</option>
+                    {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                  <div className="flex bg-slate-200 p-1 rounded-full shrink-0">
                  <button onClick={()=>setViewMode('day')} className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode==='day'?'bg-slate-900 text-white':'text-slate-500'}`}>日別</button>
                  <button onClick={()=>setViewMode('week')} className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode==='week'?'bg-slate-900 text-white':'text-slate-500'}`}>週別</button>
                  <button onClick={()=>setViewMode('month')} className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode==='month'?'bg-slate-900 text-white':'text-slate-500'}`}>月間</button>
@@ -1277,7 +1290,8 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole }) => {
       if (periodMode === 'daily') key = toLocalDateString(dateObj).slice(-5);
       else if (periodMode === 'weekly') {
         const mon = getMondayKey(dateObj);
-        key = mon.slice(5).replace('-', '/');
+        const md = mon.slice(5).replace('-', '/');
+        key = md + '週';
       } else if (periodMode === 'monthly') {
         key = `${dateObj.getMonth()+1}月`;
       } else {
