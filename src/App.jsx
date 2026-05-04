@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, onAuthStateChanged, 
@@ -279,7 +279,11 @@ const CustomChart = ({ data, color, type = 'area' }) => {
   
   const max = Math.max(...safeData.map(d => d.value), 1); 
   const len = Math.max(safeData.length - 1, 1);
-  const points = safeData.map((d, i) => `${(i / len) * 100},${100 - (d.value / max) * 100}`).join(' ');
+  const points = safeData.map((d, i) => {
+    const x = (i / len) * 100;
+    const y = 100 - (Math.max(0, d.value) / max) * 100;
+    return `${isNaN(x)?0:x},${isNaN(y)?100:y}`;
+  }).join(' ');
   const areaPoints = `${points} 100,100 0,100`;
 
   return (
@@ -409,7 +413,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
     <div className="space-y-12 pb-24 font-sans">
        <div className="flex flex-col md:flex-row md:items-end justify-between gap-10 border-b border-slate-100 pb-10">
           <div className="space-y-3">
-             <h2 className="text-4xl font-black text-slate-900 tracking-tighter">{event.name}</h2>
+             <h2 className="text-4xl font-black text-slate-900 tracking-tighter">{event?.name || '案件未選択'}</h2>
              <div className="flex items-center gap-4 text-xs font-bold text-slate-400">
                 <span className="flex items-center gap-2"><div className="w-2 h-2 bg-emerald-500 rounded-full"></div> 正常稼働中</span>
                 <span className="w-px h-3 bg-slate-200"></span>
@@ -553,7 +557,8 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                 </div>
              </div>
           </div>
-                 <div className="space-y-12">
+        ) : (
+           <div className="space-y-12">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                        <div className="space-y-6">
                           <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
@@ -1173,7 +1178,7 @@ const MetricHelpModal = ({ onClose }) => (
   </div>
 );
 
-const AnalyticsView = ({ members, reports, event, userRole }) => {
+const AnalyticsView = ({ members, reports, gasData, event, userRole }) => {
   const [selectedMid, setSelectedMid] = useState('all');
   const [chartType, setChartType] = useState('line');
   const [chartMetric, setChartMetric] = useState('appts');
@@ -1237,7 +1242,8 @@ const AnalyticsView = ({ members, reports, event, userRole }) => {
       } else {
         key = `${dateObj.getFullYear()}年`;
       }
-      map[key] = (map[key] || 0) + (Number(r[chartMetric]) || 0);
+       const val = Number(r[chartMetric]);
+       map[key] = (map[key] || 0) + (isNaN(val) ? 0 : val);
     });
     return Object.entries(map).map(([day, value]) => ({ day, value })).sort((a,b)=>a.day.localeCompare(b.day));
   }, [combinedData, chartMetric, periodMode]);
