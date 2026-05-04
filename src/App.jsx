@@ -1388,8 +1388,8 @@ const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, 
     return events.find(e => e.id === currentEventId) || null;
   }, [events, currentEventId]);
 
-  const myWeeklyGoal = currentEvent?.individualWeeklyGoals?.[mon]?.[me?.id]?.appts || 0;
-  const myMonthlyGoal = currentEvent?.individualMonthlyGoals?.[mKey]?.[me?.id] || 0;
+  const myIndivWeeklyGoal = currentEvent?.individualWeeklyGoals?.[mon]?.[me?.id] || { appts: 0, calls: 0 };
+  const myIndivMonthlyGoal = currentEvent?.individualMonthlyGoals?.[mKey]?.[me?.id] || { appts: 0, calls: 0 };
 
   const activeWeeklyGoals = useMemo(() => {
     if (!currentEvent || !currentBaseDate) return { appts: 0 };
