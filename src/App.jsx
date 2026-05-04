@@ -456,7 +456,10 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
                  <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm space-y-6">
                     <div className="flex items-center justify-between">
-                       <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">アポ目標達成率 ({personalPeriod})</div>
+                       <div className="flex items-center gap-1">
+                          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">アポ目標達成率 ({personalPeriod})</div>
+                          <button onClick={()=>alert(METRIC_HELP.達成率)} className="text-slate-300 hover:text-blue-500 transition-colors"><Icon p={I.Help} size={12}/></button>
+                       </div>
                        <Icon p={I.Target} size={18} color="#10b981"/>
                     </div>
                     <div className="flex items-end justify-between">
@@ -470,7 +473,10 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
 
                  <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm space-y-6">
                     <div className="flex items-center justify-between">
-                       <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">架電目標達成率 ({personalPeriod})</div>
+                       <div className="flex items-center gap-1">
+                          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">架電目標達成率 ({personalPeriod})</div>
+                          <button onClick={()=>alert("現在の獲得架電数 / 設定した目標架電数")} className="text-slate-300 hover:text-blue-500 transition-colors"><Icon p={I.Help} size={12}/></button>
+                       </div>
                        <Icon p={I.Phone} size={18} color="#0ea5e9"/>
                     </div>
                     <div className="flex items-end justify-between">
@@ -496,7 +502,10 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                 </div>
 
                 <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm space-y-4">
-                   <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">稼働効率 (CPH)</div>
+                   <div className="flex items-center gap-1">
+                       <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">稼働効率 (CPH)</div>
+                       <button onClick={()=>alert("1時間あたりの架電数。稼働効率を示す指標。高いほど効率的です。")} className="text-slate-300 hover:text-blue-500 transition-colors"><Icon p={I.Help} size={12}/></button>
+                    </div>
                    <div className="text-5xl font-black text-slate-900 tabular-nums">{personalStats.cph}</div>
                    <div className="text-[10px] text-slate-400 font-bold leading-tight">架電数 / 稼働時間</div>
                 </div>
@@ -630,7 +639,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                                          <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg font-black tabular-nums">{m.cph} <span className="text-[8px]">c/h</span></span>
                                       </td>
                                       <td className="p-6 text-right">
-                                         <div className="inline-flex p-2 bg-slate-50 rounded-xl text-slate-200 group-hover:bg-blue-600 group-hover:text-white transition-colors"><Icon p={I.ChevronRight} size={16}/></div>
+                                         <div className="inline-flex p-2 bg-blue-600 rounded-xl text-white shadow-sm hover:bg-blue-700 transition-colors"><Icon p={I.ChevronRight} size={16}/></div>
                                       </td>
                                    </tr>
                                 ))}
@@ -2003,13 +2012,38 @@ function App() {
   const addEvent = async (n) => await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'events'), { name: n, goals: defaultGoals, weeklyGoals: {}, createdAt: Timestamp.now() });
   const deleteEvent = async (id) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', id));
   
-  const handleUpdateGoal = (key, memberId, goal, type = 'weekly') => {
-    if (!currentEventId) return;
-    const field = type === 'weekly' ? `individualWeeklyGoals.${key}.${memberId}` : `individualMonthlyGoals.${key}.${memberId}`;
-    if (memberId) {
-      updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', currentEventId), { [field]: goal });
-    } else {
-      updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', currentEventId), { [`weeklyGoals.${key}`]: goal });
+  const handleUpdateGoal = async (key, memberId, goal, type = 'weekly') => {
+    if (!currentEventId || !key) return;
+    const coll = type === 'weekly' ? 'individualWeeklyGoals' : 'individualMonthlyGoals';
+    const field = `${coll}.${key}.${memberId}`;
+    
+    try {
+      if (memberId) {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', currentEventId), { [field]: goal });
+      } else {
+        const globalField = type === 'weekly' ? `weeklyGoals.${key}` : `goals.monthly`;
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', currentEventId), { [globalField]: goal });
+      }
+    } catch (e) {
+      console.error("Goal update failed:", e);
+      const eventDoc = events.find(e => e.id === currentEventId);
+      if (eventDoc) {
+        const newDoc = { ...eventDoc };
+        if (!newDoc[coll]) newDoc[coll] = {};
+        if (!newDoc[coll][key]) newDoc[coll][key] = {};
+        if (memberId) {
+          newDoc[coll][key][memberId] = goal;
+        } else {
+          if (type === 'weekly') {
+            if (!newDoc.weeklyGoals) newDoc.weeklyGoals = {};
+            newDoc.weeklyGoals[key] = goal;
+          } else {
+            if (!newDoc.goals) newDoc.goals = {};
+            newDoc.goals.monthly = goal;
+          }
+        }
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', currentEventId), newDoc);
+      }
     }
   };
   
