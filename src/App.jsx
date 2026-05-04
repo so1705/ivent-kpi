@@ -15,7 +15,7 @@ import {
 const appId = 'tele-apo-manager-v42-date-nav';
 const ADMIN_EMAIL = 'sotaro50017@gmail.com'; 
 
-// 鬨ｾ・ｲ隰千､ｼ諞ｾ雎補・竊楢｢諛環ｧ邵ｺ貅ｯ迚｡陋ｻ・､陞ｳ繝ｻ
+// Helper: Color coding based on targets
 const getStatusColor = (val, tgt) => {
   if (!tgt || tgt === 0) return 'text-slate-900';
   return val >= tgt ? 'text-emerald-700' : 'text-rose-600';
@@ -81,6 +81,11 @@ const toLocalMonthString = (date) => {
   return `${year}-${month}`;
 };
 
+const parseTime = (t) => {
+  if (!t || typeof t !== "string" || !t.includes(":")) return [0, 0];
+  return t.split(":").map(Number);
+};
+
 const getMondayKey = (dateObj) => {
   const d = new Date(dateObj);
   const day = d.getDay();
@@ -91,7 +96,7 @@ const getMondayKey = (dateObj) => {
 };
 
 // ==========================================
-// 2. 郢ｧ・｢郢ｧ・､郢ｧ・ｳ郢晢ｽｳ郢昴・繝ｻ郢ｧ・ｿ (Data)
+// 2. Icons & Shared UI Data
 // ==========================================
 const I = {
   Target: <><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></>,
@@ -137,7 +142,7 @@ const BREAKDOWN_LABELS = {
 };
 
 // ==========================================
-// 3. UI鬩幢ｽｨ陷ｩ竏壹＆郢晢ｽｳ郢晄亢繝ｻ郢晞亂ﾎｦ郢昴・(Atomic Components)
+// 3. UI Components (Atomic Components)
 // ==========================================
 const Icon = ({ p, size=24, color="currentColor", className="", strokeWidth=1.5 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="square" strokeLinejoin="square" className={className}>
@@ -708,7 +713,7 @@ const AttendanceView = ({ members, reports, onEdit }) => {
                 <div className="flex items-center gap-3">
                     <div className="w-9 h-9 bg-slate-900 text-white flex items-center justify-center font-bold text-xs rounded-full">{m?.name?.slice(0,1)}</div>
                     <div className="flex flex-col">
-                        <span className="text-[9px] font-bold text-slate-400">{toLocalDateString(r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000))}</span>
+                        <span className="text-[9px] font-bold text-slate-400">{r.date ? toLocalDateString(r.date.toDate ? r.date.toDate() : (r.date.seconds ? new Date(r.date.seconds * 1000) : new Date(r.date))) : "---"}</span>
                         <span className="font-bold text-slate-800 text-sm">{m?.name || '不明'}</span>
                     </div>
                 </div>
@@ -1105,7 +1110,7 @@ const AnalyticsView = ({ members, reports, event, userRole }) => {
     const map = {};
     fReports.forEach(r => {
       if (!r.date) return;
-      const dateObj = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
+      if (!r.date) return; const dateObj = r.date.toDate ? r.date.toDate() : (r.date.seconds ? new Date(r.date.seconds * 1000) : new Date(r.date));
       let key = '';
       if (periodMode === 'daily') key = toLocalDateString(dateObj).slice(-5);
       else if (periodMode === 'weekly') {
@@ -1578,12 +1583,12 @@ function App() {
     }, { appts: 0, calls: 0, requests: 0 });
 
     const wD = reports.filter(r => {
-      const d = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
+      if (!r.date) return false; const d = r.date.toDate ? r.date.toDate() : (r.date.seconds ? new Date(r.date.seconds * 1000) : new Date(r.date));
       return r.eventId === currentEventId && d >= wr.start && d <= wr.end;
     });
     const s = sum(wD);
     const gWs = sumGas(gasData.filter(d => {
-       const dt = d.timestamp?.toDate ? d.timestamp.toDate() : new Date(d.timestamp?.seconds * 1000);
+       if (!d.timestamp) return false; const dt = d.timestamp.toDate ? d.timestamp.toDate() : (d.timestamp.seconds ? new Date(d.timestamp.seconds * 1000) : new Date(d.timestamp));
        return dt >= wr.start && dt <= wr.end;
     }));
     s.appts += gWs.appts; s.calls += gWs.calls; s.requests += gWs.requests;
@@ -1598,8 +1603,8 @@ function App() {
       return d >= wr.start && d <= wr.end;
     });
     const totalScheduledHours = weekShifts.reduce((acc, sh) => {
-      const [h1, m1] = sh.startTime.split(':').map(Number);
-      const [h2, m2] = sh.endTime.split(':').map(Number);
+      if (!sh.startTime || typeof sh.startTime !== "string") return acc; const [h1, m1] = sh.startTime.split(":").map(Number);
+      if (!sh.endTime || typeof sh.endTime !== "string") return acc; const [h2, m2] = sh.endTime.split(":").map(Number);
       return acc + (h2 + m2/60) - (h1 + m1/60);
     }, 0);
 
@@ -1637,8 +1642,8 @@ function App() {
         return sh.memberId === m.id && d >= wr.start && d <= wr.end;
       });
       const scheduledHours = myWeekShifts.reduce((acc, sh) => {
-        const [h1, m1] = sh.startTime.split(':').map(Number);
-        const [h2, m2] = sh.endTime.split(':').map(Number);
+        if (!sh.startTime || typeof sh.startTime !== "string") return acc; const [h1, m1] = sh.startTime.split(":").map(Number);
+        if (!sh.endTime || typeof sh.endTime !== "string") return acc; const [h2, m2] = sh.endTime.split(":").map(Number);
         return acc + (h2 + m2/60) - (h1 + m1/60);
       }, 0);
 
