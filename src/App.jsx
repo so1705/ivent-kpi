@@ -1481,10 +1481,11 @@ const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, 
                       <input type="number" id="pw-calls" className="w-full p-4 bg-white border-2 border-slate-100 rounded-2xl font-black text-xl outline-none focus:border-blue-600 transition-all" defaultValue={myIndivWeeklyGoal.calls || 0} />
                    </div>
                 </div>
-                <button onClick={() => {
+                <button onClick={async () => {
+                   if (!me?.id) return alert("スタッフ情報が見つかりません。スタッフ登録を確認してください。");
                    const appts = Number(document.getElementById('pw-appts').value);
                    const calls = Number(document.getElementById('pw-calls').value);
-                   onUpdateGoal(mon, me.id, { appts, calls }, 'weekly');
+                   await onUpdateGoal(mon, me.id, { appts, calls }, 'weekly');
                    alert("週間個人目標を更新しました");
                 }} className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl shadow-lg hover:bg-blue-700 active:scale-95 transition-all">週間目標を保存</button>
              </div>
@@ -1502,10 +1503,11 @@ const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, 
                       <input type="number" id="pm-calls" className="w-full p-4 bg-white border-2 border-slate-100 rounded-2xl font-black text-xl outline-none focus:border-emerald-600 transition-all" defaultValue={myIndivMonthlyGoal.calls || 0} />
                    </div>
                 </div>
-                <button onClick={() => {
+                <button onClick={async () => {
+                   if (!me?.id) return alert("スタッフ情報が見つかりません。スタッフ登録を確認してください。");
                    const appts = Number(document.getElementById('pm-appts').value);
                    const calls = Number(document.getElementById('pm-calls').value);
-                   onUpdateGoal(mKey, me.id, { appts, calls }, 'monthly');
+                   await onUpdateGoal(mKey, me.id, { appts, calls }, 'monthly');
                    alert("月間個人目標を更新しました");
                 }} className="w-full py-4 bg-emerald-600 text-white font-black rounded-2xl shadow-lg hover:bg-emerald-700 active:scale-95 transition-all">月間目標を保存</button>
              </div>
