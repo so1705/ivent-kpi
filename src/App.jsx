@@ -382,10 +382,10 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
       ...r,
       date: r.date?.toDate ? r.date.toDate() : new Date(r.date)
     }));
-    const gas = (gasData || []).filter(d => d.memberId === currentMember?.spreadsheetName || d.memberId === currentMember?.name).map(d => ({
-      appts: d.type === 'アポ獲得' ? 1 : 0,
+        const gas = (gasData || []).filter(d => d.memberId === currentMember?.spreadsheetName || d.memberId === currentMember?.name).map(d => ({
+      appts: d.type === 'アポ確定' ? 1 : 0,
       calls: 1,
-      picConnected: (d.type === 'アポ獲得' || d.type?.includes('資料請求') || d.type?.includes('接続')) ? 1 : 0,
+      picConnected: (d.type === 'アポ確定' || d.type?.startsWith('資料送付予定') || d.type === '担当者不在' || d.type === '折り返し' || d.type?.startsWith('再架電')) ? 1 : 0,
       date: d.timestamp?.toDate ? d.timestamp.toDate() : (d.timestamp?.seconds ? new Date(d.timestamp.seconds * 1000) : new Date(d.timestamp))
     }));
     return [...reps, ...gas].sort((a,b) => a.date - b.date);
@@ -1131,17 +1131,17 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole }) => {
     }));
 
     // GAS Data mapped to report format
-    const gasList = (gasData || []).map(d => {
+        const gasList = (gasData || []).map(d => {
       const dt = d.timestamp?.toDate ? d.timestamp.toDate() : (d.timestamp?.seconds ? new Date(d.timestamp.seconds * 1000) : new Date(d.timestamp));
       const m = members.find(mem => mem.spreadsheetName === d.memberId || mem.name === d.memberId);
       return {
         memberId: m?.id || d.memberId,
         date: dt,
-        appts: d.type === 'アポ獲得' ? 1 : 0,
-        requests: d.type?.includes('資料請求') ? 1 : 0,
+        appts: d.type === 'アポ確定' ? 1 : 0,
+        requests: d.type?.startsWith('資料送付予定') ? 1 : 0,
         calls: 1,
-        picConnected: (d.type === 'アポ獲得' || d.type?.includes('資料請求') || d.type?.includes('接続')) ? 1 : 0,
-        hours: 0 // GAS doesn't usually have hours
+        picConnected: (d.type === 'アポ確定' || d.type?.startsWith('資料送付予定') || d.type === '担当者不在' || d.type === '折り返し' || d.type?.startsWith('再架電')) ? 1 : 0,
+        hours: 0
       };
     });
 
@@ -1568,7 +1568,7 @@ function App() {
     const unsubShifts = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'shifts'), (snap) => {
       setShifts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-    const unsubGas = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'gas_sync'), (snap) => {
+    const unsubGas = onSnapshot(collection(db, 'kpi_sync'), (snap) => {
       setGasData(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b)=>b.timestamp?.seconds - a.timestamp?.seconds));
     });
     return () => { unsubEvents(); unsubMembers(); unsubReports(); unsubShifts(); unsubGas(); };
@@ -1615,14 +1615,16 @@ function App() {
       picConnected: acc.picConnected + (Number(r.picConnected)||0),
     }), { appts: 0, calls: 0, requests: 0, picConnected: 0 });
 
-    const sumGas = (list) => list.reduce((acc, r) => {
-       acc.calls += 1;
-       const t = r.type || "";
-       if (t === 'アポ獲得') { acc.appts += 1; acc.picConnected += 1; }
-       else if (t.includes('資料請求')) { acc.requests += 1; acc.picConnected += 1; }
-       else if (t.includes('接続') || t.includes('通話')) { acc.picConnected += 1; }
-       return acc;
-    }, { appts: 0, calls: 0, requests: 0, picConnected: 0 });
+        const sumGas = (arr) => arr.reduce((acc, d) => {
+      acc.calls += 1;
+      if (d.type === 'アポ確定') { acc.appts += 1; acc.picConnected += 1; }
+      else if (d.type?.startsWith('資料送付予定')) { acc.requests += 1; acc.picConnected += 1; }
+      else if (d.type === '担当者不在' || d.type === '折り返し' || d.type?.startsWith('再架電') || d.type === '営業時間外') { acc.picAbsent += 1; acc.picConnected += 1; }
+      else if (d.type === '受付拒否') { acc.receptionRefusal += 1; }
+      else if (d.type === '担当者拒否') { /* out of target usually not in simple totals */ }
+      else if (d.type === '本人接続' || d.type?.includes('接続') || d.type?.includes('通話')) { acc.picConnected += 1; }
+      return acc;
+    }, { appts: 0, calls: 0, requests: 0, picConnected: 0, picAbsent: 0, receptionRefusal: 0 });
 
     const wD = reports.filter(r => {
       if (!r.date) return false; 
@@ -1676,15 +1678,14 @@ function App() {
         picAbsent: acc.picAbsent + (Number(r.picAbsent)||0),
       }), { appts: 0, calls: 0, requests: 0, hours: 0, picConnected: 0, noAnswer: 0, receptionRefusal: 0, picAbsent: 0 });
       
-      gasData.filter(d => d.memberId === m.spreadsheetName || d.memberId === m.name).forEach(d => {
+            gasData.filter(d => d.memberId === m.spreadsheetName || d.memberId === m.name).forEach(d => {
         myTot.calls += 1;
-        const t = d.type || "";
-        if (t === 'アポ獲得') { myTot.appts += 1; myTot.picConnected += 1; }
-        else if (t.includes('資料請求')) { myTot.requests += 1; myTot.picConnected += 1; }
-        else if (t.includes('接続') || t.includes('通話')) { myTot.picConnected += 1; }
-        else if (t.includes('受付拒否') || t.includes('拒否')) { myTot.receptionRefusal += 1; }
-        else if (t.includes('不在') || t.includes('担当者不在')) { myTot.picAbsent += 1; }
-        else { myTot.noAnswer += 1; }
+        if (d.type === 'アポ確定') { myTot.appts += 1; myTot.picConnected += 1; }
+        else if (d.type?.startsWith('資料送付予定')) { myTot.requests += 1; myTot.picConnected += 1; }
+        else if (d.type === '担当者不在' || d.type === '折り返し' || d.type?.startsWith('再架電') || d.type === '営業時間外') { myTot.picAbsent += 1; myTot.picConnected += 1; }
+        else if (d.type === '受付拒否') { myTot.receptionRefusal += 1; }
+        else if (d.type === '担当者拒否') { myTot.picAbsent += 1; /* mapping as absent/lost */ }
+        else { myTot.picConnected += 1; }
       });
 
       const cph = myTot.hours > 0 ? (myTot.calls / myTot.hours).toFixed(1) : "0.0";
