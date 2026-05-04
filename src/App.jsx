@@ -2014,36 +2014,29 @@ function App() {
   
   const handleUpdateGoal = async (key, memberId, goal, type = 'weekly') => {
     if (!currentEventId || !key) return;
+    const eventRef = doc(db, 'artifacts', appId, 'public', 'data', 'events', currentEventId);
     const coll = type === 'weekly' ? 'individualWeeklyGoals' : 'individualMonthlyGoals';
-    const field = `${coll}.${key}.${memberId}`;
     
     try {
       if (memberId) {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', currentEventId), { [field]: goal });
+        // 使用 setDoc + merge: true することで、階層構造を自動で作成しながらマージ
+        await setDoc(eventRef, {
+          [coll]: {
+            [key]: {
+              [memberId]: goal
+            }
+          }
+        }, { merge: true });
       } else {
-        const globalField = type === 'weekly' ? `weeklyGoals.${key}` : `goals.monthly`;
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', currentEventId), { [globalField]: goal });
+        if (type === 'weekly') {
+          await setDoc(eventRef, { weeklyGoals: { [key]: goal } }, { merge: true });
+        } else {
+          await setDoc(eventRef, { goals: { monthly: goal } }, { merge: true });
+        }
       }
     } catch (e) {
       console.error("Goal update failed:", e);
-      const eventDoc = events.find(e => e.id === currentEventId);
-      if (eventDoc) {
-        const newDoc = { ...eventDoc };
-        if (!newDoc[coll]) newDoc[coll] = {};
-        if (!newDoc[coll][key]) newDoc[coll][key] = {};
-        if (memberId) {
-          newDoc[coll][key][memberId] = goal;
-        } else {
-          if (type === 'weekly') {
-            if (!newDoc.weeklyGoals) newDoc.weeklyGoals = {};
-            newDoc.weeklyGoals[key] = goal;
-          } else {
-            if (!newDoc.goals) newDoc.goals = {};
-            newDoc.goals.monthly = goal;
-          }
-        }
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', currentEventId), newDoc);
-      }
+      alert("目標の保存に失敗しました。ネットワーク状況を確認してください。");
     }
   };
   
