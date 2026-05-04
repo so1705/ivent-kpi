@@ -364,7 +364,10 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
     }), { appts: 0, calls: 0, hours: 0, picConnected: 0, requests: 0 });
 
     const myGas = gasData.filter(d => {
-      const isMe = d.memberId === currentMember?.spreadsheetName || d.memberId === currentMember?.name;
+      const gMid = (d.memberId || "").trim();
+      const mName = (currentMember?.name || "").trim();
+      const mSName = (currentMember?.spreadsheetName || "").trim();
+      const isMe = (mSName && gMid === mSName) || (mName && gMid === mName);
       if (!isMe || !d.timestamp) return false;
       const ts = d.timestamp.toDate ? d.timestamp.toDate() : (d.timestamp.seconds ? new Date(d.timestamp.seconds * 1000) : new Date(d.timestamp));
       return ts >= start && ts <= end;
@@ -395,7 +398,10 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
     });
     const monthlyAppts = mReps.reduce((acc, r) => acc + (Number(r.appts)||0), 0);
     const mGas = gasData.filter(d => {
-      const isMe = d.memberId === currentMember?.spreadsheetName || d.memberId === currentMember?.name;
+      const gMid = (d.memberId || "").trim();
+      const mName = (currentMember?.name || "").trim();
+      const mSName = (currentMember?.spreadsheetName || "").trim();
+      const isMe = (mSName && gMid === mSName) || (mName && gMid === mName);
       if (!isMe || !d.timestamp) return false;
       const ts = d.timestamp.toDate ? d.timestamp.toDate() : (d.timestamp.seconds ? new Date(d.timestamp.seconds * 1000) : new Date(d.timestamp));
       return ts >= mRange.start && ts <= mRange.end;
@@ -868,11 +874,16 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
   }, [calendarMonth]);
 
   const displayShifts = useMemo(() => {
-    if (viewMode === 'day') return shifts.filter(s => s.date === selectedDate).sort((a,b)=>a.startTime.localeCompare(b.startTime));
-    if (viewMode === 'week') return shifts.filter(s => { const d = new Date(s.date); return d >= wr.start && d <= wr.end; }).sort((a,b)=>a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+    let filtered = shifts;
+    if (selectedMemberId && selectedMemberId !== 'all') {
+      filtered = filtered.filter(s => s.memberId === selectedMemberId);
+    }
+    
+    if (viewMode === 'day') return filtered.filter(s => s.date === selectedDate).sort((a,b)=>a.startTime.localeCompare(b.startTime));
+    if (viewMode === 'week') return filtered.filter(s => { const d = new Date(s.date); return d >= wr.start && d <= wr.end; }).sort((a,b)=>a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
     const monthPrefix = calendarMonth.slice(0,7);
-    return shifts.filter(s => s.date.startsWith(monthPrefix)).sort((a,b)=>a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
-  }, [shifts, selectedDate, viewMode, wr, calendarMonth]);
+    return filtered.filter(s => s.date.startsWith(monthPrefix)).sort((a,b)=>a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime));
+  }, [shifts, selectedDate, viewMode, wr, calendarMonth, selectedMemberId]);
 
   const selectedDateShifts = useMemo(() => {
     return shifts.filter(s => s.date === selectedDate).sort((a,b)=>a.startTime.localeCompare(b.startTime));
@@ -913,10 +924,20 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
               )}
             </div>
             {!bulkMode && (
-              <div className="flex bg-slate-200 p-1 rounded-full">
+              <div className="flex items-center gap-4">
+                <select 
+                  className="bg-white border border-slate-300 p-2 px-4 font-bold text-[10px] outline-none rounded-xl shadow-sm"
+                  value={selectedMemberId}
+                  onChange={e => setSelectedMemberId(e.target.value)}
+                >
+                  <option value="all">全員のシフトを表示</option>
+                  {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+                <div className="flex bg-slate-200 p-1 rounded-full">
                  <button onClick={()=>setViewMode('day')} className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode==='day'?'bg-slate-900 text-white':'text-slate-500'}`}>日別</button>
                  <button onClick={()=>setViewMode('week')} className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode==='week'?'bg-slate-900 text-white':'text-slate-500'}`}>週別</button>
                  <button onClick={()=>setViewMode('month')} className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode==='month'?'bg-slate-900 text-white':'text-slate-500'}`}>月間</button>
+                </div>
               </div>
             )}
           </div>
@@ -1199,7 +1220,11 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole }) => {
     const m = (members || []).find(mem => mem.id === selectedMid);
     
     (gasData || []).forEach(d => {
-      const isMemberMatch = selectedMid === 'all' || d.memberId === m?.spreadsheetName || d.memberId === m?.name;
+      const gMid = (d.memberId || "").trim();
+      const mName = (m?.name || "").trim();
+      const mSName = (m?.spreadsheetName || "").trim();
+      const isMemberMatch = selectedMid === 'all' || (mSName && gMid === mSName) || (mName && gMid === mName);
+      
       if (isMemberMatch && d.timestamp) {
         const dt = d.timestamp.toDate ? d.timestamp.toDate() : (d.timestamp.seconds ? new Date(d.timestamp.seconds * 1000) : new Date(d.timestamp));
         list.push({
@@ -1866,38 +1891,65 @@ function App() {
   const handleLogout = () => signOut(auth);
 
   useEffect(() => {
-    if (isOffline || !auth) { setConnectionStatus("offline"); return; }
+    if (isOffline || !auth) { 
+      setConnectionStatus("offline"); 
+      return; 
+    }
 
-    const unsubAuth = onAuthStateChanged(auth, async (u) => {
+    let unsubs = [];
+
+    const unsubAuth = onAuthStateChanged(auth, (u) => {
       setUser(u);
+      
+      // Cleanup previous data listeners if any
+      unsubs.forEach(unsub => unsub());
+      unsubs = [];
+
       if (u) {
         setConnectionStatus("connected");
         setUserRole(u.email === ADMIN_EMAIL ? 'admin' : 'member');
 
-        onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'events'), (s) => {
+        const eSub = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'events'), (s) => {
           const list = s.docs.map(d => ({ id: d.id, ...d.data() }));
           setEvents(list);
           if (!currentEventId && list.length > 0) setCurrentEventId(list[0].id);
         });
+        unsubs.push(eSub);
 
-        onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'members'), (s) => {
+        const mSub = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'members'), (s) => {
           setMembers(s.docs.map(d => ({ id: d.id, ...d.data() })));
         });
-        onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'reports'), (s) => {
+        unsubs.push(mSub);
+
+        const rSub = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'reports'), (s) => {
           setReports(s.docs.map(d => ({ id: d.id, ...d.data() })));
         });
-        onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'shifts'), (s) => {
+        unsubs.push(rSub);
+
+        const sSub = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'shifts'), (s) => {
           setShifts(s.docs.map(d => ({ id: d.id, ...d.data() })));
         });
-        onSnapshot(collection(db, 'kpi_sync'), (s) => {
+        unsubs.push(sSub);
+
+        const gSub = onSnapshot(collection(db, 'kpi_sync'), (s) => {
           setGasData(s.docs.map(d => ({ id: d.id, ...d.data() })));
         });
+        unsubs.push(gSub);
       } else {
         setConnectionStatus("unauthenticated");
+        setEvents([]);
+        setMembers([]);
+        setReports([]);
+        setShifts([]);
+        setGasData([]);
       }
     });
-    return () => unsubAuth();
-  }, [currentEventId]);
+
+    return () => {
+      unsubAuth();
+      unsubs.forEach(unsub => unsub());
+    };
+  }, []); // Only run once on mount
 
   const addEvent = async (n) => await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'events'), { name: n, goals: defaultGoals, weeklyGoals: {}, createdAt: Timestamp.now() });
   const deleteEvent = async (id) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', id));
