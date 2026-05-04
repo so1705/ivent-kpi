@@ -306,8 +306,8 @@ const CustomChart = ({ data, color, type = 'area' }) => {
   if (!data || data.length === 0) return <div className="h-full flex items-center justify-center text-slate-300 font-bold text-xs uppercase tracking-widest">データがありません</div>;
   const len = data.length - 1 || 1;
   const max = Math.max(...data.map(d => d.value), 1);
-  const points = data.map((d, i) => `\${(i / len) * 100},\${100 - (d.value / max) * 100}`).join(' ');
-  const areaPoints = `0,100 \${points} 100,100`;
+  const points = data.map((d, i) => `${(i / len) * 100},${100 - (d.value / max) * 100}`).join(' ');
+  const areaPoints = `0,100 ${points} 100,100`;
 
   return (
     <div className="w-full h-full relative flex flex-col pl-4 pb-2">
@@ -323,7 +323,7 @@ const CustomChart = ({ data, color, type = 'area' }) => {
             {[...Array(5)].map((_, i) => <div key={i} className="w-px h-full bg-slate-100 opacity-50" />)}
           </div>
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full absolute inset-0 z-10 overflow-visible">
-            {type === 'area' && <polygon fill={`\${color}15`} points={areaPoints} />}
+            {type === 'area' && <polygon fill={`${color}15`} points={areaPoints} />}
             <polyline fill="none" stroke={color} strokeWidth={type === 'line' ? "3" : "2"} strokeLinejoin="round" points={points} vectorEffect="non-scaling-stroke" />
             {data.map((d, i) => (
               <circle key={i} cx={(i / len) * 100} cy={100 - (d.value / max) * 100} r="1.5" fill="white" stroke={color} strokeWidth="1" vectorEffect="non-scaling-stroke" />
@@ -335,7 +335,7 @@ const CustomChart = ({ data, color, type = 'area' }) => {
         {data.map((d, i) => {
            const isShow = data.length <= 7 || i === 0 || i === data.length - 1 || i % Math.ceil(data.length/5) === 0;
            return (
-             <span key={i} className={`text-[9px] font-bold uppercase whitespace-nowrap absolute transform -translate-x-1/2 \${i===data.length-1?'text-blue-600':'text-slate-400'}`} style={{ left: `\${(i/len)*100}%`, opacity: isShow ? 1 : 0 }}>
+             <span key={i} className={`text-[9px] font-bold uppercase whitespace-nowrap absolute transform -translate-x-1/2 ${i===data.length-1?'text-blue-600':'text-slate-400'}`} style={{ left: `${(i/len)*100}%`, opacity: isShow ? 1 : 0 }}>
                {d.day}
              </span>
            );
@@ -377,8 +377,8 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
              </div>
           </div>
           <div className="flex bg-slate-200 p-1 rounded-2xl">
-             <button onClick={()=>setViewMode('personal')} className={`px-8 py-3 text-xs font-bold transition-all rounded-xl \${viewMode==='personal'?'bg-white text-blue-600 shadow-sm':'text-slate-500 hover:text-slate-900'}`}>{currentUserEmail === ADMIN_EMAIL ? '管理者データ' : 'マイデータ'}</button>
-             <button onClick={()=>setViewMode('team')} className={`px-8 py-3 text-xs font-bold transition-all rounded-xl \${viewMode==='team'?'bg-white text-blue-600 shadow-sm':'text-slate-500 hover:text-slate-900'}`}>チーム全体</button>
+             <button onClick={()=>setViewMode('personal')} className={`px-8 py-3 text-xs font-bold transition-all rounded-xl ${viewMode==='personal'?'bg-white text-blue-600 shadow-sm':'text-slate-500 hover:text-slate-900'}`}>{currentUserEmail === ADMIN_EMAIL ? '管理者データ' : 'マイデータ'}</button>
+             <button onClick={()=>setViewMode('team')} className={`px-8 py-3 text-xs font-bold transition-all rounded-xl ${viewMode==='team'?'bg-white text-blue-600 shadow-sm':'text-slate-500 hover:text-slate-900'}`}>チーム全体</button>
           </div>
        </div>
 
@@ -501,7 +501,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                                     <tr key={m.id} onClick={()=>setDrilldownMember(m)} className="hover:bg-slate-50 transition-all cursor-pointer group">
                                        <td className="p-6">
                                           <div className="flex items-center gap-4">
-                                             <div className={`w-10 h-10 rounded-xl \${m.role==='closer'?'bg-amber-400':'bg-blue-600'} text-white flex items-center justify-center font-black text-sm shadow-sm`}>{m.name.slice(0,1)}</div>
+                                             <div className={`w-10 h-10 rounded-xl ${m.role==='closer'?'bg-amber-400':'bg-blue-600'} text-white flex items-center justify-center font-black text-sm shadow-sm`}>{m.name.slice(0,1)}</div>
                                              <div className="font-bold text-slate-900">{m.name}</div>
                                           </div>
                                        </td>
@@ -545,11 +545,11 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                      { label: '資料', val: drilldownMember.requests, color: 'text-slate-900' },
                      { label: 'アポ', val: drilldownMember.appts, color: 'text-blue-600' },
                      { label: '見込み', val: drilldownMember.expectedAppts, color: 'text-emerald-600' },
-                     { label: '予定時間', val: `\${drilldownMember.scheduledHours}H`, color: 'text-slate-400' },
+                     { label: '予定時間', val: `${drilldownMember.scheduledHours}H`, color: 'text-slate-400' },
                    ].map(stat => (
                       <div key={stat.label} className="p-5 bg-slate-50 border border-slate-100 rounded-3xl">
                          <div className="text-[10px] font-black text-slate-400 uppercase mb-1">{stat.label}</div>
-                         <div className={`text-2xl font-black \${stat.color} tabular-nums`}>{stat.val}</div>
+                         <div className={`text-2xl font-black ${stat.color} tabular-nums`}>{stat.val}</div>
                       </div>
                    ))}
                 </div>
@@ -575,7 +575,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                                   <span className="text-slate-900">{safeVal}件 ({p.toFixed(1)}%)</span>
                                </div>
                                <div className="h-1.5 w-full bg-slate-50 rounded-full overflow-hidden">
-                                  <div className={`h-full \${item.color} transition-all duration-1000`} style={{ width: `\${p}%` }}></div>
+                                  <div className={`h-full ${item.color} transition-all duration-1000`} style={{ width: `${p}%` }}></div>
                                 </div>
                             </div>
                          );
@@ -669,9 +669,9 @@ const AttendanceView = ({ members, reports, onEdit }) => {
             <input type="month" className="bg-white border border-slate-300 p-2 font-bold text-sm outline-none rounded-xl" value={selectedMonth} onChange={e=>setSelectedMonth(e.target.value)} />
           </div>
           <div className="flex gap-2 flex-wrap">
-            <button onClick={()=>setSelectedMemberId('all')} className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all \${selectedMemberId==='all'?'bg-slate-900 text-white border-slate-900':'bg-white text-slate-500 border-slate-200'}`}>全員</button>
+            <button onClick={()=>setSelectedMemberId('all')} className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${selectedMemberId==='all'?'bg-slate-900 text-white border-slate-900':'bg-white text-slate-500 border-slate-200'}`}>全員</button>
             {members.map(m => (
-              <button key={m.id} onClick={()=>setSelectedMemberId(m.id)} className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all \${selectedMemberId===m.id?'bg-blue-600 text-white border-blue-600':'bg-white text-slate-500 border-slate-200'}`}>{m.name}</button>
+              <button key={m.id} onClick={()=>setSelectedMemberId(m.id)} className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${selectedMemberId===m.id?'bg-blue-600 text-white border-blue-600':'bg-white text-slate-500 border-slate-200'}`}>{m.name}</button>
             ))}
           </div>
        </div>
@@ -747,7 +747,7 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
 
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const d = new Date();
-    return `\${d.getFullYear()}-\${String(d.getMonth()+1).padStart(2,'0')}-01`;
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
   });
 
   const moveMonth = (delta) => {
@@ -802,7 +802,7 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
     if (bulkSchedule.length === 0) return alert("登録する日程を選択してください");
     
     const mName = members.find(m=>m.id===bulkMemberId)?.name;
-    if (window.confirm(`\${mName}さんのシフト\${bulkSchedule.length}件を一括登録しますか？`)) {
+    if (window.confirm(`${mName}さんのシフト${bulkSchedule.length}件を一括登録しますか？`)) {
       for (const item of bulkSchedule) {
         await onAddShift({ memberId: bulkMemberId, date: item.date, startTime: item.startTime, endTime: item.endTime });
       }
@@ -1117,9 +1117,9 @@ const AnalyticsView = ({ members, reports, event, userRole }) => {
         const mon = getMondayKey(dateObj);
         key = mon.slice(5).replace('-', '/');
       } else if (periodMode === 'monthly') {
-        key = `\${dateObj.getMonth()+1}月`;
+        key = `${dateObj.getMonth()+1}月`;
       } else {
-        key = `\${dateObj.getFullYear()}年`;
+        key = `${dateObj.getFullYear()}年`;
       }
       map[key] = (map[key] || 0) + (Number(r[chartMetric]) || 0);
     });
@@ -1167,12 +1167,12 @@ const AnalyticsView = ({ members, reports, event, userRole }) => {
              <div className="flex flex-wrap gap-2">
                <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
                  {['daily','weekly','monthly','yearly'].map(p => (
-                   <button key={p} onClick={()=>setPeriodMode(p)} className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition-all \${periodMode===p?'bg-slate-900 text-white':'text-slate-400'}`}>{periodLabels[p]}</button>
+                   <button key={p} onClick={()=>setPeriodMode(p)} className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition-all ${periodMode===p?'bg-slate-900 text-white':'text-slate-400'}`}>{periodLabels[p]}</button>
                  ))}
                </div>
                <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
-                 <button onClick={()=>setChartType('line')} className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition-all \${chartType==='line'?'bg-blue-600 text-white':'text-slate-400'}`}>折れ線</button>
-                 <button onClick={()=>setChartType('area')} className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition-all \${chartType==='area'?'bg-blue-600 text-white':'text-slate-400'}`}>エリア</button>
+                 <button onClick={()=>setChartType('line')} className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition-all ${chartType==='line'?'bg-blue-600 text-white':'text-slate-400'}`}>折れ線</button>
+                 <button onClick={()=>setChartType('area')} className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition-all ${chartType==='area'?'bg-blue-600 text-white':'text-slate-400'}`}>エリア</button>
                </div>
              </div>
           </div>
@@ -1345,7 +1345,7 @@ const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, 
                 {members.map(m => (
                   <button key={m.id} onClick={() => setEditingMember(m)} className="p-4 bg-white flex items-center justify-between text-left hover:bg-slate-50 group transition-colors">
                      <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 flex items-center justify-center font-bold text-white rounded-full \${m.role==='admin'?'bg-slate-900':'bg-slate-400'}`}>{m.name?.slice(0,1) || '?'}</div>
+                        <div className={`w-10 h-10 flex items-center justify-center font-bold text-white rounded-full ${m.role==='admin'?'bg-slate-900':'bg-slate-400'}`}>{m.name?.slice(0,1) || '?'}</div>
                         <div>
                            <div className="font-bold text-slate-900">{m.name}</div>
                            <div className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">¥{m.hourlyWage}/H | {m.role}</div>
