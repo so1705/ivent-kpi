@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, onAuthStateChanged, 
@@ -273,10 +273,13 @@ const MainMetric = ({ label, icon, current, target }) => {
 };
 
 const CustomChart = ({ data, color, type = 'area' }) => {
-  if (!data || data.length === 0) return <div className="h-full flex items-center justify-center text-slate-300 font-bold text-xs uppercase tracking-widest">データがありません</div>;
-  const max = Math.max(...data.map(d => d.value), 1); 
-  const len = Math.max(data.length - 1, 1);
-  const points = data.map((d, i) => `${(i / len) * 100},${100 - (d.value / max) * 100}`).join(' ');
+  if (!data || !Array.isArray(data) || data.length === 0) return <div className="h-full flex items-center justify-center text-slate-300 font-bold text-xs uppercase tracking-widest">データがありません</div>;
+  const safeData = data.filter(d => d && typeof d.value === 'number');
+  if (safeData.length === 0) return <div className="h-full flex items-center justify-center text-slate-300 font-bold text-xs uppercase tracking-widest">データがありません</div>;
+  
+  const max = Math.max(...safeData.map(d => d.value), 1); 
+  const len = Math.max(safeData.length - 1, 1);
+  const points = safeData.map((d, i) => `${(i / len) * 100},${100 - (d.value / max) * 100}`).join(' ');
   const areaPoints = `${points} 100,100 0,100`;
 
   return (
@@ -284,7 +287,7 @@ const CustomChart = ({ data, color, type = 'area' }) => {
       <div className="absolute -left-2 top-1/2 -translate-y-1/2 -rotate-90 text-[10px] font-bold text-slate-400 tracking-widest">件数</div>
       <div className="flex-1 relative flex">
         <div className="w-6 flex flex-col justify-between text-[10px] font-bold text-slate-400 pb-1 pr-2 text-right">
-          <span>{max}</span>
+          <span>{Math.round(max)}</span>
           <span>{Math.round(max / 2)}</span>
           <span>0</span>
         </div>
@@ -295,7 +298,7 @@ const CustomChart = ({ data, color, type = 'area' }) => {
           <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full absolute inset-0 z-10 overflow-visible">
             {type === 'area' && <polygon fill={`${color}15`} points={areaPoints} />}
             <polyline fill="none" stroke={color} strokeWidth={type === 'line' ? "3" : "2"} strokeLinejoin="round" points={points} vectorEffect="non-scaling-stroke" />
-            {data.map((d, i) => (
+            {safeData.map((d, i) => (
               <circle key={i} cx={(i / len) * 100} cy={100 - (d.value / max) * 100} r="1.5" fill="white" stroke={color} strokeWidth="1" vectorEffect="non-scaling-stroke" />
             ))}
           </svg>
@@ -378,11 +381,29 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
     const totalConnected = s.picConnected + gasCounts.picConnected;
     const cph = s.hours > 0 ? (totalCalls / s.hours).toFixed(1) : "0.0";
 
-    return { ...s, totalCalls, totalAppts, totalRequests, totalConnected, gasCounts, cph };
+    // Monthly Personal Stats
+    const mRange = { start: new Date(now.getFullYear(), now.getMonth(), 1), end: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59) };
+    const mReps = eventReports.filter(r => {
+      const isMe = r.memberId === currentMember?.id;
+      if (!isMe || !r.date) return false;
+      const d = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
+      return d >= mRange.start && d <= mRange.end;
+    });
+    const monthlyAppts = mReps.reduce((acc, r) => acc + (Number(r.appts)||0), 0);
+    const mGas = gasData.filter(d => {
+      const isMe = d.memberId === currentMember?.spreadsheetName || d.memberId === currentMember?.name;
+      if (!isMe || !d.timestamp) return false;
+      const ts = d.timestamp.toDate ? d.timestamp.toDate() : (d.timestamp.seconds ? new Date(d.timestamp.seconds * 1000) : new Date(d.timestamp));
+      return ts >= mRange.start && ts <= mRange.end;
+    });
+    const totalMonthlyAppts = monthlyAppts + mGas.filter(d => d.type === 'アポ確定').length;
+
+    return { ...s, totalCalls, totalAppts, totalRequests, totalConnected, gasCounts, cph, totalMonthlyAppts };
   }, [viewMode, personalPeriod, personalDate, eventReports, gasData, currentMember]);
 
   const activeWeeklyGoals = event.weeklyGoals?.[getMondayKey(currentBaseDate)] || event.goals?.weekly || {};
   const activeIndivGoals = event.individualWeeklyGoals?.[getMondayKey(currentBaseDate)]?.[currentMember?.id] || activeWeeklyGoals;
+  const activeMonthlyGoal = event.individualMonthlyGoals?.[toLocalMonthString(new Date())]?.[currentMember?.id] || 50;
 
   return (
     <div className="space-y-12 pb-24 font-sans">
@@ -433,18 +454,16 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{personalStats.totalAppts} / {activeIndivGoals.appts} APPTS</div>
                 </div>
 
-                <div className="bg-emerald-900 text-white p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden flex flex-col justify-between">
-                   <div className="absolute top-0 right-0 p-4 opacity-10"><Icon p={I.TrendingUp} size={100} /></div>
+                <div className="bg-slate-900 text-white p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden flex flex-col justify-between">
+                   <div className="absolute top-0 right-0 p-4 opacity-10"><Icon p={I.Trophy} size={100} /></div>
                    <div>
-                      <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-2">週次期待着地</div>
-                      <div className="text-5xl font-black">{memberStats.find(m=>m.email===currentUserEmail)?.expectedAppts || 0}<span className="text-sm font-normal ml-2 opacity-50">件</span></div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">月間進捗 ({new Date().getMonth() + 1}月)</div>
+                      <div className="text-5xl font-black">{personalStats.totalMonthlyAppts}<span className="text-sm font-normal ml-2 opacity-50">/ {activeMonthlyGoal}</span></div>
                    </div>
-                   <div className="pt-4 border-t border-emerald-800 flex justify-between items-center">
-                      <span className="text-[10px] font-bold opacity-60 uppercase">目標との予測差分</span>
-                      <span className="text-lg font-black text-emerald-400">
-                         {((memberStats.find(m=>m.email===currentUserEmail)?.expectedAppts || 0) - (memberStats.find(m=>m.email===currentUserEmail)?.uniformGoal || 0)).toFixed(1)}
-                         <span className="text-xs ml-1">件</span>
-                      </span>
+                   <div className="pt-4 border-t border-white/10 flex justify-between items-center">
+                      <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                        <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${Math.min(100, (personalStats.totalMonthlyAppts / (activeMonthlyGoal || 1)) * 100)}%` }}></div>
+                      </div>
                    </div>
                 </div>
 
@@ -534,7 +553,6 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                 </div>
              </div>
           </div>
-       ) : (
                  <div className="space-y-12">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                        <div className="space-y-6">
@@ -904,7 +922,7 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
                   <div className="flex-1 space-y-6">
                      <div className="flex items-center justify-between">
                         <label className="text-xs font-black text-rose-500 uppercase tracking-widest block">1. スタッフを選択</label>
-                        {bulkMemberId && <button onClick={()=>setBulkDates([])} className="text-[10px] font-bold text-rose-400 hover:text-rose-600 underline">選択解除</button>}
+                        {bulkMemberId && <button onClick={()=>{setBulkDates([]); setBulkMemberId(null);}} className="text-[10px] font-bold text-rose-400 hover:text-rose-600 underline">選択解除</button>}
                      </div>
                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                         {members.map(m => (
@@ -917,15 +935,34 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
                           </button>
                         ))}
                      </div>
+
+                     <div className="pt-6 space-y-4">
+                        <label className="text-xs font-black text-rose-500 uppercase tracking-widest block">2. 日付をリストから選ぶ（一括）</label>
+                        <div className="flex flex-wrap gap-2">
+                           {[...Array(21)].map((_, i) => {
+                              const d = new Date(); d.setDate(d.getDate() + i);
+                              const ds = toLocalDateString(d);
+                              const isSel = bulkDates.includes(ds);
+                              return (
+                                 <button key={ds} onClick={() => {
+                                    if(isSel) setBulkDates(bulkDates.filter(x=>x!==ds));
+                                    else setBulkDates([...bulkDates, ds]);
+                                 }} className={`px-3 py-2 text-[10px] font-black rounded-xl border-2 transition-all ${isSel ? 'bg-rose-500 border-rose-500 text-white' : 'bg-white border-rose-100 text-rose-400'}`}>
+                                    {ds.slice(5).replace('-','/')}
+                                 </button>
+                              );
+                           })}
+                        </div>
+                     </div>
                   </div>
                   
                   <div className="w-full lg:w-[400px] space-y-6 bg-white/50 p-6 rounded-3xl border border-rose-100">
-                     <label className="text-xs font-black text-rose-500 uppercase tracking-widest block">2. 選択中の日付と時間設定</label>
+                     <label className="text-xs font-black text-rose-500 uppercase tracking-widest block">3. 個別の時間調整</label>
                      <div className="max-h-[300px] overflow-y-auto space-y-3 pr-2 custom-scrollbar">
                         {bulkDates.length === 0 ? (
-                           <div className="text-center py-10 text-rose-300 text-xs font-bold italic">カレンダーから日付を選択してください</div>
+                           <div className="text-center py-10 text-rose-300 text-xs font-bold italic">上のリストから日付を選択してください</div>
                         ) : (
-                           bulkDates.map(dateStr => (
+                           [...bulkDates].sort().map(dateStr => (
                               <div key={dateStr} className="flex items-center justify-between bg-white p-3 rounded-xl border border-rose-100 shadow-sm">
                                  <div className="text-xs font-black text-slate-700">{dateStr.slice(5).replace('-','/')}</div>
                                  <div className="flex items-center gap-2">
@@ -943,14 +980,14 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
 
                <div className="flex flex-col md:flex-row items-center justify-between border-t border-rose-100 pt-6 gap-4">
                   <div className="flex items-center gap-4">
-                     <div className="w-12 h-12 bg-rose-500 text-white flex items-center justify-center rounded-2xl font-black shadow-lg">3</div>
+                     <div className="w-12 h-12 bg-rose-500 text-white flex items-center justify-center rounded-2xl font-black shadow-lg">4</div>
                      <div>
-                        <p className="text-sm font-black text-rose-600">一斉登録の最終確認</p>
-                        <p className="text-[10px] font-bold text-rose-400 uppercase">計 {bulkDates.length} 件のシフトを保存します</p>
+                        <p className="text-sm font-black text-rose-600">シフトの一括保存</p>
+                        <p className="text-[10px] font-bold text-rose-400 uppercase">計 {bulkDates.length} 件のシフトを登録します</p>
                      </div>
                   </div>
                   <button onClick={handleBulkRegister} className="w-full md:w-auto px-12 py-5 bg-rose-600 text-white font-black rounded-[2rem] shadow-xl hover:bg-rose-700 transition-all transform active:scale-95 flex items-center justify-center gap-3">
-                     <Icon p={I.Check} size={20}/> 変更を確定し一括保存
+                     <Icon p={I.Check} size={20}/> 変更内容で一括保存
                   </button>
                </div>
             </div>
@@ -1152,10 +1189,11 @@ const AnalyticsView = ({ members, reports, event, userRole }) => {
   }, [reports, selectedMid, event]);
 
   const combinedData = useMemo(() => {
+    if (!reports || !members || !gasData) return [];
     const list = [...fReports];
-    const m = members.find(mem => mem.id === selectedMid);
+    const m = (members || []).find(mem => mem.id === selectedMid);
     
-    gasData.forEach(d => {
+    (gasData || []).forEach(d => {
       const isMemberMatch = selectedMid === 'all' || d.memberId === m?.spreadsheetName || d.memberId === m?.name;
       if (isMemberMatch && d.timestamp) {
         const dt = d.timestamp.toDate ? d.timestamp.toDate() : (d.timestamp.seconds ? new Date(d.timestamp.seconds * 1000) : new Date(d.timestamp));
@@ -1286,7 +1324,7 @@ const AnalyticsView = ({ members, reports, event, userRole }) => {
   );
 };
 
-const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, onAddMember, onDelMember, onUpdateMember, onUpdateGoal, currentBaseDate, onClose }) => {
+const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, onAddMember, onDelMember, onUpdateMember, onUpdateGoal, currentUserEmail, userRole, currentBaseDate, onClose }) => {
   const [newEName, setNewEName] = useState("");
   const [newMName, setNewMName] = useState("");
   const [newSpreadsheetName, setNewSpreadsheetName] = useState("");
@@ -1295,10 +1333,16 @@ const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, 
   const [newWage, setNewWage] = useState("1500");
   const [editingMember, setEditingMember] = useState(null);
   
+  const me = useMemo(() => members.find(m => m.email === currentUserEmail), [members, currentUserEmail]);
+  const mon = getMondayKey(currentBaseDate);
+  const mKey = toLocalMonthString(new Date());
+  
   const currentEvent = useMemo(() => {
-    if (!events || !currentEventId) return null;
     return events.find(e => e.id === currentEventId) || null;
   }, [events, currentEventId]);
+
+  const myWeeklyGoal = currentEvent?.individualWeeklyGoals?.[mon]?.[me?.id]?.appts || 0;
+  const myMonthlyGoal = currentEvent?.individualMonthlyGoals?.[mKey]?.[me?.id] || 0;
 
   const activeWeeklyGoals = useMemo(() => {
     if (!currentEvent || !currentBaseDate) return { appts: 0 };
@@ -1341,11 +1385,47 @@ const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, 
        <div className="flex items-center justify-between border-b-4 border-slate-900 pb-6">
           <div className="flex items-center gap-6">
              <button onClick={onClose} className="p-4 bg-slate-900 text-white rounded-2xl"><Icon p={I.X}/></button>
-             <div><h2 className="font-black text-3xl text-slate-900 leading-none">システム高度管理</h2><p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mt-1">管理者権限のみ。一般スタッフは閲覧できません。</p></div>
+             <div>
+                <h2 className="font-black text-3xl text-slate-900 leading-none">設定と目標</h2>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
+                   {userRole === 'admin' ? '管理者権限有効' : '個人設定'}
+                </p>
+             </div>
           </div>
        </div>
 
-       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+       {/* Personal Goal Section - Everyone */}
+       <div className="p-10 bg-white border border-slate-100 rounded-[3rem] shadow-sm space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <h3 className="text-xl font-black flex items-center gap-4"><div className="w-1.5 h-6 bg-blue-600 rounded-full"></div> 個人目標の設定</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+             <div className="space-y-4">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">今週のアポ目標 (Weekly)</label>
+                <div className="flex gap-3">
+                   <input type="number" id="p-weekly-goal" className="flex-1 p-5 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] font-black text-2xl outline-none focus:border-blue-600 transition-all" defaultValue={myWeeklyGoal} />
+                   <button onClick={() => {
+                      const val = Number(document.getElementById('p-weekly-goal').value);
+                      onUpdateGoal(mon, me.id, { appts: val }, 'weekly');
+                      alert("週間目標を更新しました");
+                   }} className="px-10 bg-blue-600 text-white font-black rounded-[1.5rem] shadow-xl hover:bg-blue-700 active:scale-95 transition-all">保存</button>
+                </div>
+             </div>
+             <div className="space-y-4">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">今月の総アポ目標 (Monthly)</label>
+                <div className="flex gap-3">
+                   <input type="number" id="p-monthly-goal" className="flex-1 p-5 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] font-black text-2xl outline-none focus:border-emerald-600 transition-all" defaultValue={myMonthlyGoal} />
+                   <button onClick={() => {
+                      const val = Number(document.getElementById('p-monthly-goal').value);
+                      onUpdateGoal(mKey, me.id, val, 'monthly');
+                      alert("月間目標を更新しました");
+                   }} className="px-10 bg-emerald-600 text-white font-black rounded-[1.5rem] shadow-xl hover:bg-emerald-700 active:scale-95 transition-all">保存</button>
+                </div>
+             </div> 
+          </div>
+       </div>
+
+       {userRole === 'admin' ? (
+         <>
+           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
           <section className="space-y-6">
              <h3 className="text-sm font-bold text-slate-800 border-l-4 border-slate-900 pl-3">案件・プロジェクト</h3>
              <div className="p-8 bg-white border border-slate-200 space-y-4 shadow-sm rounded-3xl">
@@ -1466,6 +1546,18 @@ const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, 
                </div>
                <button onClick={()=>setEditingMember(null)} className="w-full text-slate-400 text-sm font-bold pt-4 hover:text-slate-900 transition-colors">キャンセル</button>
             </div>
+         </div>
+        )}
+      </>
+    ) : (
+         <div className="p-10 bg-slate-900 text-white rounded-[3rem] shadow-2xl flex flex-col items-center justify-center text-center space-y-6 relative overflow-hidden">
+            <div className="absolute inset-0 opacity-5 pointer-events-none"><Icon p={I.Target} size={300} /></div>
+            <div className="p-4 bg-white/10 rounded-2xl backdrop-blur-md border border-white/20"><Icon p={I.TrendingUp} size={32} color="white"/></div>
+            <h4 className="text-xl font-black">目標達成に向けて</h4>
+            <p className="text-sm text-slate-400 max-w-sm font-medium leading-relaxed">
+               設定した目標はダッシュボードへリアルタイムに反映されます。
+               高い生産性を維持し、チーム全体の成功に貢献しましょう。
+            </p>
          </div>
        )}
     </div>
@@ -1804,12 +1896,13 @@ function App() {
   const addEvent = async (n) => await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'events'), { name: n, goals: defaultGoals, weeklyGoals: {}, createdAt: Timestamp.now() });
   const deleteEvent = async (id) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', id));
   
-  const handleUpdateGoal = (monday, memberId, goal) => {
+  const handleUpdateGoal = (key, memberId, goal, type = 'weekly') => {
     if (!currentEventId) return;
+    const field = type === 'weekly' ? `individualWeeklyGoals.${key}.${memberId}` : `individualMonthlyGoals.${key}.${memberId}`;
     if (memberId) {
-      updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', currentEventId), { [`individualWeeklyGoals.${monday}.${memberId}`]: goal });
+      updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', currentEventId), { [field]: goal });
     } else {
-      updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', currentEventId), { [`weeklyGoals.${monday}`]: goal });
+      updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'events', currentEventId), { [`weeklyGoals.${key}`]: goal });
     }
   };
   
@@ -1984,6 +2077,7 @@ function App() {
             onAddEvent={addEvent} onDeleteEvent={deleteEvent}
             members={members} onAddMember={addMember} onDelMember={deleteMember} onUpdateMember={updateMember}
             onUpdateGoal={handleUpdateGoal}
+            currentUserEmail={user.email} userRole={userRole}
             currentBaseDate={currentBaseDate}
             onClose={() => setActiveTab('dashboard')}
           />
