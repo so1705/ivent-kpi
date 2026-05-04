@@ -486,11 +486,11 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                    <div className="absolute top-0 right-0 p-4 opacity-10"><Icon p={I.Trophy} size={100} /></div>
                    <div>
                       <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">月間進捗 ({new Date().getMonth() + 1}月)</div>
-                      <div className="text-5xl font-black">{personalStats.totalMonthlyAppts}<span className="text-sm font-normal ml-2 opacity-50">/ {activeMonthlyGoal}</span></div>
+                      <div className="text-5xl font-black">{personalStats.totalMonthlyAppts}<span className="text-sm font-normal ml-2 opacity-50">/ {displayMonthlyGoalAppts}</span></div>
                    </div>
                    <div className="pt-4 border-t border-white/10 flex justify-between items-center">
                       <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-                        <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${Math.min(100, (personalStats.totalMonthlyAppts / (activeMonthlyGoal || 1)) * 100)}%` }}></div>
+                        <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${Math.min(100, (personalStats.totalMonthlyAppts / (displayMonthlyGoalAppts || 1)) * 100)}%` }}></div>
                       </div>
                    </div>
                 </div>
