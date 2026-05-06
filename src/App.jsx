@@ -1287,127 +1287,125 @@ const MetricHelpModal = ({ onClose }) => (
 
 const AnalyticsView = ({ members, reports, gasData, event, userRole, currentUserEmail }) => {
   const [selectedMid, setSelectedMid] = useState('all');
-  const [chartType, setChartType] = useState('line');
   const [chartMetric, setChartMetric] = useState('appts');
   const [periodMode, setPeriodMode] = useState('daily');
+  const [showHelp, setShowHelp] = useState(false);
+
   const currentMemberId = useMemo(() => {
     return currentUserEmail ? members.find(m => m.email === currentUserEmail)?.id : null;
   }, [members, currentUserEmail]);
   
   useEffect(() => {
-    if (userRole !== 'admin' && currentMemberId) {
-      setSelectedMid(currentMemberId);
-    }
+    if (userRole !== 'admin' && currentMemberId) setSelectedMid(currentMemberId);
   }, [userRole, currentMemberId]);
 
-  const fReports = useMemo(() => {
-    return (reports || []).filter(r => {
-      const isEventMatch = !r.eventId || r.eventId === event?.id;
-      const targetMid = (userRole === 'admin') ? selectedMid : currentMemberId;
-      if (targetMid === 'all') return isEventMatch;
-      return isEventMatch && r.memberId === targetMid;
-    });
-  }, [reports, selectedMid, event, userRole, currentMemberId]);
+  const stats = useMemo(() => {
+    const s = { calls: 0, appts: 0, requests: 0, effectiveContact: 0, picRefusal: 0, refusal: 0 };
+    const targetMid = (userRole === 'admin') ? selectedMid : currentMemberId;
 
-  const combinedData = useMemo(() => {
-    if (!reports || !members || !gasData) return [];
-    const list = [...fReports];
-    const m = (members || []).find(mem => mem.id === ((userRole === 'admin') ? selectedMid : currentMemberId));
+    (reports || []).forEach(r => {
+      if (event && r.eventId && r.eventId !== event.id) return;
+      if (targetMid !== 'all' && r.memberId !== targetMid) return;
+      s.calls += (Number(r.calls) || 0);
+      s.appts += (Number(r.appts) || 0);
+      s.requests += (Number(r.requests) || 0);
+      s.effectiveContact += (Number(r.picConnected) || 0);
+      s.refusal += (Number(r.receptionRefusal) || 0);
+    });
 
     (gasData || []).forEach(d => {
-      const gMid = (d.memberId || "").trim();
-      const mName = (m?.name || "").trim();
-      const mSName = (m?.spreadsheetName || "").trim();
-      const isMemberMatch = ((userRole === 'admin') ? selectedMid : currentMemberId) === 'all' || (mSName && gMid === mSName) || (mName && gMid === mName);
-
-      if (isMemberMatch && d.timestamp) {
-        const dt = d.timestamp.toDate ? d.timestamp.toDate() : (d.timestamp.seconds ? new Date(d.timestamp.seconds * 1000) : new Date(d.timestamp));
-        list.push({
-          date: { toDate: () => dt },
-          appts: d.type === 'アポ確定' ? 1 : 0,
-          calls: 1,
-          requests: d.type?.includes('資料送付') ? 1 : 0,
-          effectiveContact: ['アポ確定', '資料送付予定A', '資料送付予定B', '資料送付予定C', '再架電', '担当者拒否'].some(t => d.type?.includes(t)) ? 1 : 0,
-          picAbsent: d.type === '担当者不在' ? 1 : 0,
-          picRefusal: d.type === '担当者拒否' ? 1 : 0,
-          receptionRefusal: d.type === '受付拒否' ? 1 : 0,
-        });
-      }
+      const m = members.find(mem => mem.id === targetMid);
+      const isMe = targetMid === 'all' || (m && (d.memberId === m.spreadsheetName || d.memberId === m.name));
+      if (!isMe) return;
+      s.calls += 1;
+      if (d.type === 'アポ確定') s.appts += 1;
+      if (d.type?.includes('資料送付')) s.requests += 1;
+      if (['アポ確定', '資料送付予定A', '資料送付予定B', '資料送付予定C', '再架電', '担当者拒否'].some(t => d.type?.includes(t))) s.effectiveContact += 1;
+      if (d.type === '受付拒否') s.refusal += 1;
+      if (d.type === '担当者拒否') s.picRefusal += 1;
     });
-    return list;
-  }, [fReports, gasData, selectedMid, members, userRole, currentMemberId]);
 
-  const stats = useMemo(() => {
-    return combinedData.reduce((acc, r) => ({
-      calls: acc.calls + (Number(r.calls) || 0),
-      appts: acc.appts + (Number(r.appts) || 0),
-      requests: acc.requests + (Number(r.requests) || 0),
-      effectiveContact: acc.effectiveContact + (Number(r.effectiveContact) || 0),
-      picAbsent: acc.picAbsent + (Number(r.picAbsent) || 0),
-      picRefusal: acc.picRefusal + (Number(r.picRefusal) || 0),
-      refusal: acc.refusal + (Number(r.receptionRefusal) || 0),
-    }), { calls: 0, appts: 0, requests: 0, effectiveContact: 0, picAbsent: 0, picRefusal: 0, refusal: 0 });
-  }, [combinedData]);
+    return s;
+  }, [reports, gasData, selectedMid, members, event, userRole, currentMemberId]);
 
   const trendData = useMemo(() => {
     const map = {};
-    combinedData.forEach(r => {
-      if (!r || !r.date) return;
-      const dateObj = r.date.toDate ? r.date.toDate() : (r.date.seconds ? new Date(r.date.seconds * 1000) : new Date(r.date));
-      if (!dateObj || isNaN(dateObj.getTime())) return;
-      
+    const targetMid = (userRole === 'admin') ? selectedMid : currentMemberId;
+
+    const process = (date, val) => {
+      if (!date) return;
+      const d = date.toDate ? date.toDate() : (date.seconds ? new Date(date.seconds * 1000) : new Date(date));
+      if (isNaN(d.getTime())) return;
       let key = '';
-      if (periodMode === 'daily') key = toLocalDateString(dateObj).slice(-5);
-      else if (periodMode === 'weekly') {
-        const mon = getMondayKey(dateObj);
-        const md = mon.slice(5).replace('-', '/');
-        key = md + '週';
-      } else if (periodMode === 'monthly') {
-        key = `${dateObj.getMonth() + 1}月`;
-      } else {
-        key = `${dateObj.getFullYear()}年`;
-      }
-      const val = Number(r[chartMetric] || 0);
-      map[key] = (map[key] || 0) + (isNaN(val) ? 0 : val);
+      if (periodMode === 'daily') key = toLocalDateString(d).slice(-5);
+      else if (periodMode === 'weekly') { key = getMondayKey(d).slice(5).replace('-', '/') + '週'; }
+      else if (periodMode === 'monthly') { key = `${d.getMonth() + 1}月`; }
+      else { key = `${d.getFullYear()}年`; }
+      map[key] = (map[key] || 0) + Number(val || 0);
+    };
+
+    (reports || []).forEach(r => {
+      if (event && r.eventId && r.eventId !== event.id) return;
+      if (targetMid !== 'all' && r.memberId !== targetMid) return;
+      process(r.date, r[chartMetric === 'effectiveContact' ? 'picConnected' : chartMetric === 'refusal' ? 'receptionRefusal' : chartMetric]);
     });
+
+    (gasData || []).forEach(d => {
+      const m = members.find(mem => mem.id === targetMid);
+      const isMe = targetMid === 'all' || (m && (d.memberId === m.spreadsheetName || d.memberId === m.name));
+      if (!isMe) return;
+      let val = 0;
+      if (chartMetric === 'calls') val = 1;
+      else if (chartMetric === 'appts' && d.type === 'アポ確定') val = 1;
+      else if (chartMetric === 'requests' && d.type?.includes('資料送付')) val = 1;
+      else if (chartMetric === 'effectiveContact' && ['アポ確定', '資料送付予定A', '資料送付予定B', '資料送付予定C', '再架電', '担当者拒否'].some(t => d.type?.includes(t))) val = 1;
+      else if (chartMetric === 'picRefusal' && d.type === '担当者拒否') val = 1;
+      else if (chartMetric === 'receptionRefusal' && d.type === '受付拒否') val = 1;
+      process(d.timestamp, val);
+    });
+
     return Object.entries(map).map(([day, value]) => ({ day, value })).sort((a, b) => (a.day || "").localeCompare(b.day || ""));
-  }, [combinedData, chartMetric, periodMode]);
+  }, [reports, gasData, selectedMid, members, event, chartMetric, periodMode, userRole, currentMemberId]);
 
   const metricLabels = {
     calls: '架電数', appts: 'アポ獲得数', requests: '資料請求数', effectiveContact: '有効接触数',
-    picAbsent: '不在・無応答', picRefusal: '担当者拒否', receptionRefusal: '受付拒否'
+    picRefusal: '担当者拒否', receptionRefusal: '受付拒否'
   };
-  const periodLabels = { daily: '日次', weekly: '週次', monthly: '月次', yearly: '年次' };
 
   return (
-    <div className="space-y-10 pb-28">
+    <div className="space-y-10 pb-32">
       {showHelp && <MetricHelpModal onClose={() => setShowHelp(false)} />}
-      <div className="flex flex-col md:flex-row md:items-center justify-between border-b-2 border-slate-900 pb-4 gap-4">
-        <div className="flex items-center gap-3">
-          <h2 className="text-xl font-black flex items-center gap-3"><Icon p={I.PieChart} size={20} /> プロジェクト多角分析</h2>
-          <button onClick={() => setShowHelp(true)} className="p-2 rounded-full bg-slate-100 hover:bg-blue-100 text-slate-400 hover:text-blue-600 transition-colors" title="指標の説明">
-            <Icon p={I.Help} size={16} />
-          </button>
+      <div className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-4">
+            <div className="p-3 bg-slate-900 text-white rounded-2xl"><Icon p={I.PieChart} size={24} /></div>
+            プロジェクト多角分析
+            <button onClick={() => setShowHelp(true)} className="p-2 rounded-full bg-slate-50 hover:bg-blue-100 text-slate-400 hover:text-blue-600 transition-colors">
+              <Icon p={I.Help} size={18} />
+            </button>
+          </h2>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-14">統計データと推移グラフ</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap gap-3">
           {userRole === 'admin' ? (
-            <select className="bg-white border border-slate-300 p-2 px-4 font-bold text-xs outline-none rounded-xl shadow-sm" value={selectedMid} onChange={e => setSelectedMid(e.target.value)}>
-              <option value="all">チーム全体の推移を表示</option>
+            <select className="bg-slate-50 border-2 border-slate-100 p-3 px-5 font-black text-xs rounded-2xl outline-none focus:border-blue-600 transition-all shadow-sm" value={selectedMid} onChange={e => setSelectedMid(e.target.value)}>
+              <option value="all">チーム全体の推移</option>
               {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           ) : (
-            <div className="px-4 py-2 bg-slate-100 rounded-xl text-xs font-bold text-slate-500">
-              マイ実績の推移を表示中
-            </div>
+            <div className="px-5 py-3 bg-slate-100 rounded-2xl text-xs font-black text-slate-400">マイ実績を表示中</div>
           )}
+          <select className="bg-slate-50 border-2 border-slate-100 p-3 px-5 font-black text-xs rounded-2xl outline-none focus:border-blue-600 transition-all shadow-sm" value={periodMode} onChange={e => setPeriodMode(e.target.value)}>
+            {['daily', 'weekly', 'monthly', 'yearly'].map(p => <option key={p} value={p}>{p === 'daily' ? '日次' : p === 'weekly' ? '週次' : p === 'monthly' ? '月次' : '年次'}</option>)}
+          </select>
         </div>
       </div>
 
-      <div className="bg-white p-6 md:p-10 rounded-[3rem] border border-slate-100 shadow-xl space-y-6">
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">トレンド・モニタリング</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        <div className="lg:col-span-2 bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm space-y-10">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div className="flex items-center gap-4">
+              <div className="p-4 bg-slate-900 text-white rounded-2xl shadow-xl"><Icon p={I.TrendingUp} size={24} /></div>
               <div className="text-2xl font-black text-slate-900">{metricLabels[chartMetric]}の推移</div>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -1416,48 +1414,28 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole, currentUser
               ))}
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
-              {['daily', 'weekly', 'monthly', 'yearly'].map(p => (
-                <button key={p} onClick={() => setPeriodMode(p)} className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition-all ${periodMode === p ? 'bg-slate-900 text-white' : 'text-slate-400'}`}>{periodLabels[p]}</button>
-              ))}
-            </div>
-            <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
-              <button onClick={() => setChartType('line')} className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition-all ${chartType === 'line' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>折れ線</button>
-              <button onClick={() => setChartType('area')} className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition-all ${chartType === 'area' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}>エリア</button>
-            </div>
-          </div>
-        </div>
-        <div className="h-[300px] w-full">
-          <CustomChart data={trendData} color={chartMetric === 'appts' ? '#4f46e5' : chartMetric === 'calls' ? '#0ea5e9' : '#10b981'} type={chartType} />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-        <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-10">
-          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">転換・効率（CVR）</h3>
-          <div className="space-y-10">
-            <MetricBar label="有効接触率 (架電比)" val={stats.effectiveContact} tgt={stats.calls} />
-            <MetricBar label="アポ率 (接触比)" val={stats.appts} tgt={stats.effectiveContact} />
-          </div>
+          <div className="h-[350px] w-full"><CustomChart data={trendData} color={chartMetric === 'appts' ? '#2563eb' : '#64748b'} /></div>
         </div>
 
-        <section className="p-10 bg-slate-900 text-white relative rounded-[2.5rem] shadow-xl overflow-hidden min-h-[300px] flex flex-col justify-between border border-slate-800">
-          <div className="absolute top-0 right-0 p-10 opacity-10 pointer-events-none"><Icon p={I.Zap} size={140} /></div>
-          <div className="relative z-10 space-y-8">
-            <div className="flex items-center gap-3">
-              <div className="w-1.5 h-6 bg-blue-500 rounded-full"></div>
-              <h3 className="text-xs font-black text-white uppercase tracking-widest">AI戦略アドバイザー</h3>
-            </div>
-            <div className="text-sm font-bold leading-relaxed pr-6 bg-white/5 p-6 rounded-2xl border border-white/10 backdrop-blur-sm text-white">
-              {getAIAdvice(stats, selectedMid !== 'all')}
+        <div className="space-y-10">
+          <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm space-y-10">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">転換・効率（CVR）</h3>
+            <div className="space-y-10">
+              <MetricBar label="有効接触率 (架電比)" val={stats.effectiveContact} tgt={stats.calls} />
+              <MetricBar label="アポ率 (接触比)" val={stats.appts} tgt={stats.effectiveContact} />
             </div>
           </div>
-          <div className="relative z-10 border-t border-white/10 pt-6 flex items-center justify-between text-[11px] font-black text-slate-500 uppercase tracking-widest">
-            <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div> リアルタイム解析中</span>
-            <span className="opacity-40 italic text-white/50">深層分析エンジン v5.0.3</span>
+
+          <div className="bg-slate-900 p-10 rounded-[3rem] shadow-2xl text-white space-y-8">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">AI パフォーマンス診断</h3>
+            <div className="space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center font-black shadow-lg">AI</div>
+                <div className="text-xs font-bold leading-relaxed opacity-90 pr-4">{getAIAdvice(stats, selectedMid !== 'all')}</div>
+              </div>
+            </div>
           </div>
-        </section>
+        </div>
       </div>
     </div>
   );
