@@ -436,12 +436,16 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
   }, [viewMode, personalPeriod, personalDate, eventReports, gasData, currentMember]);
 
   const activeWeeklyGoals = event.weeklyGoals?.[getMondayKey(currentBaseDate)] || event.goals?.weekly || {};
-  const indivWeekly = event.individualWeeklyGoals?.[getMondayKey(currentBaseDate)]?.[currentMember?.id] || activeWeeklyGoals;
-  const indivMonthly = event.individualMonthlyGoals?.[toLocalMonthString(new Date())]?.[currentMember?.id] || { appts: 50, calls: 500 };
+  const activeIndivGoals = useMemo(() => {
+    if (personalPeriod === '月次') {
+      return event?.individualMonthlyGoals?.[toLocalMonthString(new Date())]?.[currentMember?.id] || { appts: 50, calls: 500 };
+    }
+    const weeklyKey = getMondayKey(currentBaseDate);
+    return event?.individualWeeklyGoals?.[weeklyKey]?.[currentMember?.id] || activeWeeklyGoals;
+  }, [event, currentBaseDate, currentMember, personalPeriod, activeWeeklyGoals]);
 
-  const activeIndivGoals = personalPeriod === '月次' ? indivMonthly : indivWeekly;
   // Legacy support for monthly goals that were just numbers
-  const displayMonthlyGoalAppts = (typeof indivMonthly === 'object') ? (indivMonthly.appts || 0) : indivMonthly;
+  const displayMonthlyGoalAppts = (typeof activeIndivGoals === 'object') ? (activeIndivGoals.appts || 0) : activeIndivGoals;
 
   return (
     <div className="space-y-12 pb-24 font-sans">
@@ -487,11 +491,11 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                 <Icon p={I.Target} size={18} color="#10b981" />
               </div>
               <div className="flex items-end justify-between">
-                <div className="text-4xl font-black text-slate-900 leading-none">{((personalStats.totalAppts / Math.max(1, activeIndivGoals.appts || 0)) * 100).toFixed(0)}%</div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{personalStats.totalAppts} / {activeIndivGoals.appts || 0} APPTS</div>
+                <div className="text-4xl font-black text-slate-900 leading-none">{((personalStats.totalAppts / Math.max(1, activeIndivGoals?.appts || 0)) * 100).toFixed(0)}%</div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{personalStats.totalAppts} / {activeIndivGoals?.appts || 0} APPTS</div>
               </div>
               <div className="h-2 bg-slate-50 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${Math.min(100, (personalStats.totalAppts / Math.max(1, activeIndivGoals.appts || 0)) * 100)}%` }}></div>
+                <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${Math.min(100, (personalStats.totalAppts / Math.max(1, activeIndivGoals?.appts || 0)) * 100)}%` }}></div>
               </div>
             </div>
 
@@ -1362,7 +1366,7 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole }) => {
       const val = Number(r[chartMetric] || 0);
       map[key] = (map[key] || 0) + (isNaN(val) ? 0 : val);
     });
-    return Object.entries(map).map(([day, value]) => ({ day, value })).sort((a, b) => a.day.localeCompare(b.day));
+    return Object.entries(map).map(([day, value]) => ({ day, value })).sort((a, b) => (a.day || "").localeCompare(b.day || ""));
   }, [combinedData, chartMetric, periodMode]);
 
   const metricLabels = {
