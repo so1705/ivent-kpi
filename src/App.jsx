@@ -331,7 +331,7 @@ const CustomChart = ({ data, color, type = 'area' }) => {
   );
 };
 
-const Dashboard = ({ event, totals, memberStats, eventReports, members, currentBaseDate, setCurrentBaseDate, userRole, currentUserEmail, onUpdateGoal, gasData, onEditGasRecord, onDeleteGasRecord }) => {
+const Dashboard = ({ event, totals, memberStats, eventReports, members, currentBaseDate, setCurrentBaseDate, userRole, currentUserEmail, onUpdateGoal, gasData, onEditGasRecord, onDeleteGasRecord, shifts }) => {
   const [drilldownMember, setDrilldownMember] = useState(null);
   const [viewMode, setViewMode] = useState('personal');
   const [editingGoal, setEditingGoal] = useState(null);
@@ -2311,6 +2311,7 @@ function App() {
             gasData={gasData}
             onEditGasRecord={updateGasRecord}
             onDeleteGasRecord={deleteGasRecord}
+            shifts={shifts}
           />
         )}
         {activeTab === 'analytics' && <AnalyticsView members={members} reports={reports} gasData={gasData} event={currentEvent} userRole={userRole} />}
