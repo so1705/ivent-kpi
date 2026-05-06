@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import {
   getAuth, onAuthStateChanged,
@@ -234,7 +234,14 @@ const MetricBar = ({ label, val, tgt }) => {
   return (
     <div className="space-y-2 w-full">
       <div className="flex justify-between items-end">
-        <span className="text-xs font-bold text-slate-500">{label}</span>
+        <div className="flex items-center gap-1">
+          <span className="text-xs font-bold text-slate-500">{label}</span>
+          {(label.includes('効率') || label.includes('率')) && (
+            <button onClick={() => alert(METRIC_HELP[label.includes('効率') ? 'CPH' : label.includes('接続') ? '接続率' : 'アポ率'])} className="text-slate-300 hover:text-blue-500 transition-colors">
+              <Icon p={I.Help} size={10} />
+            </button>
+          )}
+        </div>
         <span className={`text-sm font-black ${isOk ? 'text-emerald-600' : 'text-blue-600'}`}>
           {val.toLocaleString()} <span className="text-slate-300 font-normal">/ {tgt.toLocaleString()}</span>
         </span>
@@ -504,7 +511,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
             <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm space-y-4">
               <div className="flex items-center gap-1">
                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">稼働効率 (CPH)</div>
-                <button onClick={() => alert("1時間あたりの架電数。稼働効率を示す指標。高いほど効率的です。")} className="text-slate-300 hover:text-blue-500 transition-colors"><Icon p={I.Help} size={12} /></button>
+                <button onClick={() => alert(METRIC_HELP.CPH)} className="text-slate-300 hover:text-blue-500 transition-colors"><Icon p={I.Help} size={12} /></button>
               </div>
               <div className="text-5xl font-black text-slate-900 tabular-nums">{personalStats.cph}</div>
               <div className="text-[10px] text-slate-400 font-bold leading-tight">架電数 / 稼働時間</div>
@@ -764,12 +771,21 @@ const AttendanceView = ({ members, reports, onEdit }) => {
   const [selectedMonth, setSelectedMonth] = useState(toLocalMonthString(new Date()));
   const [selectedMemberId, setSelectedMemberId] = useState('all');
 
+  const currentMemberId = useMemo(() => members.find(m => m.email === getAuth().currentUser?.email)?.id, [members]);
+  
+  useEffect(() => {
+    if (userRole !== 'admin' && currentMemberId) {
+      setSelectedMemberId(currentMemberId);
+    }
+  }, [userRole, currentMemberId]);
+
   const fReports = useMemo(() => reports.filter(r => {
     if (!r.date) return false;
     const dateMatch = toLocalMonthString(r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000)) === selectedMonth;
-    const memberMatch = selectedMemberId === 'all' || r.memberId === selectedMemberId;
+    const isMe = r.memberId === currentMemberId;
+    const memberMatch = (userRole === 'admin') ? (selectedMemberId === 'all' || r.memberId === selectedMemberId) : isMe;
     return dateMatch && memberMatch;
-  }).sort((a, b) => b.date.seconds - a.date.seconds), [reports, selectedMonth, selectedMemberId]);
+  }).sort((a, b) => b.date.seconds - a.date.seconds), [reports, selectedMonth, selectedMemberId, userRole, currentMemberId]);
 
   const totalH = fReports.reduce((s, r) => s + (Number(r.hours) || 0), 0);
   const totalCost = fReports.reduce((s, r) => {
@@ -781,12 +797,14 @@ const AttendanceView = ({ members, reports, onEdit }) => {
   const memberSummary = useMemo(() => {
     const allReports = reports.filter(r => r.date && toLocalMonthString(r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000)) === selectedMonth);
     return members.map(m => {
+      const isMe = m.id === currentMemberId;
+      if (userRole !== 'admin' && !isMe) return null;
       const mReports = allReports.filter(r => r.memberId === m.id);
       const hours = mReports.reduce((s, r) => s + (Number(r.hours) || 0), 0);
       const cost = hours * (Number(m.hourlyWage) || 1500);
       return { ...m, hours, cost };
-    }).filter(m => m.hours > 0).sort((a, b) => b.cost - a.cost);
-  }, [members, reports, selectedMonth]);
+    }).filter(m => m && m.hours > 0).sort((a, b) => b.cost - a.cost);
+  }, [members, reports, selectedMonth, userRole, currentMemberId]);
 
   return (
     <div className="space-y-6 pb-24 font-sans">
@@ -796,14 +814,20 @@ const AttendanceView = ({ members, reports, onEdit }) => {
           <input type="month" className="bg-white border border-slate-300 p-2 font-bold text-sm outline-none rounded-xl" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} />
         </div>
         <div className="flex items-center gap-3">
-          <select
-            className="flex-1 md:flex-none bg-white border border-slate-300 p-2 px-4 font-bold text-xs outline-none rounded-xl shadow-sm"
-            value={selectedMemberId}
-            onChange={e => setSelectedMemberId(e.target.value)}
-          >
-            <option value="all">全員の統計を表示</option>
-            {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-          </select>
+          {userRole === 'admin' ? (
+            <select
+              className="flex-1 md:flex-none bg-white border border-slate-300 p-2 px-4 font-bold text-xs outline-none rounded-xl shadow-sm"
+              value={selectedMemberId}
+              onChange={e => setSelectedMemberId(e.target.value)}
+            >
+              <option value="all">全員の統計を表示</option>
+              {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          ) : (
+            <div className="px-4 py-2 bg-slate-100 rounded-xl text-xs font-bold text-slate-500">
+              マイ実績を表示中
+            </div>
+          )}
         </div>
       </div>
 
@@ -936,45 +960,47 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
   return (
     <div className="space-y-6 pb-24 font-sans">
       <div className="flex flex-col gap-4 border-b-2 border-slate-900 pb-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-8">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold">シフト管理・人員配置</h2>
-            <div className="hidden md:block">
-              {userRole === 'admin' && (
-                <button
-                  onClick={() => setBulkMode(!bulkMode)}
-                  className={`px-4 py-2 text-[10px] font-black rounded-full transition-all flex items-center gap-2 ${bulkMode ? 'bg-rose-500 text-white shadow-lg' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                >
-                  {bulkMode ? <><Icon p={I.X} size={14} /> モード解除</> : <><Icon p={I.Zap} size={14} /> 一斉入力モード</>}
-                </button>
-              )}
-            </div>
+            {userRole === 'admin' && (
+              <button
+                onClick={() => setBulkMode(!bulkMode)}
+                className={`hidden md:flex px-4 py-2 text-[10px] font-black rounded-full transition-all items-center gap-2 ${bulkMode ? 'bg-rose-500 text-white shadow-lg' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+              >
+                {bulkMode ? <><Icon p={I.X} size={14} /> モード解除</> : <><Icon p={I.Zap} size={14} /> 一斉入力モード</>}
+              </button>
+            )}
           </div>
 
           {!bulkMode && (
-            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-              <div className="md:hidden">
-                {userRole === 'admin' && (
-                  <button
-                    onClick={() => setBulkMode(!bulkMode)}
-                    className={`px-4 py-2 text-[10px] font-black rounded-full transition-all flex items-center gap-2 ${bulkMode ? 'bg-rose-500 text-white shadow-lg' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
-                  >
-                    {bulkMode ? <Icon p={I.X} size={14} /> : <Icon p={I.Zap} size={14} />} {bulkMode ? '解除' : '一斉入力'}
-                  </button>
-                )}
-              </div>
-              <select
-                className="flex-1 md:flex-none bg-white border border-slate-300 p-2 px-3 font-bold text-[10px] outline-none rounded-xl shadow-sm"
-                value={selectedMemberId}
-                onChange={e => setSelectedMemberId(e.target.value)}
-              >
-                <option value="all">全員を表示</option>
-                {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
+            <div className="flex flex-wrap items-center gap-3">
+              {userRole === 'admin' && (
+                <button
+                  onClick={() => setBulkMode(!bulkMode)}
+                  className={`md:hidden px-4 py-2 text-[10px] font-black rounded-full transition-all flex items-center gap-2 ${bulkMode ? 'bg-rose-500 text-white shadow-lg' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                >
+                  {bulkMode ? <Icon p={I.X} size={14} /> : <Icon p={I.Zap} size={14} />} 一斉入力
+                </button>
+              )}
+              {userRole === 'admin' ? (
+                <select
+                  className="flex-1 md:flex-none bg-white border border-slate-300 p-2 px-3 font-bold text-[10px] outline-none rounded-xl shadow-sm min-w-[120px]"
+                  value={selectedMemberId}
+                  onChange={e => setSelectedMemberId(e.target.value)}
+                >
+                  <option value="all">全員のシフト表示</option>
+                  {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              ) : (
+                <div className="px-3 py-2 bg-slate-100 rounded-xl text-[10px] font-bold text-slate-500">
+                  自分のシフトを表示中
+                </div>
+              )}
               <div className="flex bg-slate-200 p-1 rounded-full shrink-0">
                 <button onClick={() => setViewMode('day')} className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode === 'day' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}>日別</button>
                 <button onClick={() => setViewMode('week')} className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode === 'week' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}>週別</button>
-                <button onClick={() => setViewMode('month')} className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode === 'month' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}>月間</button>
+                <button onClick={() => setViewMode('month')} className={`px-3 py-1 text-[10px] font-bold rounded-full transition-all ${viewMode === 'month' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}>月別</button>
               </div>
             </div>
           )}
@@ -1242,26 +1268,32 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole }) => {
   const [chartType, setChartType] = useState('line');
   const [chartMetric, setChartMetric] = useState('appts');
   const [periodMode, setPeriodMode] = useState('daily');
-  const [showHelp, setShowHelp] = useState(false);
+  const currentMemberId = useMemo(() => members.find(m => m.email === getAuth().currentUser?.email)?.id, [members]);
+  
+  useEffect(() => {
+    if (userRole !== 'admin' && currentMemberId) {
+      setSelectedMid(currentMemberId);
+    }
+  }, [userRole, currentMemberId]);
 
   const fReports = useMemo(() => {
-    return reports.filter(r => {
       const isEventMatch = !r.eventId || r.eventId === event?.id;
-      if (selectedMid === 'all') return isEventMatch;
-      return isEventMatch && r.memberId === selectedMid;
+      const targetMid = (userRole === 'admin') ? selectedMid : currentMemberId;
+      if (targetMid === 'all') return isEventMatch;
+      return isEventMatch && r.memberId === targetMid;
     });
-  }, [reports, selectedMid, event]);
+  }, [reports, selectedMid, event, userRole, currentMemberId]);
 
   const combinedData = useMemo(() => {
     if (!reports || !members || !gasData) return [];
     const list = [...fReports];
-    const m = (members || []).find(mem => mem.id === selectedMid);
+      const m = (members || []).find(mem => mem.id === ((userRole === 'admin') ? selectedMid : currentMemberId));
 
-    (gasData || []).forEach(d => {
-      const gMid = (d.memberId || "").trim();
-      const mName = (m?.name || "").trim();
-      const mSName = (m?.spreadsheetName || "").trim();
-      const isMemberMatch = selectedMid === 'all' || (mSName && gMid === mSName) || (mName && gMid === mName);
+      (gasData || []).forEach(d => {
+        const gMid = (d.memberId || "").trim();
+        const mName = (m?.name || "").trim();
+        const mSName = (m?.spreadsheetName || "").trim();
+        const isMemberMatch = ((userRole === 'admin') ? selectedMid : currentMemberId) === 'all' || (mSName && gMid === mSName) || (mName && gMid === mName);
 
       if (isMemberMatch && d.timestamp) {
         const dt = d.timestamp.toDate ? d.timestamp.toDate() : (d.timestamp.seconds ? new Date(d.timestamp.seconds * 1000) : new Date(d.timestamp));
@@ -1328,10 +1360,18 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole }) => {
             <Icon p={I.Help} size={16} />
           </button>
         </div>
-        <select className="bg-white border border-slate-300 p-2 px-4 font-bold text-xs outline-none rounded-xl shadow-sm" value={selectedMid} onChange={e => setSelectedMid(e.target.value)}>
-          <option value="all">チーム全体の推移を表示</option>
-          {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-        </select>
+        <div className="flex items-center gap-3">
+          {userRole === 'admin' ? (
+            <select className="bg-white border border-slate-300 p-2 px-4 font-bold text-xs outline-none rounded-xl shadow-sm" value={selectedMid} onChange={e => setSelectedMid(e.target.value)}>
+              <option value="all">チーム全体の推移を表示</option>
+              {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          ) : (
+            <div className="px-4 py-2 bg-slate-100 rounded-xl text-xs font-bold text-slate-500">
+              マイ実績の推移を表示中
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="bg-white p-6 md:p-10 rounded-[3rem] border border-slate-100 shadow-xl space-y-6">
@@ -1399,7 +1439,8 @@ const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, 
   const [newMName, setNewMName] = useState("");
   const [newSpreadsheetName, setNewSpreadsheetName] = useState("");
   const [newEmail, setNewEmail] = useState("");
-  const [newRole, setNewRole] = useState("apo");
+  const [newJobType, setNewJobType] = useState("apo");
+  const [newPermissionLevel, setNewPermissionLevel] = useState("intern");
   const [newWage, setNewWage] = useState("1500");
   const [editingMember, setEditingMember] = useState(null);
 
@@ -1585,16 +1626,21 @@ const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, 
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <input className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold rounded-xl" placeholder="Gmail" value={newEmail} onChange={e => setNewEmail(e.target.value)} />
-                  <select className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none rounded-xl" value={newRole} onChange={e => setNewRole(e.target.value)}>
-                    <option value="apo">アポインター</option>
-                    <option value="closer">クローザー</option>
-                    <option value="admin">管理者</option>
-                  </select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none rounded-xl" value={newJobType} onChange={e => setNewJobType(e.target.value)}>
+                      <option value="apo">アポインター</option>
+                      <option value="closer">クローザー</option>
+                    </select>
+                    <select className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none rounded-xl" value={newPermissionLevel} onChange={e => setNewPermissionLevel(e.target.value)}>
+                      <option value="intern">インターン生</option>
+                      <option value="admin">管理者</option>
+                    </select>
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 gap-4">
                   <input type="number" className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none rounded-xl" placeholder="時給" value={newWage} onChange={e => setNewWage(e.target.value)} />
                 </div>
-                <button onClick={() => { if (newMName) { onAddMember(newMName, newRole, newWage, newEmail, newSpreadsheetName); setNewMName(""); setNewEmail(""); setNewSpreadsheetName(""); } }} className="w-full bg-emerald-600 text-white py-4 font-bold rounded-2xl hover:bg-emerald-700 transition-colors">スタッフを新規登録</button>
+                <button onClick={() => { if (newMName) { onAddMember(newMName, newJobType, newPermissionLevel, newWage, newEmail, newSpreadsheetName); setNewMName(""); setNewEmail(""); setNewSpreadsheetName(""); } }} className="w-full bg-emerald-600 text-white py-4 font-bold rounded-2xl hover:bg-emerald-700 transition-colors">スタッフを新規登録</button>
               </div>
               <div className="flex flex-col gap-px bg-slate-200 border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
                 {members.map(m => (
@@ -1603,11 +1649,12 @@ const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, 
                     setNewMName(m.name);
                     setNewSpreadsheetName(m.spreadsheetName || "");
                     setNewEmail(m.email || "");
-                    setNewRole(m.role);
+                    setNewJobType(m.jobType || m.role || "apo");
+                    setNewPermissionLevel(m.permissionLevel || (m.role === 'admin' ? 'admin' : 'intern'));
                     setNewWage(m.hourlyWage || "1500");
                   }} className="p-4 bg-white flex items-center justify-between text-left hover:bg-slate-50 group transition-colors">
                     <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 flex items-center justify-center font-bold text-white rounded-full ${m.role === 'admin' ? 'bg-slate-900' : 'bg-blue-600'}`}>{m.name?.slice(0, 1) || '?'}</div>
+                      <div className={`w-10 h-10 flex items-center justify-center font-bold text-white rounded-full ${(m.permissionLevel === 'admin' || m.role === 'admin') ? 'bg-slate-900' : 'bg-blue-600'}`}>{m.name?.slice(0, 1) || '?'}</div>
                       <div>
                         <div className="font-bold text-slate-900 flex items-center gap-2">
                           {m.name}
@@ -1615,7 +1662,7 @@ const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, 
                         </div>
                         <div className="text-[10px] text-slate-400">{m.email || 'メールアドレス未設定 (ログイン不可)'}</div>
                         <div className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mt-0.5 flex items-center gap-2">
-                          <span>¥{m.hourlyWage}/H • {m.role}</span>
+                          <span>¥{m.hourlyWage}/H • {m.jobType || m.role} • {m.permissionLevel || (m.role === 'admin' ? 'admin' : 'intern')}</span>
                           {m.spreadsheetName && <span className="text-emerald-600">スプシ: {m.spreadsheetName}</span>}
                         </div>
                       </div>
@@ -1637,11 +1684,16 @@ const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, 
                     <input className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold rounded-xl" value={editingMember.spreadsheetName || ''} onChange={e => setEditingMember({ ...editingMember, spreadsheetName: e.target.value })} placeholder="スプシ表示名" />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <select className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none rounded-xl" value={editingMember.role} onChange={e => setEditingMember({ ...editingMember, role: e.target.value })}>
-                      <option value="apo">アポインター</option>
-                      <option value="closer">クローザー</option>
-                      <option value="admin">管理者</option>
-                    </select>
+                    <div className="grid grid-cols-1 gap-2">
+                      <select className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none rounded-xl" value={editingMember.jobType || editingMember.role || 'apo'} onChange={e => setEditingMember({ ...editingMember, jobType: e.target.value })}>
+                        <option value="apo">アポインター</option>
+                        <option value="closer">クローザー</option>
+                      </select>
+                      <select className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none rounded-xl" value={editingMember.permissionLevel || (editingMember.role === 'admin' ? 'admin' : 'intern')} onChange={e => setEditingMember({ ...editingMember, permissionLevel: e.target.value })}>
+                        <option value="intern">インターン生</option>
+                        <option value="admin">管理者</option>
+                      </select>
+                    </div>
                     <input type="number" className="w-full p-4 bg-slate-50 border-2 border-slate-200 font-bold outline-none rounded-xl" value={editingMember.hourlyWage} onChange={e => setEditingMember({ ...editingMember, hourlyWage: e.target.value })} placeholder="時給" />
                   </div>
                   <div className="grid grid-cols-1 gap-4">
@@ -1677,15 +1729,19 @@ const Settings = ({ events, currentEventId, members, onAddEvent, onDeleteEvent, 
   );
 };
 
-function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData = null }) {
+function InputModal({ members, onAdd, onUpdate, onDelete, onClose, userRole, initialData = null }) {
   const [val, setVal] = useState({ memberId: '', date: toLocalDateString(new Date()), calls: '', appts: '', requests: '', hours: '', picConnected: '', noAnswer: '', receptionRefusal: '', picAbsent: '', outOfTarget: '' });
+
+  const currentMemberId = useMemo(() => members.find(m => m.email === getAuth().currentUser?.email)?.id, [members]);
 
   useEffect(() => {
     if (initialData) {
       const d = initialData.date?.toDate ? initialData.date.toDate() : new Date(initialData.date);
       setVal({ ...initialData, date: toLocalDateString(d) });
+    } else if (currentMemberId && !initialData) {
+      setVal(prev => ({ ...prev, memberId: currentMemberId }));
     }
-  }, [initialData]);
+  }, [initialData, currentMemberId]);
 
   const submit = (e) => {
     e.preventDefault();
@@ -1718,10 +1774,16 @@ function InputModal({ members, onAdd, onUpdate, onDelete, onClose, initialData =
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-4">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">メンバー</label>
-              <select className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none focus:border-slate-900 rounded-2xl transition-all" value={val.memberId} onChange={e => setVal({ ...val, memberId: e.target.value })}>
-                <option value="">選択してください</option>
-                {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
+              {userRole === 'admin' ? (
+                <select className="w-full p-4 bg-slate-50 border-2 border-slate-100 font-bold outline-none focus:border-slate-900 rounded-2xl transition-all" value={val.memberId} onChange={e => setVal({ ...val, memberId: e.target.value })}>
+                  <option value="">選択してください</option>
+                  {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              ) : (
+                <div className="w-full p-4 bg-slate-100 border-2 border-slate-100 font-bold rounded-2xl text-slate-500">
+                  {members.find(m => m.id === val.memberId)?.name || '読み込み中...'}
+                </div>
+              )}
             </div>
             <div className="space-y-4">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">日付</label>
@@ -1989,6 +2051,9 @@ function App() {
 
       if (u) {
         setConnectionStatus("connected");
+        // Update role based on permissionLevel if available, otherwise fallback to email check
+        const findMe = (ms) => ms.find(m => m.email === u.email);
+        // We'll set the role in the members listener to be more accurate
         setUserRole(u.email === ADMIN_EMAIL ? 'admin' : 'member');
 
         const eSub = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'events'), (s) => {
@@ -1999,7 +2064,14 @@ function App() {
         unsubs.push(eSub);
 
         const mSub = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'members'), (s) => {
-          setMembers(s.docs.map(d => ({ id: d.id, ...d.data() })));
+          const ms = s.docs.map(d => ({ id: d.id, ...d.data() }));
+          setMembers(ms);
+          if (u) {
+            const me = ms.find(m => m.email === u.email);
+            if (me) {
+              setUserRole(me.permissionLevel === 'admin' || me.role === 'admin' || u.email === ADMIN_EMAIL ? 'admin' : 'member');
+            }
+          }
         });
         unsubs.push(mSub);
 
@@ -2064,7 +2136,7 @@ function App() {
     }
   };
 
-  const addMember = async (n, r, w, e, sName) => await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'members'), { name: n, role: r, hourlyWage: Number(w), email: e || "", spreadsheetName: sName || "", createdAt: Timestamp.now() });
+  const addMember = async (n, jt, pl, w, e, sName) => await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'members'), { name: n, jobType: jt, permissionLevel: pl, hourlyWage: Number(w), email: e || "", spreadsheetName: sName || "", createdAt: Timestamp.now() });
   const updateMember = async (id, d) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', id), { ...d, updatedAt: Timestamp.now() });
   const deleteMember = async (id) => await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', id));
 
@@ -2228,7 +2300,15 @@ function App() {
             onDeleteShift={(id) => deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shifts', id))}
           />
         )}
-        {activeTab === 'gas' && <GasSyncDataView gasData={gasData} members={members} onEditGasRecord={updateGasRecord} onDeleteGasRecord={deleteGasRecord} />}
+        {activeTab === 'gas' && (
+          <GasSyncDataView
+            gasData={gasData}
+            members={members}
+            forcedMemberId={userRole === 'admin' ? null : members.find(m => m.email === user.email)?.id}
+            onEditGasRecord={updateGasRecord}
+            onDeleteGasRecord={deleteGasRecord}
+          />
+        )}
         {activeTab === 'settings' && (
           <Settings
             events={events} currentEventId={currentEventId}
@@ -2260,8 +2340,8 @@ function App() {
         <Icon p={I.Plus} size={28} />
       </button>
 
-      {showInput && <InputModal members={members} onAdd={addReport} onClose={() => setShowInput(false)} />}
-      {editingReport && <InputModal members={members} initialData={editingReport} onUpdate={updateReport} onDelete={deleteReport} onClose={() => setEditingReport(null)} />}
+      {showInput && <InputModal members={members} onAdd={addReport} onClose={() => setShowInput(false)} userRole={userRole} />}
+      {editingReport && <InputModal members={members} initialData={editingReport} onUpdate={updateReport} onDelete={deleteReport} onClose={() => setEditingReport(null)} userRole={userRole} />}
     </div>
   );
 }
