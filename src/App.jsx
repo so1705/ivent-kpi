@@ -127,11 +127,8 @@ const I = {
 };
 
 const BREAKDOWN_LABELS = {
-  noAnswer: '不在',
-  receptionRefusal: '受付拒否',
-  picAbsent: '担当不在',
   picRefusal: '担当者拒否',
-  picConnected: '本人接続',
+  effectiveContact: '有効接触',
   requests: '資料送付',
   appts: 'アポ',
   outOfTarget: '対象外'
@@ -238,7 +235,7 @@ const MetricBar = ({ label, val, tgt }) => {
         <div className="flex items-center gap-1">
           <span className="text-xs font-bold text-slate-500">{label}</span>
           {(label.includes('効率') || label.includes('率')) && (
-            <button onClick={() => alert(METRIC_HELP[label.includes('効率') ? 'CPH' : label.includes('接続') ? '接続率' : 'アポ率'])} className="text-slate-300 hover:text-blue-500 transition-colors">
+            <button onClick={() => alert(METRIC_HELP[label.includes('効率') ? 'CPH' : label.includes('接触') ? '有効接触率' : 'アポ率'])} className="text-slate-300 hover:text-blue-500 transition-colors">
               <Icon p={I.Help} size={10} />
             </button>
           )}
@@ -381,11 +378,12 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
       return ts >= start && ts <= end;
     });
 
-    const gasCounts = { appts: 0, requests: 0, picConnected: 0, noAnswer: 0, refusal: 0, picRefusal: 0, total: myGas.length };
+    const gasCounts = { appts: 0, requests: 0, effectiveContact: 0, noAnswer: 0, refusal: 0, picRefusal: 0, total: myGas.length };
     myGas.forEach(d => {
       if (d.type === 'アポ確定') gasCounts.appts++;
       if (d.type?.includes('資料送付')) gasCounts.requests++;
-      if (['アポ確定', '資料送付予定A', '資料送付予定B', '資料送付予定C', '担当者不在', '折り返し', '再架電'].some(t => d.type?.includes(t))) gasCounts.picConnected++;
+      // Effective Contact includes Appts, Requests, Re-calls, and PIC Refusal. Excludes Callback and PIC Absent.
+      if (['アポ確定', '資料送付予定A', '資料送付予定B', '資料送付予定C', '再架電', '担当者拒否'].some(t => d.type?.includes(t))) gasCounts.effectiveContact++;
       if (d.type === '受付拒否') gasCounts.refusal++;
       if (d.type === '担当者拒否') gasCounts.picRefusal++;
       if (d.type === '担当者不在') gasCounts.noAnswer++;
@@ -394,7 +392,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
     const totalCalls = s.calls + gasCounts.total;
     const totalAppts = s.appts + gasCounts.appts;
     const totalRequests = s.requests + gasCounts.requests;
-    const totalConnected = s.picConnected + gasCounts.picConnected;
+    const totalEffectiveContact = s.picConnected + gasCounts.effectiveContact;
     const cph = s.hours > 0 ? (totalCalls / s.hours).toFixed(1) : "0.0";
 
     // Expected Output calculation
@@ -432,7 +430,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
     });
     const totalMonthlyAppts = monthlyAppts + mGas.filter(d => d.type === 'アポ確定').length;
 
-    return { ...s, totalCalls, totalAppts, totalRequests, totalConnected, gasCounts, cph, totalMonthlyAppts, expectedAppts };
+    return { ...s, totalCalls, totalAppts, totalRequests, totalEffectiveContact, gasCounts, cph, totalMonthlyAppts, expectedAppts };
   }, [viewMode, personalPeriod, personalDate, eventReports, gasData, currentMember]);
 
   const activeWeeklyGoals = event.weeklyGoals?.[getMondayKey(currentBaseDate)] || event.goals?.weekly || {};
@@ -547,8 +545,8 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                   {[
                     { label: '稼働効率 (CPH)', val: personalStats.cph, icon: I.Zap, color: 'text-blue-600' },
                     { label: '期待着地', val: personalStats.expectedAppts, icon: I.TrendingUp, color: 'text-emerald-600' },
-                    { label: '本人接続率', val: (personalStats.totalCalls > 0 ? (personalStats.totalConnected / personalStats.totalCalls * 100).toFixed(1) : 0) + '%', icon: I.User, color: 'text-slate-900' },
-                    { label: 'アポ獲得率', val: (personalStats.totalConnected > 0 ? (personalStats.totalAppts / personalStats.totalConnected * 100).toFixed(1) : 0) + '%', icon: I.Check, color: 'text-blue-600' },
+                    { label: '有効接触率', val: (personalStats.totalCalls > 0 ? (personalStats.totalEffectiveContact / personalStats.totalCalls * 100).toFixed(1) : 0) + '%', icon: I.User, color: 'text-slate-900' },
+                    { label: 'アポ獲得率', val: (personalStats.totalEffectiveContact > 0 ? (personalStats.totalAppts / personalStats.totalEffectiveContact * 100).toFixed(1) : 0) + '%', icon: I.Check, color: 'text-blue-600' },
                   ].map(stat => (
                     <div key={stat.label} className="space-y-1">
                       <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -565,7 +563,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                     {[
                       { label: 'アポ獲得', val: personalStats.totalAppts, color: 'bg-blue-600' },
                       { label: '資料送付', val: personalStats.totalRequests, color: 'bg-emerald-500' },
-                      { label: '再架電', val: personalStats.gasCounts.picConnected - personalStats.totalAppts - personalStats.totalRequests, color: 'bg-amber-400' },
+                      { label: '有効接触', val: personalStats.gasCounts.effectiveContact, color: 'bg-amber-400' },
                       { label: '担当者拒否', val: personalStats.gasCounts.picRefusal, color: 'bg-rose-600' },
                       { label: '受付拒否', val: personalStats.gasCounts.refusal, color: 'bg-rose-400' },
                       { label: '不在', val: personalStats.gasCounts.noAnswer, color: 'bg-slate-200' },
@@ -789,11 +787,13 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
 };
 
 
-const AttendanceView = ({ members, reports, onEdit, userRole }) => {
+const AttendanceView = ({ members, reports, onEdit, userRole, currentUserEmail }) => {
   const [selectedMonth, setSelectedMonth] = useState(toLocalMonthString(new Date()));
   const [selectedMemberId, setSelectedMemberId] = useState('all');
 
-  const currentMemberId = useMemo(() => members.find(m => m.email === getAuth().currentUser?.email)?.id, [members]);
+  const currentMemberId = useMemo(() => {
+    return currentUserEmail ? members.find(m => m.email === currentUserEmail)?.id : null;
+  }, [members, currentUserEmail]);
   
   useEffect(() => {
     if (userRole !== 'admin' && currentMemberId) {
@@ -801,13 +801,13 @@ const AttendanceView = ({ members, reports, onEdit, userRole }) => {
     }
   }, [userRole, currentMemberId]);
 
-  const fReports = useMemo(() => reports.filter(r => {
+  const fReports = useMemo(() => (reports || []).filter(r => {
     if (!r.date) return false;
     const dateMatch = toLocalMonthString(r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000)) === selectedMonth;
     const isMe = r.memberId === currentMemberId;
     const memberMatch = (userRole === 'admin') ? (selectedMemberId === 'all' || r.memberId === selectedMemberId) : isMe;
     return dateMatch && memberMatch;
-  }).sort((a, b) => b.date.seconds - a.date.seconds), [reports, selectedMonth, selectedMemberId, userRole, currentMemberId]);
+  }).sort((a, b) => (b.date?.seconds || 0) - (a.date?.seconds || 0)), [reports, selectedMonth, selectedMemberId, userRole, currentMemberId]);
 
   const totalH = fReports.reduce((s, r) => s + (Number(r.hours) || 0), 0);
   const totalCost = fReports.reduce((s, r) => {
@@ -1259,11 +1259,11 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
 
 const METRIC_HELP = {
   CPH: 'CPH（Calls Per Hour）= 1時間あたりの架電数。稼働効率を示す指標。高いほど効率的。',
-  接続率: '本人接続率 = 架電数のうち担当者本人と会話できた割合。リストの質を測る指標。',
-  アポ率: 'アポ率 = 本人接続数のうちアポイントを獲得できた割合。トークの転換力を測る指標。',
+  有効接触率: '有効接触率 = 架電数のうち、アポや資料送付、確度の高い再架電に繋がった割合。',
+  アポ率: 'アポ率 = 有効接触数のうちアポイントを獲得できた割合。トークの転換力を測る指標。',
   達成率: '達成率 = 今週の個人アポ目標に対する現在の獲得数の割合。',
   期待着地: '期待着地件数 = 過去の実績（アポ率×CPH）×今週の予定稼働時間から算出した予測値。',
-  本人接続: '担当者本人と直接会話できた件数。受付止まりや不在は含まない。',
+  有効接触: 'アポ、資料送付、確度の高い再架電、担当者拒否の合計。折り返しや不在は含まない。',
 };
 
 const MetricHelpModal = ({ onClose }) => (
@@ -1285,12 +1285,14 @@ const MetricHelpModal = ({ onClose }) => (
   </div>
 );
 
-const AnalyticsView = ({ members, reports, gasData, event, userRole }) => {
+const AnalyticsView = ({ members, reports, gasData, event, userRole, currentUserEmail }) => {
   const [selectedMid, setSelectedMid] = useState('all');
   const [chartType, setChartType] = useState('line');
   const [chartMetric, setChartMetric] = useState('appts');
   const [periodMode, setPeriodMode] = useState('daily');
-  const currentMemberId = useMemo(() => members.find(m => m.email === getAuth().currentUser?.email)?.id, [members]);
+  const currentMemberId = useMemo(() => {
+    return currentUserEmail ? members.find(m => m.email === currentUserEmail)?.id : null;
+  }, [members, currentUserEmail]);
   
   useEffect(() => {
     if (userRole !== 'admin' && currentMemberId) {
@@ -1299,7 +1301,7 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole }) => {
   }, [userRole, currentMemberId]);
 
   const fReports = useMemo(() => {
-    return reports.filter(r => {
+    return (reports || []).filter(r => {
       const isEventMatch = !r.eventId || r.eventId === event?.id;
       const targetMid = (userRole === 'admin') ? selectedMid : currentMemberId;
       if (targetMid === 'all') return isEventMatch;
@@ -1325,7 +1327,7 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole }) => {
           appts: d.type === 'アポ確定' ? 1 : 0,
           calls: 1,
           requests: d.type?.includes('資料送付') ? 1 : 0,
-          picConnected: ['アポ確定', '資料送付予定A', '資料送付予定B', '資料送付予定C', '担当者不在', '折り返し', '再架電'].some(t => d.type?.includes(t)) ? 1 : 0,
+          effectiveContact: ['アポ確定', '資料送付予定A', '資料送付予定B', '資料送付予定C', '再架電', '担当者拒否'].some(t => d.type?.includes(t)) ? 1 : 0,
           picAbsent: d.type === '担当者不在' ? 1 : 0,
           picRefusal: d.type === '担当者拒否' ? 1 : 0,
           receptionRefusal: d.type === '受付拒否' ? 1 : 0,
@@ -1333,25 +1335,27 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole }) => {
       }
     });
     return list;
-  }, [fReports, gasData, selectedMid, members]);
+  }, [fReports, gasData, selectedMid, members, userRole, currentMemberId]);
 
   const stats = useMemo(() => {
     return combinedData.reduce((acc, r) => ({
       calls: acc.calls + (Number(r.calls) || 0),
       appts: acc.appts + (Number(r.appts) || 0),
       requests: acc.requests + (Number(r.requests) || 0),
-      picConnected: acc.picConnected + (Number(r.picConnected) || 0),
+      effectiveContact: acc.effectiveContact + (Number(r.effectiveContact) || 0),
       picAbsent: acc.picAbsent + (Number(r.picAbsent) || 0),
       picRefusal: acc.picRefusal + (Number(r.picRefusal) || 0),
       refusal: acc.refusal + (Number(r.receptionRefusal) || 0),
-    }), { calls: 0, appts: 0, requests: 0, picConnected: 0, picAbsent: 0, picRefusal: 0, refusal: 0 });
+    }), { calls: 0, appts: 0, requests: 0, effectiveContact: 0, picAbsent: 0, picRefusal: 0, refusal: 0 });
   }, [combinedData]);
 
   const trendData = useMemo(() => {
     const map = {};
     combinedData.forEach(r => {
-      if (!r.date) return;
-      const dateObj = r.date.toDate ? r.date.toDate() : new Date(r.date.seconds * 1000);
+      if (!r || !r.date) return;
+      const dateObj = r.date.toDate ? r.date.toDate() : (r.date.seconds ? new Date(r.date.seconds * 1000) : new Date(r.date));
+      if (!dateObj || isNaN(dateObj.getTime())) return;
+      
       let key = '';
       if (periodMode === 'daily') key = toLocalDateString(dateObj).slice(-5);
       else if (periodMode === 'weekly') {
@@ -1370,7 +1374,7 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole }) => {
   }, [combinedData, chartMetric, periodMode]);
 
   const metricLabels = {
-    calls: '架電数', appts: 'アポ獲得数', requests: '資料請求数', picConnected: '本人接続数',
+    calls: '架電数', appts: 'アポ獲得数', requests: '資料請求数', effectiveContact: '有効接触数',
     picAbsent: '不在・無応答', picRefusal: '担当者拒否', receptionRefusal: '受付拒否'
   };
   const periodLabels = { daily: '日次', weekly: '週次', monthly: '月次', yearly: '年次' };
@@ -1407,7 +1411,7 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole }) => {
               <div className="text-2xl font-black text-slate-900">{metricLabels[chartMetric]}の推移</div>
             </div>
             <div className="flex flex-wrap gap-2">
-              {['appts', 'calls', 'requests', 'picConnected', 'picRefusal', 'receptionRefusal'].map(m => (
+              {['appts', 'calls', 'requests', 'effectiveContact', 'picRefusal', 'receptionRefusal'].map(m => (
                 <button key={m} onClick={() => setChartMetric(m)} className={`px-3 py-2 text-[10px] font-black rounded-xl transition-all border ${chartMetric === m ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-200'}`}>{metricLabels[m]}</button>
               ))}
             </div>
@@ -1433,8 +1437,8 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole }) => {
         <div className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-10">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">転換・効率（CVR）</h3>
           <div className="space-y-10">
-            <MetricBar label="接続率 (架電比)" val={stats.picConnected} tgt={stats.calls} />
-            <MetricBar label="アポ率 (接続比)" val={stats.appts} tgt={stats.picConnected} />
+            <MetricBar label="有効接触率 (架電比)" val={stats.effectiveContact} tgt={stats.calls} />
+            <MetricBar label="アポ率 (接触比)" val={stats.appts} tgt={stats.effectiveContact} />
           </div>
         </div>
 
@@ -2060,6 +2064,7 @@ function App() {
 
   const handleLogout = () => signOut(auth);
 
+
   useEffect(() => {
     if (isOffline || !auth) {
       setConnectionStatus("offline");
@@ -2219,11 +2224,11 @@ function App() {
 
   const memberStats = useMemo(() => {
     const wr = getWeekRange(currentBaseDate);
-    const activeWeeklyGoals = currentEvent.weeklyGoals?.[getMondayKey(currentBaseDate)] || currentEvent.goals?.weekly || {};
-    const uniformGoal = members.length > 0 ? Math.ceil(activeWeeklyGoals.appts / members.length) : 0;
+    const activeWeeklyGoals = currentEvent?.weeklyGoals?.[getMondayKey(currentBaseDate)] || currentEvent?.goals?.weekly || {};
+    const uniformGoal = members.length > 0 ? Math.ceil((activeWeeklyGoals.appts || 0) / members.length) : 0;
 
-    return members.map(m => {
-      const myReps = reports.filter(r => r.memberId === m.id && (!r.eventId || r.eventId === currentEventId));
+    return (members || []).map(m => {
+      const myReps = (reports || []).filter(r => r.memberId === m.id && (!r.eventId || r.eventId === currentEventId));
       const myTot = myReps.reduce((acc, r) => ({
         appts: acc.appts + (Number(r.appts) || 0),
         calls: acc.calls + (Number(r.calls) || 0),
@@ -2233,7 +2238,7 @@ function App() {
         receptionRefusal: acc.receptionRefusal + (Number(r.receptionRefusal) || 0),
       }), { appts: 0, calls: 0, hours: 0, picConnected: 0, requests: 0, receptionRefusal: 0 });
 
-      gasData.filter(d => d.memberId === m.spreadsheetName || d.memberId === m.name).forEach(d => {
+      (gasData || []).filter(d => d.memberId === m.spreadsheetName || d.memberId === m.name).forEach(d => {
         myTot.calls += 1;
         if (d.type === 'アポ確定') myTot.appts += 1;
         if (d.type?.startsWith('資料送付予定')) myTot.requests += 1;
@@ -2242,7 +2247,7 @@ function App() {
       });
 
       const cph = myTot.hours > 0 ? (myTot.calls / myTot.hours).toFixed(1) : "0.0";
-      const myWeekShifts = shifts.filter(sh => {
+      const myWeekShifts = (shifts || []).filter(sh => {
         const d = new Date(sh.date);
         return sh.memberId === m.id && d >= wr.start && d <= wr.end;
       });
@@ -2318,8 +2323,8 @@ function App() {
             shifts={shifts}
           />
         )}
-        {activeTab === 'analytics' && <AnalyticsView members={members} reports={reports} gasData={gasData} event={currentEvent} userRole={userRole} />}
-        {activeTab === 'attendance' && <AttendanceView members={members} reports={reports} onEdit={setEditingReport} userRole={userRole} />}
+        {activeTab === 'analytics' && <AnalyticsView members={members} reports={reports} gasData={gasData} event={currentEvent} userRole={userRole} currentUserEmail={user?.email} />}
+        {activeTab === 'attendance' && <AttendanceView members={members} reports={reports} onEdit={setEditingReport} userRole={userRole} currentUserEmail={user?.email} />}
         {activeTab === 'shifts' && (
           <ShiftView
             members={members} shifts={shifts} userRole={userRole} myMemberId={memberStats.find(m => m.email === user.email)?.id}
