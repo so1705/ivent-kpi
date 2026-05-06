@@ -767,7 +767,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
 };
 
 
-const AttendanceView = ({ members, reports, onEdit }) => {
+const AttendanceView = ({ members, reports, onEdit, userRole }) => {
   const [selectedMonth, setSelectedMonth] = useState(toLocalMonthString(new Date()));
   const [selectedMemberId, setSelectedMemberId] = useState('all');
 
@@ -1277,6 +1277,7 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole }) => {
   }, [userRole, currentMemberId]);
 
   const fReports = useMemo(() => {
+    return reports.filter(r => {
       const isEventMatch = !r.eventId || r.eventId === event?.id;
       const targetMid = (userRole === 'admin') ? selectedMid : currentMemberId;
       if (targetMid === 'all') return isEventMatch;
@@ -1287,13 +1288,13 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole }) => {
   const combinedData = useMemo(() => {
     if (!reports || !members || !gasData) return [];
     const list = [...fReports];
-      const m = (members || []).find(mem => mem.id === ((userRole === 'admin') ? selectedMid : currentMemberId));
+    const m = (members || []).find(mem => mem.id === ((userRole === 'admin') ? selectedMid : currentMemberId));
 
-      (gasData || []).forEach(d => {
-        const gMid = (d.memberId || "").trim();
-        const mName = (m?.name || "").trim();
-        const mSName = (m?.spreadsheetName || "").trim();
-        const isMemberMatch = ((userRole === 'admin') ? selectedMid : currentMemberId) === 'all' || (mSName && gMid === mSName) || (mName && gMid === mName);
+    (gasData || []).forEach(d => {
+      const gMid = (d.memberId || "").trim();
+      const mName = (m?.name || "").trim();
+      const mSName = (m?.spreadsheetName || "").trim();
+      const isMemberMatch = ((userRole === 'admin') ? selectedMid : currentMemberId) === 'all' || (mSName && gMid === mSName) || (mName && gMid === mName);
 
       if (isMemberMatch && d.timestamp) {
         const dt = d.timestamp.toDate ? d.timestamp.toDate() : (d.timestamp.seconds ? new Date(d.timestamp.seconds * 1000) : new Date(d.timestamp));
@@ -2292,7 +2293,7 @@ function App() {
           />
         )}
         {activeTab === 'analytics' && <AnalyticsView members={members} reports={reports} gasData={gasData} event={currentEvent} userRole={userRole} />}
-        {activeTab === 'attendance' && <AttendanceView members={members} reports={reports} onEdit={setEditingReport} />}
+        {activeTab === 'attendance' && <AttendanceView members={members} reports={reports} onEdit={setEditingReport} userRole={userRole} />}
         {activeTab === 'shifts' && (
           <ShiftView
             members={members} shifts={shifts} userRole={userRole} myMemberId={memberStats.find(m => m.email === user.email)?.id}
