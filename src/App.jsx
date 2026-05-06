@@ -553,7 +553,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
               <div className="bg-white border border-slate-100 p-12 rounded-[3.5rem] shadow-sm space-y-12">
                 <div className="flex items-center justify-between border-b border-slate-50 pb-8">
                   <h3 className="text-2xl font-black flex items-center gap-4 text-slate-900">
-                    <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl"><Icon p={I.Activity} size={24} /></div>
+                    <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl"><Icon p={I.TrendingUp} size={24} /></div>
                     パフォーマンス詳細分析
                   </h3>
                   <div className="px-4 py-2 bg-slate-50 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -1253,61 +1253,7 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase mb-3 block">担当スタッフ</label>
                 <div className="flex flex-wrap gap-2">{members.map(m => (
-                  <button key={m.id} onClick={() => { setSelectedMemberId(m.id); }} className={`px-4 py-2 border font-bold text-xs transition-all rounded-full ${selectedMemberId === m.id ? 'bg-slate-900 text-white' : 'border-slate-200 hover:bg-slate-50'}`}>{m.name}</button>
-                ))}</div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">開始</label>
-                  <input type="time" className="w-full p-4 border-2 border-slate-100 font-bold outline-none focus:border-slate-900 rounded-xl transition-colors" value={startTime} onChange={e => setStartTime(e.target.value)} />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">終了</label>
-                  <input type="time" className="w-full p-4 border-2 border-slate-100 font-bold outline-none focus:border-slate-900 rounded-xl transition-colors" value={endTime} onChange={e => setEndTime(e.target.value)} />
-                </div>
-              </div>
-            </div>
-            <button onClick={async () => {
-              if (!selectedMemberId) return alert("スタッフを選択してください");
-              await onAddShift({ memberId: selectedMemberId, date: selectedDate, startTime, endTime });
-              setShowModal(false);
-            }} className="w-full bg-slate-900 text-white py-4 font-bold rounded-2xl hover:bg-black transition-colors">内容を保存</button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const METRIC_HELP = {
-  CPH: 'CPH（Calls Per Hour）= 1時間あたりの架電数。稼働効率を示す指標。高いほど効率的。',
-  有効接触率: '有効接触率 = 架電数のうち、アポや資料送付、確度の高い再架電に繋がった割合。',
-  アポ率: 'アポ率 = 有効接触数のうちアポイントを獲得できた割合。トークの転換力を測る指標。',
-  達成率: '達成率 = 今週の個人アポ目標に対する現在の獲得数の割合。',
-  期待着地: '期待着地件数 = 過去の実績（アポ率×CPH）×今週の予定稼働時間から算出した予測値。',
-  有効接触: 'アポ、資料送付、確度の高い再架電、担当者拒否の合計。折り返しや不在は含まない。',
-};
-
-const MetricHelpModal = ({ onClose }) => (
-  <div className="fixed inset-0 z-[500] flex items-end md:items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4" onClick={onClose}>
-    <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-      <div className="p-6 bg-slate-900 text-white flex items-center justify-between">
-        <h3 className="font-black text-lg flex items-center gap-3"><Icon p={I.Help} size={20} color="white" />指標・用語解説</h3>
-        <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 transition-colors"><Icon p={I.X} size={20} color="white" /></button>
-      </div>
-      <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
-        {Object.entries(METRIC_HELP).map(([k, v]) => (
-          <div key={k} className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-            <div className="text-xs font-black text-blue-600 uppercase tracking-widest mb-2">{k}</div>
-            <div className="text-sm text-slate-700 leading-relaxed">{v}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  </div>
-);
-
-const AnalyticsView = ({ members, reports, gasData, event, userRole, currentUserEmail }) => {
+                  <button key={m.id} onClick={() => { setSelectedMemberId(m.id); }} className={`px-4 py-2 bconst AnalyticsView = ({ members, reports, gasData, event, userRole, currentUserEmail, shifts }) => {
   const [selectedMid, setSelectedMid] = useState('all');
   const [chartMetric, setChartMetric] = useState('appts');
   const [periodMode, setPeriodMode] = useState('daily');
@@ -1323,7 +1269,7 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole, currentUser
   }, [userRole, currentMemberId]);
 
   const stats = useMemo(() => {
-    const s = { calls: 0, appts: 0, requests: 0, effectiveContact: 0, picRefusal: 0, refusal: 0 };
+    const s = { calls: 0, appts: 0, requests: 0, effectiveContact: 0, picRefusal: 0, refusal: 0, hours: 0 };
     const targetMid = (userRole === 'admin') ? selectedMid : currentMemberId;
 
     (reports || []).forEach(r => {
@@ -1334,6 +1280,7 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole, currentUser
       s.requests += (Number(r.requests) || 0);
       s.effectiveContact += (Number(r.picConnected) || 0);
       s.refusal += (Number(r.receptionRefusal) || 0);
+      s.hours += (Number(r.hours) || 0);
     });
 
     (gasData || []).forEach(d => {
@@ -1350,6 +1297,27 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole, currentUser
 
     return s;
   }, [reports, gasData, selectedMid, members, event, userRole, currentMemberId]);
+
+  const expectedStats = useMemo(() => {
+    const targetMid = (userRole === 'admin') ? selectedMid : currentMemberId;
+    const apptRatePerHour = stats.hours > 0 ? (stats.appts / stats.hours) : 0.05;
+    
+    const relevantShifts = (shifts || []).filter(sh => {
+      if (targetMid !== 'all' && sh.memberId !== targetMid) return false;
+      return true;
+    });
+
+    const scheduledHours = relevantShifts.reduce((acc, sh) => {
+      const [h1, m1] = sh.startTime.split(':').map(Number);
+      const [h2, m2] = sh.endTime.split(':').map(Number);
+      return acc + (h2 + m2 / 60) - (h1 + m1 / 60);
+    }, 0);
+
+    return {
+      expectedAppts: (apptRatePerHour * scheduledHours).toFixed(1),
+      apptRate: stats.effectiveContact > 0 ? (stats.appts / stats.effectiveContact * 100).toFixed(1) : "0.0"
+    };
+  }, [stats, shifts, selectedMid, userRole, currentMemberId]);
 
   const trendData = useMemo(() => {
     const map = {};
@@ -1405,7 +1373,7 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole, currentUser
         <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none"><Icon p={I.PieChart} size={160} /></div>
         <div className="relative z-10 space-y-2">
           <div className="flex items-center gap-4">
-            <div className="p-4 bg-slate-900 text-white rounded-2xl shadow-xl"><Icon p={I.BarChart2} size={28} /></div>
+            <div className="p-4 bg-slate-900 text-white rounded-2xl shadow-xl"><Icon p={I.Chart} size={28} /></div>
             <h2 className="text-3xl font-black text-slate-900 tracking-tighter">多角分析ダッシュボード</h2>
             <button onClick={() => setShowHelp(true)} className="p-2 rounded-full bg-slate-50 hover:bg-blue-100 text-slate-400 hover:text-blue-600 transition-colors">
               <Icon p={I.Help} size={20} />
@@ -1414,7 +1382,12 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole, currentUser
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] pl-16">Intelligence Analytics System v2.0</p>
         </div>
         
-        <div className="flex flex-wrap gap-3 relative z-10">
+        <div className="flex items-center gap-6 relative z-10">
+          <div className="text-right">
+            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">期待着地出力</div>
+            <div className="text-2xl font-black text-emerald-600 tabular-nums">{expectedStats.expectedAppts}</div>
+          </div>
+          <div className="w-px h-8 bg-slate-100"></div>
           {userRole === 'admin' ? (
             <select className="bg-white border-2 border-slate-100 p-4 px-6 font-black text-xs rounded-2xl outline-none focus:border-blue-600 transition-all shadow-md" value={selectedMid} onChange={e => setSelectedMid(e.target.value)}>
               <option value="all">チーム全体の推移</option>
@@ -1445,6 +1418,70 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole, currentUser
               <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-1">
                 {['daily', 'weekly', 'monthly'].map(p => (
                   <button key={p} onClick={() => setPeriodMode(p)} className={`px-4 py-1.5 text-[10px] font-black rounded-xl transition-all ${periodMode === p ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>{periodLabels[p]}</button>
+                ))}
+                <div className="w-px h-4 bg-slate-200 self-center mx-1"></div>
+                <button onClick={() => setChartType(chartType === 'area' ? 'line' : 'area')} className="px-4 py-1.5 text-[10px] font-black rounded-xl transition-all bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center gap-2">
+                  <Icon p={chartType === 'area' ? I.TrendingUp : I.Zap} size={14} />
+                  {chartType === 'area' ? 'エリア' : 'ライン'}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="h-[400px] w-full pt-4">
+            <CustomChart data={trendData} color={chartMetric === 'appts' ? '#2563eb' : '#64748b'} type={chartType} />
+          </div>
+        </div>
+
+        <div className="lg:col-span-4 flex flex-col gap-10">
+          <div className="bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-xl space-y-10 flex-1">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none flex items-center gap-3">
+                <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                Conversion Metrics
+              </h3>
+              <div className="text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                転換率: {expectedStats.apptRate}%
+              </div>
+            </div>
+            <div className="space-y-12 py-4">
+              <div className="group">
+                <MetricBar label="有効接触率 (架電比)" val={stats.effectiveContact} tgt={stats.calls} color="bg-blue-600" />
+                <p className="mt-4 text-[10px] text-slate-400 font-medium leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity">架電から担当者への接続・確度の高い反応への転換率です。</p>
+              </div>
+              <div className="group">
+                <MetricBar label="アポ獲得率 (接触比)" val={stats.appts} tgt={stats.effectiveContact} color="bg-emerald-600" />
+                <p className="mt-4 text-[10px] text-slate-400 font-medium leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity">有効な接触からアポイント獲得に至った成約率です。</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-slate-900 p-10 rounded-[3.5rem] shadow-2xl text-white relative overflow-hidden flex-shrink-0">
+            <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none rotate-12"><Icon p={I.Zap} size={120} /></div>
+            <div className="relative z-10 space-y-8">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center font-black shadow-lg shadow-blue-500/20 text-xl">AI</div>
+                <div>
+                  <h3 className="text-sm font-black text-white leading-none">戦略アドバイザー</h3>
+                  <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mt-1">Diagnostic AI v5.0</p>
+                </div>
+              </div>
+              <div className="p-6 bg-white/5 border border-white/10 rounded-[2rem] backdrop-blur-md">
+                <div className="text-xs font-bold leading-relaxed text-slate-200">{getAIAdvice(stats, selectedMid !== 'all')}</div>
+              </div>
+              <div className="flex items-center justify-between pt-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping"></div>
+                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Realtime Analysis</span>
+                </div>
+                <div className="px-3 py-1 bg-white/10 rounded-lg text-[9px] font-black text-slate-400">OPTIMIZED</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};p)} className={`px-4 py-1.5 text-[10px] font-black rounded-xl transition-all ${periodMode === p ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>{periodLabels[p]}</button>
                 ))}
                 <div className="w-px h-4 bg-slate-200 self-center mx-1"></div>
                 <button onClick={() => setChartType(chartType === 'area' ? 'line' : 'area')} className="px-4 py-1.5 text-[10px] font-black rounded-xl transition-all bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center gap-2">
@@ -2365,7 +2402,7 @@ function App() {
             shifts={shifts}
           />
         )}
-        {activeTab === 'analytics' && <AnalyticsView members={members} reports={reports} gasData={gasData} event={currentEvent} userRole={userRole} currentUserEmail={user?.email} />}
+        {activeTab === 'analytics' && <AnalyticsView members={members} reports={reports} gasData={gasData} event={currentEvent} userRole={userRole} currentUserEmail={user?.email} shifts={shifts} />}
         {activeTab === 'attendance' && <AttendanceView members={members} reports={reports} onEdit={setEditingReport} userRole={userRole} currentUserEmail={user?.email} />}
         {activeTab === 'shifts' && (
           <ShiftView
