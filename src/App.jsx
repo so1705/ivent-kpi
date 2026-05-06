@@ -1253,7 +1253,61 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase mb-3 block">担当スタッフ</label>
                 <div className="flex flex-wrap gap-2">{members.map(m => (
-                  <button key={m.id} onClick={() => { setSelectedMemberId(m.id); }} className={`px-4 py-2 bconst AnalyticsView = ({ members, reports, gasData, event, userRole, currentUserEmail, shifts }) => {
+                  <button key={m.id} onClick={() => { setSelectedMemberId(m.id); }} className={`px-4 py-2 border font-bold text-xs transition-all rounded-full ${selectedMemberId === m.id ? 'bg-slate-900 text-white' : 'border-slate-200 hover:bg-slate-50'}`}>{m.name}</button>
+                ))}</div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">開始</label>
+                  <input type="time" className="w-full p-4 border-2 border-slate-100 font-bold outline-none focus:border-slate-900 rounded-xl transition-colors" value={startTime} onChange={e => setStartTime(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase mb-2 block">終了</label>
+                  <input type="time" className="w-full p-4 border-2 border-slate-100 font-bold outline-none focus:border-slate-900 rounded-xl transition-colors" value={endTime} onChange={e => setEndTime(e.target.value)} />
+                </div>
+              </div>
+            </div>
+            <button onClick={async () => {
+              if (!selectedMemberId) return alert("スタッフを選択してください");
+              await onAddShift({ memberId: selectedMemberId, date: selectedDate, startTime, endTime });
+              setShowModal(false);
+            }} className="w-full bg-slate-900 text-white py-4 font-bold rounded-2xl hover:bg-black transition-colors">内容を保存</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const METRIC_HELP = {
+  CPH: 'CPH（Calls Per Hour）= 1時間あたりの架電数。稼働効率を示す指標。高いほど効率的。',
+  有効接触率: '有効接触率 = 架電数のうち、アポや資料送付、確度の高い再架電に繋がった割合。',
+  アポ率: 'アポ率 = 有効接触数のうちアポイントを獲得できた割合。トークの転換力を測る指標。',
+  達成率: '達成率 = 今週の個人アポ目標に対する現在の獲得数の割合。',
+  期待着地: '期待着地件数 = 過去の実績（アポ率×CPH）×今週の予定稼働時間から算出した予測値。',
+  有効接触: 'アポ、資料送付、確度の高い再架電、担当者拒否の合計。折り返しや不在は含まない。',
+};
+
+const MetricHelpModal = ({ onClose }) => (
+  <div className="fixed inset-0 z-[500] flex items-end md:items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4" onClick={onClose}>
+    <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div className="p-6 bg-slate-900 text-white flex items-center justify-between">
+        <h3 className="font-black text-lg flex items-center gap-3"><Icon p={I.Help} size={20} color="white" />指標・用語解説</h3>
+        <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 transition-colors"><Icon p={I.X} size={20} color="white" /></button>
+      </div>
+      <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+        {Object.entries(METRIC_HELP).map(([k, v]) => (
+          <div key={k} className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+            <div className="text-xs font-black text-blue-600 uppercase tracking-widest mb-2">{k}</div>
+            <div className="text-sm text-slate-700 leading-relaxed">{v}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+const AnalyticsView = ({ members, reports, gasData, event, userRole, currentUserEmail, shifts }) => {
   const [selectedMid, setSelectedMid] = useState('all');
   const [chartMetric, setChartMetric] = useState('appts');
   const [periodMode, setPeriodMode] = useState('daily');
@@ -1398,6 +1452,7 @@ const ShiftView = ({ members, shifts, onAddShift, onDeleteShift, userRole, myMem
           )}
         </div>
       </div>
+
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
         <div className="lg:col-span-8 bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-xl space-y-10">
