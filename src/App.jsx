@@ -130,6 +130,7 @@ const BREAKDOWN_LABELS = {
   noAnswer: '不在',
   receptionRefusal: '受付拒否',
   picAbsent: '担当不在',
+  picRefusal: '担当者拒否',
   picConnected: '本人接続',
   requests: '資料送付',
   appts: 'アポ',
@@ -284,7 +285,7 @@ const CustomChart = ({ data, color, type = 'area' }) => {
   const safeData = data.filter(d => d && typeof d.value === 'number');
   if (safeData.length === 0) return <div className="h-full flex items-center justify-center text-slate-300 font-bold text-xs uppercase tracking-widest">データがありません</div>;
 
-  const max = Math.max(...safeData.map(d => d.value), 1);
+  const max = safeData.reduce((m, d) => Math.max(m, d.value), 1);
   const len = Math.max(safeData.length - 1, 1);
   const points = safeData.map((d, i) => {
     const x = (i / len) * 100;
@@ -380,12 +381,13 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
       return ts >= start && ts <= end;
     });
 
-    const gasCounts = { appts: 0, requests: 0, picConnected: 0, noAnswer: 0, refusal: 0, total: myGas.length };
+    const gasCounts = { appts: 0, requests: 0, picConnected: 0, noAnswer: 0, refusal: 0, picRefusal: 0, total: myGas.length };
     myGas.forEach(d => {
       if (d.type === 'アポ確定') gasCounts.appts++;
       if (d.type?.includes('資料送付')) gasCounts.requests++;
       if (['アポ確定', '資料送付予定A', '資料送付予定B', '資料送付予定C', '担当者不在', '折り返し', '再架電'].some(t => d.type?.includes(t))) gasCounts.picConnected++;
       if (d.type === '受付拒否') gasCounts.refusal++;
+      if (d.type === '担当者拒否') gasCounts.picRefusal++;
       if (d.type === '担当者不在') gasCounts.noAnswer++;
     });
 
@@ -394,6 +396,21 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
     const totalRequests = s.requests + gasCounts.requests;
     const totalConnected = s.picConnected + gasCounts.picConnected;
     const cph = s.hours > 0 ? (totalCalls / s.hours).toFixed(1) : "0.0";
+
+    // Expected Output calculation
+    const apptRatePerHour = s.hours > 0 ? (totalAppts / s.hours) : 0.05;
+    // We need scheduled hours for this member
+    const wr = getWeekRange(now);
+    const myWeekShifts = (shifts || []).filter(sh => {
+      const d = new Date(sh.date);
+      return sh.memberId === currentMember?.id && d >= wr.start && d <= wr.end;
+    });
+    const scheduledHours = myWeekShifts.reduce((acc, sh) => {
+      const [h1, m1] = sh.startTime.split(':').map(Number);
+      const [h2, m2] = sh.endTime.split(':').map(Number);
+      return acc + (h2 + m2 / 60) - (h1 + m1 / 60);
+    }, 0);
+    const expectedAppts = (apptRatePerHour * scheduledHours).toFixed(1);
 
     // Monthly Personal Stats
     const mRange = { start: new Date(now.getFullYear(), now.getMonth(), 1), end: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59) };
@@ -415,7 +432,7 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
     });
     const totalMonthlyAppts = monthlyAppts + mGas.filter(d => d.type === 'アポ確定').length;
 
-    return { ...s, totalCalls, totalAppts, totalRequests, totalConnected, gasCounts, cph, totalMonthlyAppts };
+    return { ...s, totalCalls, totalAppts, totalRequests, totalConnected, gasCounts, cph, totalMonthlyAppts, expectedAppts };
   }, [viewMode, personalPeriod, personalDate, eventReports, gasData, currentMember]);
 
   const activeWeeklyGoals = event.weeklyGoals?.[getMondayKey(currentBaseDate)] || event.goals?.weekly || {};
@@ -524,10 +541,10 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                 <h3 className="text-xl font-black flex items-center gap-3"><div className="w-1.5 h-6 bg-blue-600 rounded-full"></div> パフォーマンス解析</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
                   {[
-                    { label: '総架電数', val: personalStats.totalCalls, icon: I.Phone, color: 'text-slate-900' },
-                    { label: '本人接続', val: personalStats.totalConnected, icon: I.User, color: 'text-slate-900' },
-                    { label: '資料送付', val: personalStats.totalRequests, icon: I.FileText, color: 'text-emerald-600' },
-                    { label: 'アポ獲得', val: personalStats.totalAppts, icon: I.Check, color: 'text-blue-600' },
+                    { label: '稼働効率 (CPH)', val: personalStats.cph, icon: I.Zap, color: 'text-blue-600' },
+                    { label: '期待着地', val: personalStats.expectedAppts, icon: I.TrendingUp, color: 'text-emerald-600' },
+                    { label: '本人接続率', val: (personalStats.totalCalls > 0 ? (personalStats.totalConnected / personalStats.totalCalls * 100).toFixed(1) : 0) + '%', icon: I.User, color: 'text-slate-900' },
+                    { label: 'アポ獲得率', val: (personalStats.totalConnected > 0 ? (personalStats.totalAppts / personalStats.totalConnected * 100).toFixed(1) : 0) + '%', icon: I.Check, color: 'text-blue-600' },
                   ].map(stat => (
                     <div key={stat.label} className="space-y-1">
                       <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
@@ -545,7 +562,8 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
                       { label: 'アポ獲得', val: personalStats.totalAppts, color: 'bg-blue-600' },
                       { label: '資料送付', val: personalStats.totalRequests, color: 'bg-emerald-500' },
                       { label: '再架電', val: personalStats.gasCounts.picConnected - personalStats.totalAppts - personalStats.totalRequests, color: 'bg-amber-400' },
-                      { label: '受付拒否', val: personalStats.gasCounts.refusal, color: 'bg-rose-500' },
+                      { label: '担当者拒否', val: personalStats.gasCounts.picRefusal, color: 'bg-rose-600' },
+                      { label: '受付拒否', val: personalStats.gasCounts.refusal, color: 'bg-rose-400' },
                       { label: '不在', val: personalStats.gasCounts.noAnswer, color: 'bg-slate-200' },
                     ].map(st => {
                       const p = (st.val / (personalStats.totalCalls || 1) * 100).toFixed(1);
@@ -1305,6 +1323,7 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole }) => {
           requests: d.type?.includes('資料送付') ? 1 : 0,
           picConnected: ['アポ確定', '資料送付予定A', '資料送付予定B', '資料送付予定C', '担当者不在', '折り返し', '再架電'].some(t => d.type?.includes(t)) ? 1 : 0,
           picAbsent: d.type === '担当者不在' ? 1 : 0,
+          picRefusal: d.type === '担当者拒否' ? 1 : 0,
           receptionRefusal: d.type === '受付拒否' ? 1 : 0,
         });
       }
@@ -1319,8 +1338,9 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole }) => {
       requests: acc.requests + (Number(r.requests) || 0),
       picConnected: acc.picConnected + (Number(r.picConnected) || 0),
       picAbsent: acc.picAbsent + (Number(r.picAbsent) || 0),
-      refusal: acc.receptionRefusal + (Number(r.receptionRefusal) || 0),
-    }), { calls: 0, appts: 0, requests: 0, picConnected: 0, picAbsent: 0, refusal: 0 });
+      picRefusal: acc.picRefusal + (Number(r.picRefusal) || 0),
+      refusal: acc.refusal + (Number(r.receptionRefusal) || 0),
+    }), { calls: 0, appts: 0, requests: 0, picConnected: 0, picAbsent: 0, picRefusal: 0, refusal: 0 });
   }, [combinedData]);
 
   const trendData = useMemo(() => {
@@ -1339,7 +1359,7 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole }) => {
       } else {
         key = `${dateObj.getFullYear()}年`;
       }
-      const val = Number(r[chartMetric]);
+      const val = Number(r[chartMetric] || 0);
       map[key] = (map[key] || 0) + (isNaN(val) ? 0 : val);
     });
     return Object.entries(map).map(([day, value]) => ({ day, value })).sort((a, b) => a.day.localeCompare(b.day));
@@ -1347,7 +1367,7 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole }) => {
 
   const metricLabels = {
     calls: '架電数', appts: 'アポ獲得数', requests: '資料請求数', picConnected: '本人接続数',
-    picAbsent: '不在・無応答', receptionRefusal: '受付拒否'
+    picAbsent: '不在・無応答', picRefusal: '担当者拒否', receptionRefusal: '受付拒否'
   };
   const periodLabels = { daily: '日次', weekly: '週次', monthly: '月次', yearly: '年次' };
 
@@ -1383,7 +1403,7 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole }) => {
               <div className="text-2xl font-black text-slate-900">{metricLabels[chartMetric]}の推移</div>
             </div>
             <div className="flex flex-wrap gap-2">
-              {['appts', 'calls', 'requests', 'picConnected', 'receptionRefusal'].map(m => (
+              {['appts', 'calls', 'requests', 'picConnected', 'picRefusal', 'receptionRefusal'].map(m => (
                 <button key={m} onClick={() => setChartMetric(m)} className={`px-3 py-2 text-[10px] font-black rounded-xl transition-all border ${chartMetric === m ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-200'}`}>{metricLabels[m]}</button>
               ))}
             </div>
@@ -1876,17 +1896,18 @@ const GasSyncDataView = ({ gasData, members, forcedMemberId = null, hideHeader =
     }, {});
   }, [filtered]);
 
-  const STATUS_LIST = [
-    { key: 'アポ確定', label: 'アポ確定', icon: I.Check, color: 'bg-blue-600' },
-    { key: '資料送付予定A', label: '資料送付A', icon: I.FileText, color: 'bg-emerald-600' },
-    { key: '資料送付予定B', label: '資料送付B', icon: I.FileText, color: 'bg-emerald-500' },
-    { key: '資料送付予定C', label: '資料送付C', icon: I.FileText, color: 'bg-emerald-400' },
-    { key: '再架電🔥', label: '再架電🔥', icon: I.Zap, color: 'bg-rose-500' },
-    { key: '再架電😍', label: '再架電😍', icon: I.Zap, color: 'bg-pink-500' },
-    { key: '担当者不在', label: '不在', icon: I.Phone, color: 'bg-slate-400' },
-    { key: '受付拒否', label: '拒否', icon: I.Ban, color: 'bg-rose-600' },
-    { key: '折り返し', label: '折返', icon: I.Phone, color: 'bg-orange-500' }
-  ];
+    const STATUS_LIST = [
+      { key: 'アポ確定', label: 'アポ確定', icon: I.Check, color: 'bg-blue-600' },
+      { key: '資料送付予定A', label: '資料送付A', icon: I.FileText, color: 'bg-emerald-600' },
+      { key: '資料送付予定B', label: '資料送付B', icon: I.FileText, color: 'bg-emerald-500' },
+      { key: '資料送付予定C', label: '資料送付C', icon: I.FileText, color: 'bg-emerald-400' },
+      { key: '再架電🔥', label: '再架電🔥', icon: I.Zap, color: 'bg-rose-500' },
+      { key: '再架電😍', label: '再架電😍', icon: I.Zap, color: 'bg-pink-500' },
+      { key: '担当者不在', label: '不在', icon: I.Phone, color: 'bg-slate-400' },
+      { key: '担当者拒否', label: '担当拒否', icon: I.Ban, color: 'bg-rose-700' },
+      { key: '受付拒否', label: '受付拒否', icon: I.Ban, color: 'bg-rose-600' },
+      { key: '折り返し', label: '折返', icon: I.Phone, color: 'bg-orange-500' }
+    ];
 
   return (
     <div className="space-y-8">
