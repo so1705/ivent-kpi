@@ -480,82 +480,104 @@ const Dashboard = ({ event, totals, memberStats, eventReports, members, currentB
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
-            <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm space-y-6">
+            <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm space-y-6 group hover:shadow-xl transition-all">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1">
-                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">アポ目標達成率 ({personalPeriod})</div>
-                  <button onClick={() => alert(METRIC_HELP.達成率)} className="text-slate-300 hover:text-blue-500 transition-colors"><Icon p={I.Help} size={12} /></button>
+                <div className="flex items-center gap-2">
+                  <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg"><Icon p={I.Zap} size={20} /></div>
+                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">稼働効率 (CPH)</div>
                 </div>
-                <Icon p={I.Target} size={18} color="#10b981" />
-              </div>
-              <div className="flex items-end justify-between">
-                <div className="text-4xl font-black text-slate-900 leading-none">{((personalStats.totalAppts / Math.max(1, activeIndivGoals?.appts || 0)) * 100).toFixed(0)}%</div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{personalStats.totalAppts} / {activeIndivGoals?.appts || 0} APPTS</div>
-              </div>
-              <div className="h-2 bg-slate-50 rounded-full overflow-hidden">
-                <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${Math.min(100, (personalStats.totalAppts / Math.max(1, activeIndivGoals?.appts || 0)) * 100)}%` }}></div>
-              </div>
-            </div>
-
-            <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1">
-                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">架電目標達成率 ({personalPeriod})</div>
-                  <button onClick={() => alert("現在の獲得架電数 / 設定した目標架電数")} className="text-slate-300 hover:text-blue-500 transition-colors"><Icon p={I.Help} size={12} /></button>
-                </div>
-                <Icon p={I.Phone} size={18} color="#0ea5e9" />
-              </div>
-              <div className="flex items-end justify-between">
-                <div className="text-4xl font-black text-slate-900 leading-none">{((personalStats.totalCalls / Math.max(1, activeIndivGoals.calls || 0)) * 100).toFixed(0)}%</div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{personalStats.totalCalls} / {activeIndivGoals.calls || 0} CALLS</div>
-              </div>
-              <div className="h-2 bg-slate-50 rounded-full overflow-hidden">
-                <div className="h-full bg-sky-500 transition-all duration-1000" style={{ width: `${Math.min(100, (personalStats.totalCalls / Math.max(1, activeIndivGoals.calls || 0)) * 100)}%` }}></div>
-              </div>
-            </div>
-
-            <div className="bg-slate-900 text-white p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden flex flex-col justify-between">
-              <div className="absolute top-0 right-0 p-4 opacity-10"><Icon p={I.Trophy} size={100} /></div>
-              <div>
-                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">月間進捗 ({new Date().getMonth() + 1}月)</div>
-                <div className="text-5xl font-black">{personalStats.totalMonthlyAppts}<span className="text-sm font-normal ml-2 opacity-50">/ {displayMonthlyGoalAppts}</span></div>
-              </div>
-              <div className="pt-4 border-t border-white/10 flex justify-between items-center">
-                <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${Math.min(100, (personalStats.totalMonthlyAppts / (displayMonthlyGoalAppts || 1)) * 100)}%` }}></div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm space-y-4">
-              <div className="flex items-center gap-1">
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">稼働効率 (CPH)</div>
                 <button onClick={() => alert(METRIC_HELP.CPH)} className="text-slate-300 hover:text-blue-500 transition-colors"><Icon p={I.Help} size={12} /></button>
               </div>
-              <div className="text-5xl font-black text-slate-900 tabular-nums">{personalStats.cph}</div>
-              <div className="text-[10px] text-slate-400 font-bold leading-tight">架電数 / 稼働時間</div>
+              <div className="flex items-end justify-between">
+                <div className="text-4xl font-black text-slate-900 tabular-nums leading-none">{personalStats.cph}</div>
+                <div className="text-[10px] font-bold text-slate-400">架電数 / 稼働時間</div>
+              </div>
+              <div className="h-1.5 bg-slate-50 rounded-full overflow-hidden">
+                <div className="h-full bg-blue-500 transition-all duration-1000" style={{ width: '65%' }}></div>
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm space-y-6 group hover:shadow-xl transition-all">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-3 bg-emerald-500 text-white rounded-2xl shadow-xl"><Icon p={I.TrendingUp} size={20} /></div>
+                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">期待着地出力</div>
+                </div>
+                <button onClick={() => alert(METRIC_HELP.期待着地)} className="text-slate-300 hover:text-blue-500 transition-colors"><Icon p={I.Help} size={12} /></button>
+              </div>
+              <div className="flex items-end justify-between">
+                <div className="text-4xl font-black text-slate-900 tabular-nums leading-none">{personalStats.expectedAppts}</div>
+                <div className="text-[10px] font-bold text-slate-400">獲得予測件数</div>
+              </div>
+              <div className="h-1.5 bg-slate-50 rounded-full overflow-hidden">
+                <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: '80%' }}></div>
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-sm space-y-6 group hover:shadow-xl transition-all">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1">
+                  <div className="p-3 bg-slate-900 text-white rounded-2xl shadow-xl"><Icon p={I.Target} size={20} /></div>
+                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">目標達成率 ({personalPeriod})</div>
+                </div>
+              </div>
+              <div className="flex items-end justify-between">
+                <div className="text-4xl font-black text-slate-900 tabular-nums leading-none">
+                  {((personalStats.totalAppts / Math.max(1, activeIndivGoals?.appts || 0)) * 100).toFixed(0)}%
+                </div>
+                <div className="text-[10px] font-bold text-slate-400">{personalStats.totalAppts} / {activeIndivGoals?.appts || 0}</div>
+              </div>
+              <div className="h-1.5 bg-slate-50 rounded-full overflow-hidden">
+                <div className="h-full bg-slate-900 transition-all duration-1000" style={{ width: `${Math.min(100, (personalStats.totalAppts / Math.max(1, activeIndivGoals?.appts || 0)) * 100)}%` }}></div>
+              </div>
+            </div>
+
+            <div className="bg-slate-900 text-white p-8 rounded-[2.5rem] shadow-xl relative overflow-hidden flex flex-col justify-between group hover:scale-[1.02] transition-transform">
+              <div className="absolute top-0 right-0 p-4 opacity-10"><Icon p={I.Trophy} size={100} /></div>
+              <div className="relative z-10">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">月間進捗 ({new Date().getMonth() + 1}月)</div>
+                <div className="text-5xl font-black tracking-tighter">{personalStats.totalMonthlyAppts}<span className="text-sm font-normal ml-2 opacity-50">/ {displayMonthlyGoalAppts}</span></div>
+              </div>
+              <div className="relative z-10 pt-4 flex items-center gap-4">
+                <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${Math.min(100, (personalStats.totalMonthlyAppts / (displayMonthlyGoalAppts || 1)) * 100)}%` }}></div>
+                </div>
+                <span className="text-[10px] font-black text-emerald-400">{(personalStats.totalMonthlyAppts / (displayMonthlyGoalAppts || 1) * 100).toFixed(0)}%</span>
+              </div>
             </div>
           </div>
 
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-8">
-              <div className="bg-white border border-slate-100 p-10 rounded-[3rem] shadow-sm space-y-12">
-                <h3 className="text-xl font-black flex items-center gap-3"><div className="w-1.5 h-6 bg-blue-600 rounded-full"></div> パフォーマンス解析</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-                  {[
-                    { label: '稼働効率 (CPH)', val: personalStats.cph, icon: I.Zap, color: 'text-blue-600' },
-                    { label: '期待着地', val: personalStats.expectedAppts, icon: I.TrendingUp, color: 'text-emerald-600' },
-                    { label: '有効接触率', val: (personalStats.totalCalls > 0 ? (personalStats.totalEffectiveContact / personalStats.totalCalls * 100).toFixed(1) : 0) + '%', icon: I.User, color: 'text-slate-900' },
-                    { label: 'アポ獲得率', val: (personalStats.totalEffectiveContact > 0 ? (personalStats.totalAppts / personalStats.totalEffectiveContact * 100).toFixed(1) : 0) + '%', icon: I.Check, color: 'text-blue-600' },
-                  ].map(stat => (
-                    <div key={stat.label} className="space-y-1">
-                      <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                        <Icon p={stat.icon} size={14} /> {stat.label}
-                      </div>
-                      <div className={`text-3xl font-black ${stat.color} tabular-nums`}>{stat.val}</div>
-                    </div>
-                  ))}
+              <div className="bg-white border border-slate-100 p-12 rounded-[3.5rem] shadow-sm space-y-12">
+                <div className="flex items-center justify-between border-b border-slate-50 pb-8">
+                  <h3 className="text-2xl font-black flex items-center gap-4 text-slate-900">
+                    <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl"><Icon p={I.Activity} size={24} /></div>
+                    パフォーマンス詳細分析
+                  </h3>
+                  <div className="px-4 py-2 bg-slate-50 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    Analytics Period: {personalPeriod}
+                  </div>
                 </div>
+                
+                <div className="grid grid-cols-2 md:grid-cols-2 gap-10">
+                  <div className="space-y-4 p-8 bg-slate-50 rounded-[2.5rem] border border-slate-100">
+                    <div className="flex items-center gap-3 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div> 有効接触率
+                    </div>
+                    <div className="text-4xl font-black text-slate-900">{(personalStats.totalCalls > 0 ? (personalStats.totalEffectiveContact / personalStats.totalCalls * 100).toFixed(1) : 0)}%</div>
+                    <p className="text-[10px] font-bold text-slate-400 leading-relaxed">架電からアプローチ可能な決裁者に接続できた割合です。</p>
+                  </div>
+                  <div className="space-y-4 p-8 bg-blue-900 text-white rounded-[2.5rem] shadow-xl shadow-blue-900/10">
+                    <div className="flex items-center gap-3 text-[11px] font-black text-blue-400 uppercase tracking-[0.2em]">
+                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div> アポ獲得率
+                    </div>
+                    <div className="text-4xl font-black">{(personalStats.totalEffectiveContact > 0 ? (personalStats.totalAppts / personalStats.totalEffectiveContact * 100).toFixed(1) : 0)}%</div>
+                    <p className="text-[10px] font-bold text-blue-200/60 leading-relaxed">有効接触からアポイントへと転換できた割合（成約率）です。</p>
+                  </div>
+                </div>
+
 
                 <div className="pt-10 border-t border-slate-50 space-y-6">
                   <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">架電結果の内訳解析 ({personalPeriod})</h4>
@@ -1289,6 +1311,7 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole, currentUser
   const [selectedMid, setSelectedMid] = useState('all');
   const [chartMetric, setChartMetric] = useState('appts');
   const [periodMode, setPeriodMode] = useState('daily');
+  const [chartType, setChartType] = useState('area');
   const [showHelp, setShowHelp] = useState(false);
 
   const currentMemberId = useMemo(() => {
@@ -1372,66 +1395,107 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole, currentUser
     picRefusal: '担当者拒否', receptionRefusal: '受付拒否'
   };
 
+  const periodLabels = { daily: '日次', weekly: '週次', monthly: '月次', yearly: '年次' };
+
   return (
     <div className="space-y-10 pb-32">
       {showHelp && <MetricHelpModal onClose={() => setShowHelp(false)} />}
-      <div className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
-        <div className="space-y-1">
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-4">
-            <div className="p-3 bg-slate-900 text-white rounded-2xl"><Icon p={I.PieChart} size={24} /></div>
-            プロジェクト多角分析
+      
+      <div className="flex flex-col md:flex-row gap-8 justify-between items-start md:items-center bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none"><Icon p={I.PieChart} size={160} /></div>
+        <div className="relative z-10 space-y-2">
+          <div className="flex items-center gap-4">
+            <div className="p-4 bg-slate-900 text-white rounded-2xl shadow-xl"><Icon p={I.BarChart2} size={28} /></div>
+            <h2 className="text-3xl font-black text-slate-900 tracking-tighter">多角分析ダッシュボード</h2>
             <button onClick={() => setShowHelp(true)} className="p-2 rounded-full bg-slate-50 hover:bg-blue-100 text-slate-400 hover:text-blue-600 transition-colors">
-              <Icon p={I.Help} size={18} />
+              <Icon p={I.Help} size={20} />
             </button>
-          </h2>
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-14">統計データと推移グラフ</p>
+          </div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] pl-16">Intelligence Analytics System v2.0</p>
         </div>
-        <div className="flex flex-wrap gap-3">
+        
+        <div className="flex flex-wrap gap-3 relative z-10">
           {userRole === 'admin' ? (
-            <select className="bg-slate-50 border-2 border-slate-100 p-3 px-5 font-black text-xs rounded-2xl outline-none focus:border-blue-600 transition-all shadow-sm" value={selectedMid} onChange={e => setSelectedMid(e.target.value)}>
+            <select className="bg-white border-2 border-slate-100 p-4 px-6 font-black text-xs rounded-2xl outline-none focus:border-blue-600 transition-all shadow-md" value={selectedMid} onChange={e => setSelectedMid(e.target.value)}>
               <option value="all">チーム全体の推移</option>
               {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           ) : (
-            <div className="px-5 py-3 bg-slate-100 rounded-2xl text-xs font-black text-slate-400">マイ実績を表示中</div>
+            <div className="px-6 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black shadow-lg">マイ実績を分析中</div>
           )}
-          <select className="bg-slate-50 border-2 border-slate-100 p-3 px-5 font-black text-xs rounded-2xl outline-none focus:border-blue-600 transition-all shadow-sm" value={periodMode} onChange={e => setPeriodMode(e.target.value)}>
-            {['daily', 'weekly', 'monthly', 'yearly'].map(p => <option key={p} value={p}>{p === 'daily' ? '日次' : p === 'weekly' ? '週次' : p === 'monthly' ? '月次' : '年次'}</option>)}
-          </select>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        <div className="lg:col-span-2 bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm space-y-10">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-            <div className="flex items-center gap-4">
-              <div className="p-4 bg-slate-900 text-white rounded-2xl shadow-xl"><Icon p={I.TrendingUp} size={24} /></div>
-              <div className="text-2xl font-black text-slate-900">{metricLabels[chartMetric]}の推移</div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+        <div className="lg:col-span-8 bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-xl space-y-10">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 border-b border-slate-50 pb-8">
+            <div className="space-y-1">
+              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">トレンド・モニタリング</h3>
+              <div className="text-2xl font-black text-slate-900 flex items-center gap-3">
+                {metricLabels[chartMetric]}の推移
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {['appts', 'calls', 'requests', 'effectiveContact', 'picRefusal', 'receptionRefusal'].map(m => (
-                <button key={m} onClick={() => setChartMetric(m)} className={`px-3 py-2 text-[10px] font-black rounded-xl transition-all border ${chartMetric === m ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-200'}`}>{metricLabels[m]}</button>
-              ))}
+            <div className="flex flex-col items-end gap-3">
+              <div className="flex flex-wrap justify-end gap-2">
+                {['appts', 'calls', 'requests', 'effectiveContact', 'picRefusal', 'receptionRefusal'].map(m => (
+                  <button key={m} onClick={() => setChartMetric(m)} className={`px-4 py-2.5 text-[10px] font-black rounded-xl transition-all border ${chartMetric === m ? 'bg-slate-900 text-white border-slate-900 shadow-lg' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-400'}`}>{metricLabels[m]}</button>
+                ))}
+              </div>
+              <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-1">
+                {['daily', 'weekly', 'monthly'].map(p => (
+                  <button key={p} onClick={() => setPeriodMode(p)} className={`px-4 py-1.5 text-[10px] font-black rounded-xl transition-all ${periodMode === p ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>{periodLabels[p]}</button>
+                ))}
+                <div className="w-px h-4 bg-slate-200 self-center mx-1"></div>
+                <button onClick={() => setChartType(chartType === 'area' ? 'line' : 'area')} className="px-4 py-1.5 text-[10px] font-black rounded-xl transition-all bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center gap-2">
+                  <Icon p={chartType === 'area' ? I.TrendingUp : I.Activity} size={14} />
+                  {chartType === 'area' ? 'エリア' : 'ライン'}
+                </button>
+              </div>
             </div>
           </div>
-          <div className="h-[350px] w-full"><CustomChart data={trendData} color={chartMetric === 'appts' ? '#2563eb' : '#64748b'} /></div>
+          <div className="h-[400px] w-full pt-4">
+            <CustomChart data={trendData} color={chartMetric === 'appts' ? '#2563eb' : '#64748b'} type={chartType} />
+          </div>
         </div>
 
-        <div className="space-y-10">
-          <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm space-y-10">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">転換・効率（CVR）</h3>
-            <div className="space-y-10">
-              <MetricBar label="有効接触率 (架電比)" val={stats.effectiveContact} tgt={stats.calls} />
-              <MetricBar label="アポ率 (接触比)" val={stats.appts} tgt={stats.effectiveContact} />
+        <div className="lg:col-span-4 flex flex-col gap-10">
+          <div className="bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-xl space-y-10 flex-1">
+            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none flex items-center gap-3">
+              <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+              Conversion Metrics
+            </h3>
+            <div className="space-y-12 py-4">
+              <div className="group">
+                <MetricBar label="有効接触率 (架電比)" val={stats.effectiveContact} tgt={stats.calls} color="bg-blue-600" />
+                <p className="mt-4 text-[10px] text-slate-400 font-medium leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity">架電から担当者への接続・確度の高い反応への転換率です。</p>
+              </div>
+              <div className="group">
+                <MetricBar label="アポ率 (接触比)" val={stats.appts} tgt={stats.effectiveContact} color="bg-emerald-600" />
+                <p className="mt-4 text-[10px] text-slate-400 font-medium leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity">有効な接触からアポイント獲得に至った成約率です。</p>
+              </div>
             </div>
           </div>
 
-          <div className="bg-slate-900 p-10 rounded-[3rem] shadow-2xl text-white space-y-8">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">AI パフォーマンス診断</h3>
-            <div className="space-y-6">
+          <div className="bg-slate-900 p-10 rounded-[3.5rem] shadow-2xl text-white relative overflow-hidden flex-shrink-0">
+            <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none rotate-12"><Icon p={I.Zap} size={120} /></div>
+            <div className="relative z-10 space-y-8">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center font-black shadow-lg">AI</div>
-                <div className="text-xs font-bold leading-relaxed opacity-90 pr-4">{getAIAdvice(stats, selectedMid !== 'all')}</div>
+                <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center font-black shadow-lg shadow-blue-500/20 text-xl">AI</div>
+                <div>
+                  <h3 className="text-sm font-black text-white leading-none">戦略アドバイザー</h3>
+                  <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mt-1">Diagnostic AI v5.0</p>
+                </div>
+              </div>
+              <div className="p-6 bg-white/5 border border-white/10 rounded-[2rem] backdrop-blur-md">
+                <div className="text-xs font-bold leading-relaxed text-slate-200">{getAIAdvice(stats, selectedMid !== 'all')}</div>
+              </div>
+              <div className="flex items-center justify-between pt-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping"></div>
+                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Realtime Analysis</span>
+                </div>
+                <div className="px-3 py-1 bg-white/10 rounded-lg text-[9px] font-black text-slate-400">OPTIMIZED</div>
               </div>
             </div>
           </div>
