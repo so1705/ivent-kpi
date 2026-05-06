@@ -1453,7 +1453,6 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole, currentUser
         </div>
       </div>
 
-
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
         <div className="lg:col-span-8 bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-xl space-y-10">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 border-b border-slate-50 pb-8">
@@ -1473,70 +1472,6 @@ const AnalyticsView = ({ members, reports, gasData, event, userRole, currentUser
               <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-1">
                 {['daily', 'weekly', 'monthly'].map(p => (
                   <button key={p} onClick={() => setPeriodMode(p)} className={`px-4 py-1.5 text-[10px] font-black rounded-xl transition-all ${periodMode === p ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>{periodLabels[p]}</button>
-                ))}
-                <div className="w-px h-4 bg-slate-200 self-center mx-1"></div>
-                <button onClick={() => setChartType(chartType === 'area' ? 'line' : 'area')} className="px-4 py-1.5 text-[10px] font-black rounded-xl transition-all bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center gap-2">
-                  <Icon p={chartType === 'area' ? I.TrendingUp : I.Zap} size={14} />
-                  {chartType === 'area' ? 'エリア' : 'ライン'}
-                </button>
-              </div>
-            </div>
-          </div>
-          <div className="h-[400px] w-full pt-4">
-            <CustomChart data={trendData} color={chartMetric === 'appts' ? '#2563eb' : '#64748b'} type={chartType} />
-          </div>
-        </div>
-
-        <div className="lg:col-span-4 flex flex-col gap-10">
-          <div className="bg-white p-10 rounded-[3.5rem] border border-slate-100 shadow-xl space-y-10 flex-1">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none flex items-center gap-3">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                Conversion Metrics
-              </h3>
-              <div className="text-[10px] font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                転換率: {expectedStats.apptRate}%
-              </div>
-            </div>
-            <div className="space-y-12 py-4">
-              <div className="group">
-                <MetricBar label="有効接触率 (架電比)" val={stats.effectiveContact} tgt={stats.calls} color="bg-blue-600" />
-                <p className="mt-4 text-[10px] text-slate-400 font-medium leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity">架電から担当者への接続・確度の高い反応への転換率です。</p>
-              </div>
-              <div className="group">
-                <MetricBar label="アポ獲得率 (接触比)" val={stats.appts} tgt={stats.effectiveContact} color="bg-emerald-600" />
-                <p className="mt-4 text-[10px] text-slate-400 font-medium leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity">有効な接触からアポイント獲得に至った成約率です。</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-slate-900 p-10 rounded-[3.5rem] shadow-2xl text-white relative overflow-hidden flex-shrink-0">
-            <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none rotate-12"><Icon p={I.Zap} size={120} /></div>
-            <div className="relative z-10 space-y-8">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center font-black shadow-lg shadow-blue-500/20 text-xl">AI</div>
-                <div>
-                  <h3 className="text-sm font-black text-white leading-none">戦略アドバイザー</h3>
-                  <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mt-1">Diagnostic AI v5.0</p>
-                </div>
-              </div>
-              <div className="p-6 bg-white/5 border border-white/10 rounded-[2rem] backdrop-blur-md">
-                <div className="text-xs font-bold leading-relaxed text-slate-200">{getAIAdvice(stats, selectedMid !== 'all')}</div>
-              </div>
-              <div className="flex items-center justify-between pt-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping"></div>
-                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Realtime Analysis</span>
-                </div>
-                <div className="px-3 py-1 bg-white/10 rounded-lg text-[9px] font-black text-slate-400">OPTIMIZED</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};p)} className={`px-4 py-1.5 text-[10px] font-black rounded-xl transition-all ${periodMode === p ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>{periodLabels[p]}</button>
                 ))}
                 <div className="w-px h-4 bg-slate-200 self-center mx-1"></div>
                 <button onClick={() => setChartType(chartType === 'area' ? 'line' : 'area')} className="px-4 py-1.5 text-[10px] font-black rounded-xl transition-all bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center gap-2">
